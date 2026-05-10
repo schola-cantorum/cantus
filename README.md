@@ -10,7 +10,7 @@ Cantus（拉丁文：「歌」「詠」）是一套教學用的 LLM agent 框架
 
 ```bash
 # 釘在固定 tag（推薦 — 適合學生作業期間）
-pip install git+https://github.com/schola-cantorum/cantus@v0.1.0
+pip install git+https://github.com/schola-cantorum/cantus@v0.1.1
 
 # 跟著 main 走最新（適合老師體驗最新 commit）
 pip install git+https://github.com/schola-cantorum/cantus@main
@@ -22,7 +22,7 @@ pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 執行 runtime（Gemma 4 + transformers + bitsandbytes）需額外 extras：
 
 ```bash
-pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.0'
+pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.1'
 ```
 
 ## 30-second Quickstart
