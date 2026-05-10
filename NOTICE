@@ -1,0 +1,30 @@
+Cantus
+Copyright (c) 2026 CXPh03n1x and contributors.
+
+This product is licensed under the Educational Community License,
+Version 2.0 (ECL-2.0). See the accompanying LICENSE file for the
+full license text.
+
+Cantus was originally extracted from the colab-llm-agent course
+repository, where it was developed as the framework backing a high
+school LLM-agent teaching course. The colab-llm-agent repository
+remains the canonical home for the course materials (templates,
+notebooks, examples) that build on top of this framework.
+
+Acknowledgements
+----------------
+This framework builds on top of (and gratefully acknowledges) the
+following open-source projects:
+
+  - Hugging Face Transformers      (Apache-2.0)
+  - bitsandbytes                   (MIT)
+  - Outlines (structured decoding) (Apache-2.0)
+  - PyTorch                        (BSD-3-Clause)
+  - Pydantic                       (MIT)
+
+Trademarks
+----------
+"Schola Cantorum" refers historically to the papal singing school
+established in Rome in the 7th century. The use of this name in the
+GitHub organization `schola-cantorum/` is intended as a cultural and
+musical reference, not a claim of affiliation.

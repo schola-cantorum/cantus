@@ -1,0 +1,192 @@
+# cantus
+
+> A Python framework for writing LLM agent harnesses on Google Colab. Students compose five protocol kinds (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`) over a Gemma 4 backbone. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
+
+## When to use this file
+
+Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@skill` / `@analyzer` / `@validator` / `@workflow`, or a `Memory` subclass. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
+
+## Public API surface
+
+```python
+from cantus import (
+    # Decorator entries (most common)
+    skill, analyzer, validator, workflow, debug,
+    # Function-pass entries (intermediate)
+    register_skill, register_analyzer, register_validator, register_workflow,
+    # Class-first base classes (canonical / advanced)
+    Skill, Analyzer, Validator, Workflow, Memory,
+    # Memory implementations (class-only)
+    ShortTermMemory, BM25Memory, EmbeddingMemory,
+    # Runtime
+    Action, CallSkillAction, FinalAnswerAction,
+    Observation, SkillObservation, ToolErrorObservation,
+    ValidationErrorObservation, MaxIterationsObservation,
+    EventStream, Agent, Inspector,
+    # Validator return type
+    Result,
+    # Loader
+    mount_drive_and_load,
+)
+```
+
+Memory has **no** decorator and **no** function-pass entry. `from cantus import memory` and `from cantus import register_memory` both raise `ImportError` by design — memory needs state, so a class is required.
+
+## Skill — a tool the LLM can call
+
+```python
+from cantus import skill
+
+@skill
+def search_book(title: str, lang: str = "zh-TW") -> str:
+    """Search the library catalog.
+
+    Args:
+        title: book title keyword.
+        lang: locale hint, default zh-TW.
+
+    Returns:
+        A string with one line per match.
+    """
+    ...
+```
+
+The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block becomes per-arg descriptions.
+
+Function-pass form: `register_skill(search_book)`.
+Class-first form:
+
+```python
+from cantus import Skill
+
+class SearchBook(Skill):
+    """Search the library catalog."""
+    name = "search_book"
+    def run(self, title: str, lang: str = "zh-TW") -> str: ...
+```
+
+## Analyzer — parse text into a typed value
+
+```python
+from cantus import analyzer
+from pydantic import BaseModel
+
+class Book(BaseModel):
+    title: str
+    isbn: str
+
+@analyzer
+def parse_book_list(text: str) -> list[Book]:
+    """Parse search_book output into Book models."""
+    ...
+```
+
+## Validator — return Result(ok, value, feedback)
+
+```python
+from cantus import validator, Result
+
+@validator
+def ensure_isbn_valid(book: Book) -> Result:
+    """Verify ISBN-13 checksum."""
+    if checksum_ok(book.isbn):
+        return Result.success(book)
+    return Result.failure(f"ISBN checksum mismatch on {book.isbn}")
+```
+
+The agent loop wraps `Result(ok=False, ...)` as a `ValidationErrorObservation` and retries the previous action up to `max_retries` (default 3).
+
+## Workflow — orchestrate skills, analyzers, validators
+
+```python
+from cantus import workflow
+
+@workflow
+def recommend_books(topic: str, n: int = 3) -> list[Book]:
+    """Search → parse → validate."""
+    raw = search_book(topic=topic, n=n)
+    parsed = parse_book_list(raw)
+    return [b for b in parsed if ensure_isbn_valid(b).ok]
+```
+
+A workflow is a regular Python function (or class with `run`). Calls to other registered protocols inside the body go through the registry and appear in the `EventStream` automatically.
+
+## Memory — class-only, three reference implementations
+
+```python
+from cantus import Memory
+from cantus.protocols.memory import Turn
+
+class TopicMemory(Memory):
+    """Remember topics the student has asked about."""
+
+    def __init__(self):
+        self.topics: list[str] = []
+
+    def remember(self, turn: Turn) -> None:
+        self.topics.append(turn.user)
+
+    def recall(self, query: str) -> list[Turn]:
+        return [Turn(user=t, assistant="") for t in self.topics if query in t]
+```
+
+Built-in implementations:
+
+- `ShortTermMemory(n=10)` — most recent N turns (`collections.deque`)
+- `BM25Memory(top_k=5)` — keyword retrieval (requires `rank-bm25`)
+- `EmbeddingMemory(top_k=5)` — semantic retrieval (requires `sentence-transformers`)
+
+## Tool-call grammar (for reference)
+
+The agent constrains the LLM output to:
+
+```json
+{
+  "thought": "<free-form reasoning text>",
+  "action": {"skill_name": "<one-of-registered>", "args": {...}}
+}
+```
+
+or, to terminate:
+
+```json
+{
+  "thought": "<free-form>",
+  "action": {"final_answer": "<string>"}
+}
+```
+
+`thought` is **never** constrained by grammar — only `skill_name` (whitelist of registered skills) and `args` (Pydantic schema of the named skill) are.
+
+## Common patterns
+
+```python
+# Three-protocol pipeline
+@workflow
+def pipeline(query: str):
+    raw = search_book(query)
+    parsed = parse_book_list(raw)
+    return [b for b in parsed if ensure_isbn_valid(b).ok]
+
+# @debug stacking — opt-in trace
+from cantus import debug
+@debug
+@skill
+def traced_search(title: str) -> str: ...
+# stdout will include: [debug] traced_search args=... result=...
+
+# Loading the model
+from cantus import mount_drive_and_load, Agent
+model = mount_drive_and_load(variant="E4B")  # or "E2B"
+agent = Agent(model=model)
+state = agent.run("Recommend three sci-fi books", max_iterations=8)
+```
+
+## Style rules for generated code
+
+- Always use type annotations on every parameter and return.
+- Always include a Google-style docstring with description and `Args:` block.
+- Decorator goes on the line *immediately above* the function definition.
+- Stack `@debug` *above* `@skill` (or other protocol decorator), never below.
+- For validators, always return `Result.success(...)` or `Result.failure(...)`.
+- Memory subclasses always implement both `recall(query)` and `remember(turn)`.

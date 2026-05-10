@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cantus"
+version = "0.1.0"
+description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "ECL-2.0" }
+authors = [
+    { name = "CXPh03n1x", email = "0826@fhsh.tp.edu.tw" }
+]
+classifiers = [
+    "License :: OSI Approved :: Educational Community License, Version 2.0 (ECL-2.0)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Education",
+    "Topic :: Education",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+runtime = [
+    "transformers>=4.53.0",
+    "bitsandbytes>=0.43.0",
+    "accelerate>=0.30.0",
+    "torch>=2.1.0",
+    "outlines>=0.0.40",
+]
+memory = [
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=2.5.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+all = ["cantus[runtime,memory,dev]"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cantus*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.cache
+*.cover
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Secrets (defense in depth)
+.env
+.env.*
+!.env.example
+.envrc
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+.credentials/
+
+# ML / model artifacts (don't accidentally commit weights)
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
+models/
+weights/
+checkpoints/
+
+# Claude Code / AI tooling
+.claude/
+.cursor/
+.copilot/
+
+# Backup / temp
+*.bak
+*.tmp
+*.orig
+*.rej
+temp/
+tmp/
+
+# OS-specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Logs
+*.log
+logs/
+
+# uv
+uv.lock
