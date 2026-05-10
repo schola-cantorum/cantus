@@ -83,13 +83,13 @@ __all__ = [
 ]
 
 
-def mount_drive_and_load(variant, allow_hub_fallback=False):
+def mount_drive_and_load(*args, **kwargs):
     """Mount Google Drive and load Gemma 4 weights — see model.loader."""
     from cantus.model.loader import mount_drive_and_load as _impl
 
-    return _impl(variant=variant, allow_hub_fallback=allow_hub_fallback)
+    return _impl(*args, **kwargs)
 
 
-def load_gemma(variant, allow_hub_fallback=False):
+def load_gemma(*args, **kwargs):
     """Alias of mount_drive_and_load for direct hub loading scenarios."""
-    return mount_drive_and_load(variant=variant, allow_hub_fallback=allow_hub_fallback)
+    return mount_drive_and_load(*args, **kwargs)
