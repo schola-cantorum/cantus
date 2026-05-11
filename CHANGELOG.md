@@ -4,6 +4,73 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-05-11
+
+This release bundles ready-to-run Colab notebooks and visual identity assets into
+the cantus repository itself, and rewrites the README around a hero banner with
+an Open-in-Colab call-to-action. **No code changes, no API changes** — the
+framework runtime, protocols, grammar, and model loader are byte-for-byte
+identical to `v0.1.2`. The release is purely distribution + documentation.
+
+### Added
+
+- **`notebooks/task_template.ipynb`.** End-user notebook with the four-cell
+  contract from the `task-template` capability: mount Drive → pick variant +
+  install Cantus + load model → write protocols → run agent → Inspector
+  replay. Pre-wired to `cantus_version = "v0.1.3"` and `model_variant = "E4B"`,
+  with the embedded E2B retry guidance markdown. Drive paths are presented as
+  generic `@param` form fields so any administrator can point the notebook at
+  the directory they populated.
+- **`notebooks/admin_setup.ipynb`.** Administrator-facing one-time setup
+  notebook that mirrors `google/gemma-4-E2B-it` and `google/gemma-4-E4B-it`
+  from Hugging Face Hub to a Drive directory. The cell-zero header identifies
+  the audience as administrator (中文：管理者) — no role-specific organization
+  labels. Five-step structure (mount Drive → optional HF login → download both
+  variants → verify files → optional smoke test) plus an advanced
+  pre-quantised storage appendix.
+- **`notebooks/README.md`.** Index for the bundled notebooks with audience
+  matrix and Open-in-Colab badge URLs pinned to the `v0.1.3` tag.
+- **`assets/banner_hero.jpeg`.** Brand-identity hero banner (chorus + Cantus
+  wordmark + five protocol icons) committed as a binary blob. Referenced from
+  the README via the repo-relative path `assets/banner_hero.jpeg`.
+- **`assets/banner_protocols.jpeg`.** Five-protocol overview banner (musical
+  staff weaving Skill / Analyzer / Validator / Workflow / Memory icons)
+  committed as a binary blob. Referenced from the README immediately above the
+  five-protocol introductions.
+
+### Changed
+
+- **`README.md` rewritten.** Top of the document now opens with the hero
+  banner, a badge bar (release `v0.1.3`, ECL-2.0 license, Open-in-Colab), an
+  Open-in-Colab CTA pointing at `notebooks/task_template.ipynb`, and a
+  five-minute "open in Colab" path table. The five-protocol overview now
+  appears below the inline `assets/banner_protocols.jpeg` reference. Install
+  command examples bump from `@v0.1.1` / `@v0.1.2` to `@v0.1.3`. The existing
+  30-second Quickstart, Documentation links, and License section are
+  preserved.
+- **`llms.txt`.** New "Versioning" section names the current `v0.1.3` install
+  command and points external LLMs at the Open-in-Colab notebook URL. The
+  remaining priming content (public API surface, five-protocol templates,
+  tool-call grammar, style rules) is unchanged.
+- **`cantus.__version__`** bumps from `"0.1.2"` to `"0.1.3"`.
+- **`pyproject.toml`** `version` bumps from `"0.1.2"` to `"0.1.3"`.
+
+### Notes
+
+- **No code changes.** `cantus/core/`, `cantus/protocols/`, `cantus/grammar/`,
+  and `cantus/model/` are byte-for-byte identical to v0.1.2. The pytest suite
+  retains the v0.1.2 baseline of 95 passed / 2 skipped. v0.1.2 users upgrading
+  to v0.1.3 do not need to change any import, any `Agent.run` call site, any
+  `@skill` / `@analyzer` / `@validator` / `@workflow` definition, or any
+  `Memory` subclass.
+- **No API changes.** The public surface listed in `cantus.__init__.py`
+  `__all__` is unchanged. No new exports, no removed exports, no signature
+  changes.
+- The Open-in-Colab badge URLs hardcode the `v0.1.3` tag. Future releases will
+  bump those URLs alongside the `cantus_version` pin and `pyproject.toml`
+  version string — `grep -nF '@v0.1.3'` and `grep -nF 'blob/v0.1.3/'` give the
+  complete list of strings to update.
+
 ## [0.1.2] - 2026-05-11
 
 This release implements the five failure-handling Requirements added to the

@@ -1,28 +1,49 @@
+<p align="center">
+  <img src="assets/banner_hero.jpeg" alt="Cantus — a polyphonic framework for composing LLM agent harnesses">
+</p>
+
+<p align="center">
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.1.3"><img alt="release v0.1.3" src="https://img.shields.io/badge/release-v0.1.3-blue"></a>
+  <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+</p>
+
 # Cantus
 
 > A polyphonic framework for composing LLM agent harnesses — designed for teaching on Google Colab.
 
-Cantus（拉丁文：「歌」「詠」）是一套教學用的 LLM agent 框架，用五種 protocol（Skill / Analyzer / Validator / Workflow / Memory）讓師生在 Google Colab 上組裝 agent，後端搭配 Gemma 4 4-bit 量化模型。
+Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Five protocols (Skill / Analyzer / Validator / Workflow / Memory) let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
 
-對應中文 LLM 圈把 prompt engineering 稱為「詠唱」的文化梗，Cantus 把 agent 編排視為一場複音歌詠 —— 每個 protocol 是一個聲部，組起來就是一個會回應的 agent。
+The Chinese-speaking LLM community refers to prompt engineering as *詠唱* (incantation). Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
+
+## Open in Colab — 5-minute path
+
+The fastest way to experience Cantus is to launch the bundled notebooks directly:
+
+| Notebook | Audience | One-click launch |
+| --- | --- | --- |
+| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/admin_setup.ipynb) |
+
+See [`notebooks/README.md`](./notebooks/README.md) for the recommended order and tag-pinning conventions.
 
 ## Install
 
 ```bash
-# 釘在固定 tag（推薦 — 適合學生作業期間）
-pip install git+https://github.com/schola-cantorum/cantus@v0.1.1
+# Pin to a tag (recommended — reproducible)
+pip install git+https://github.com/schola-cantorum/cantus@v0.1.3
 
-# 跟著 main 走最新（適合老師體驗最新 commit）
+# Follow main (latest commit)
 pip install git+https://github.com/schola-cantorum/cantus@main
 
-# 釘在某個 commit（bug 重現時）
+# Pin to a commit SHA (bug reproduction)
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
 
-執行 runtime（Gemma 4 + transformers + bitsandbytes）需額外 extras：
+The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 
 ```bash
-pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.1'
+pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.3'
 ```
 
 ## 30-second Quickstart
@@ -35,30 +56,34 @@ def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
 
-model, tokenizer = mount_drive_and_load(variant="gemma-3-4b-it")
-agent = Agent.from_skills([add], model=model, tokenizer=tokenizer)
+model_handle = mount_drive_and_load(variant="E4B")
+agent = Agent(model=model_handle)
 
 result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-## 五種 Protocol（一句話介紹）
+<p align="center">
+  <img src="assets/banner_protocols.jpeg" alt="Cantus five protocols: Skill, Analyzer, Validator, Workflow, Memory">
+</p>
 
-- **Skill** — 可被 agent 呼叫的函式（tool use）。用 `@skill` 裝飾或繼承 `Skill` 類別。
-- **Analyzer** — 把使用者輸入轉成結構化結果，回傳前不進入 agent loop。用 `@analyzer` 或繼承 `Analyzer`。
-- **Validator** — 對 agent 輸出做後處理檢驗，回傳 `Result` 決定通過或重試。用 `@validator` 或繼承 `Validator`。
-- **Workflow** — 串接多個 skill / analyzer / validator 的固定流程。用 `@workflow` 或繼承 `Workflow`。
-- **Memory** — 對話狀態與檢索記憶，內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`。
+## The five protocols (one sentence each)
+
+- **Skill** — a function the agent can call (tool use). Decorate with `@skill` or subclass `Skill`.
+- **Analyzer** — turn user input into a structured result before entering the agent loop. Use `@analyzer` or subclass `Analyzer`.
+- **Validator** — post-process the agent's output, returning a `Result` that decides pass or retry. Use `@validator` or subclass `Validator`.
+- **Workflow** — a fixed flow that chains skills, analyzers, and validators. Use `@workflow` or subclass `Workflow`.
+- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`.
 
 ## Documentation
 
-完整文件在 [`docs/`](./docs/)：
+Full docs live in [`docs/`](./docs/):
 
-- [Overview](./docs/overview.md) — 框架架構與設計哲學
-- [Quickstart](./docs/quickstart.md) — 從零開始 10 分鐘
-- [Protocols](./docs/protocols/) — 五件 protocol 的設計與用法
-- [Cookbook](./docs/cookbook/) — 常見模式、錯誤排查、教學技巧
-- [llms.txt](./llms.txt) — 給外部 LLM 一次抓的 priming 文件
+- [Overview](./docs/overview.md) — architecture and design philosophy
+- [Quickstart](./docs/quickstart.md) — from zero to first agent in 10 minutes
+- [Protocols](./docs/protocols/) — design and usage of all five protocols
+- [Cookbook](./docs/cookbook/) — patterns, error recipes, teaching tips
+- [llms.txt](./llms.txt) — priming document for external LLMs
 
 ## License
 
