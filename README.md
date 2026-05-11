@@ -8,6 +8,12 @@
   <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
+<div align="center">
+
+[繁體中文](README.zhTW.md)
+
+</div>
+
 # Cantus
 
 > A polyphonic framework for composing LLM agent harnesses — designed for teaching on Google Colab.
