@@ -8,8 +8,11 @@ self-correct. We do not let exceptions escape the loop.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from cantus.core.event_stream import EventStream
 
 
 @dataclass(frozen=True)
@@ -50,9 +53,22 @@ class ValidationErrorObservation(Observation):
     feedback: str
 
 
+def _default_event_stream() -> "EventStream":
+    from cantus.core.event_stream import EventStream
+
+    return EventStream()
+
+
 @dataclass(frozen=True)
 class MaxIterationsObservation(Observation):
-    """The agent loop hit `max_iterations` without producing a FinalAnswerAction."""
+    """The agent loop hit `max_iterations` without producing a FinalAnswerAction.
+
+    `partial_state` is a deep copy of the EventStream as it stood when the
+    bound was hit (NOT containing this MaxIterationsObservation itself).
+    Caller code MAY mutate `partial_state` without affecting subsequent
+    `agent.run` invocations — the deep copy guarantees isolation.
+    """
 
     iterations: int
     last_action_summary: str = ""
+    partial_state: "EventStream" = field(default_factory=_default_event_stream)

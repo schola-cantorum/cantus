@@ -74,7 +74,7 @@ def build_schema(registry: Registry | None = None) -> dict[str, Any]:
                     {
                         "required": ["final_answer"],
                         "properties": {
-                            "final_answer": {"type": "string"},
+                            "final_answer": {"type": "string", "minLength": 1},
                         },
                         "additionalProperties": False,
                     },
@@ -106,6 +106,10 @@ def parse_tool_call(raw: str, registry: Registry | None = None) -> ParsedToolCal
     if "final_answer" in action:
         if not isinstance(action["final_answer"], str):
             raise GrammarError("final_answer must be a string")
+        if len(action["final_answer"]) < 1:
+            raise GrammarError(
+                "final_answer must be a non-empty string (minLength: 1)"
+            )
         return ParsedToolCall(
             thought=thought,
             skill_name=None,

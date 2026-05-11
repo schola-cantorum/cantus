@@ -24,6 +24,27 @@ from cantus.protocols._common import (
     pascal,
 )
 
+RESERVED_VALIDATOR_NAMES: frozenset[str] = frozenset(
+    {"non_empty_final_answer", "action_parse"}
+)
+"""Validator names reserved by the cantus framework for its built-in
+failure-handling pipeline. User-defined validators MUST NOT use these
+names; collision raises ValueError at registration time, case-sensitive.
+"""
+
+
+class ReservedValidatorNameError(ValueError):
+    """Raised when a user-defined validator collides with a reserved name."""
+
+
+def _guard_reserved_name(name: str) -> None:
+    if name in RESERVED_VALIDATOR_NAMES:
+        raise ReservedValidatorNameError(
+            f"Validator name {name!r} collides with framework-reserved "
+            f"validator vocabulary {sorted(RESERVED_VALIDATOR_NAMES)}; "
+            f"choose a different name."
+        )
+
 
 class Validator:
     """Base class for class-first validator definitions."""
@@ -59,6 +80,7 @@ class Validator:
 
 def validator(fn: Callable[..., Result]) -> Validator:
     """Decorator entry: wrap a function as a `Validator` and register it."""
+    _guard_reserved_name(fn.__name__)
     instance = _from_function(fn)
     get_registry().register("validator", instance)
     return instance
@@ -66,6 +88,7 @@ def validator(fn: Callable[..., Result]) -> Validator:
 
 def register_validator(fn: Callable[..., Result]) -> Validator:
     """Function-pass entry."""
+    _guard_reserved_name(fn.__name__)
     instance = _from_function(fn)
     get_registry().register("validator", instance)
     return instance

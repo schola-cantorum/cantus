@@ -142,3 +142,37 @@ except GrammarError as e:
 - args 寫成 string 而非 object。
 
 修法：用 `outlines` / `xgrammar` 套上 `build_schema(registry)` 的 schema 強制約束 decoding；或在 prompt 給 few-shot 範例。
+
+## 8. 空 FinalAnswer 與小模型 robustness
+
+學生在 Colab 用 Gemma 4 E2B（2B 參數量）跑 cantus，最常踩到的雷是「`agent.run` 第一輪就回 `FinalAnswerAction(answer="")` 終止 loop，從來沒呼叫任何 skill」。看起來 agent 沒做事就直接結束。原因是 sub-3B 模型容易在 grammar-constrained decoding 下走捷徑——既然 `final_answer` 接受任意字串，最省 token 的合法輸出就是空字串。v0.1.2 起 cantus 從四個層面把這條捷徑堵死：
+
+1. **Schema-level `minLength: 1` 約束**：`cantus/grammar/tool_call.py` 的 `build_schema()` 對 `final_answer` 欄位加上 `{"type": "string", "minLength": 1}`，讓 `outlines` / `xgrammar` 之類 grammar-constrained decoder 在生成階段就不會輸出空字串。
+
+2. **Runtime fallback `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`**：若 caller 沒走 grammar 路徑（例如自己直接 `agent.step()` 或測試用 mock model），`_parse_action()` 在解析後仍會 `final_answer.strip() != ""` 檢查；觸發失敗時 append `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer")` 到 `state.stream`，loop 繼續 retry 直到 `max_retries` 用盡或 `max_iterations` 用盡。同樣的 `validator_name` 也用於 grammar 層；下游 grep / NotebookLM 索引一個字串就能涵蓋兩層。
+
+3. **Sub-3B 建議 `max_iterations=12`**：`Agent.run` 預設 `max_iterations=8` 對 4B+ 模型夠用，但 sub-3B 模型（Gemma 4 E2B、其他 2B 級別 instruct 變體）容易吃掉 8 次 retry 才生出非空答；caller 顯式傳 `max_iterations=12` 可提供餘裕：
+
+   ```python
+   state = agent.run("找一本科幻小說", max_iterations=12)
+   ```
+
+   注意這是 caller-supplied override，不是框架 default——4B+ 模型保留 `8` 即可。
+
+4. **EventStream replay 觀察 retry 流程**：碰到非空答之前，stream 會塞入一筆或多筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`。用 `state.stream.replay()` 可看到完整 retry 軌跡：
+
+   ```python
+   from cantus import Agent, mount_drive_and_load
+
+   handle = mount_drive_and_load(variant="E4B")
+   agent = Agent(model=handle)
+   state = agent.run("找一本詩集", max_iterations=12)
+   print(state.stream.replay())
+   # [0] Action      :: CallSkillAction(skill_name='search_book', ...)
+   # [1] Observation :: ValidationErrorObservation(validator_name='non_empty_final_answer', feedback='FinalAnswerAction.answer must be non-empty...')
+   # [2] Action      :: CallSkillAction(skill_name='search_book', ...)
+   # [3] Observation :: SkillObservation(skill_name='search_book', result=[Book(title=...), ...])
+   # [4] Action      :: FinalAnswerAction(answer='推薦《零號宇宙》— ...')
+   ```
+
+EventStream 中出現一筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)` 是**框架自動 retry**，不是 bug；若連續三次以上同類條目出現在同一個 `agent.run` 內，回 `mount_drive_and_load(variant="E4B")` 通常比繼續加 retry 更實用。

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.1.0"
+version = "0.1.2"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"

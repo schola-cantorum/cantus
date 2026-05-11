@@ -49,7 +49,16 @@ def test_skill_internal_raise_becomes_tool_error():
     assert any(getattr(e, "answer", None) == "ok" for e in state.stream)
 
 
-def test_unknown_skill_name_emits_tool_error_with_available():
+def test_unknown_skill_name_at_parse_emits_action_parse_validation_error():
+    """v0.1.2 BREAKING: unknown skill_name at parse-time produces
+    `ValidationErrorObservation(validator_name="action_parse",
+    feedback="error_type: unknown_skill\\n...")` rather than the v0.1.1
+    `ToolErrorObservation`. This implements the
+    `Action parse failures fall back to ValidationErrorObservation`
+    requirement's `unknown_skill` vocabulary entry. `ToolErrorObservation`
+    remains the response for dispatch-level failures (e.g. a registered
+    skill that raises at call time).
+    """
     @skill
     def search_book(title: str) -> str:
         """Search."""
@@ -59,9 +68,10 @@ def test_unknown_skill_name_emits_tool_error_with_available():
         model=ScriptedModel([_action("search_books", {"title": "x"}), _final("done")])
     )
     state = agent.run("q")
-    errors = [e for e in state.stream if isinstance(e, ToolErrorObservation)]
-    assert any("not registered" in e.message for e in errors)
-    assert any("search_book" in e.message for e in errors)
+    val_errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
+    assert any(e.validator_name == "action_parse" for e in val_errors)
+    assert any("error_type: unknown_skill" in e.feedback for e in val_errors)
+    assert any("search_book" in e.feedback for e in val_errors)
 
 
 def test_validator_failure_emits_validation_error_and_retries():
