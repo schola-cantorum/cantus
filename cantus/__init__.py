@@ -1,6 +1,6 @@
 """cantus — LLM agent harness teaching framework for Google Colab."""
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 from cantus.core.action import (
     Action,

@@ -2,6 +2,11 @@
 
 > A Python framework for writing LLM agent harnesses on Google Colab. Students compose five protocol kinds (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`) over a Gemma 4 backbone. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
 
+## Versioning
+
+- Current release: `v0.1.3`. Install with `pip install git+https://github.com/schola-cantorum/cantus@v0.1.3` (use `cantus[runtime]` extras for the Gemma 4 loader).
+- Notebooks: open `notebooks/task_template.ipynb` in Colab via `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/task_template.ipynb`. The companion `notebooks/admin_setup.ipynb` mirrors Gemma 4 weights to Drive once per installation.
+
 ## When to use this file
 
 Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@skill` / `@analyzer` / `@validator` / `@workflow`, or a `Memory` subclass. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
