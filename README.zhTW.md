@@ -69,9 +69,9 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-## 多 provider 快速上手（v0.2.0）
+## 多 provider 快速上手（v0.2.1）
 
-Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI 或 Anthropic，不再侷限於本地 Gemma。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
+Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI、Anthropic、Google Gemini、Groq 或 NVIDIA NIM，不再侷限於本地 Gemma。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
 
 OpenAI（`pip install 'cantus[openai]'`，並設定 `OPENAI_API_KEY`）：
 
@@ -95,7 +95,40 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-`cantus[providers]` 可一次安裝兩家 adapter。Google / Groq / NVIDIA adapter 排在 v0.2.1。cantus 在任何 layer **皆不**相依 LiteLLM。
+Google Gemini（`pip install 'cantus[google]'`，並設定 `GOOGLE_API_KEY`；使用 `google-genai`，**非**舊版 `google-generativeai`）：
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("google/gemini-2.0-flash")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+Groq（`pip install 'cantus[groq]'`，並設定 `GROQ_API_KEY`）：
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("groq/llama-3.3-70b-versatile")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+NVIDIA NIM（`pip install 'cantus[openai]'` — NIM 走 OpenAI SDK，因此**不**另開 `cantus[nvidia]` extras；設定 `NVIDIA_API_KEY`）：
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+`cantus[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus 五協定：Skill、Analyzer、Validator、Workflow、Memory">

@@ -1,6 +1,6 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from cantus.core.action import (
     Action,

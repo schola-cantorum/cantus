@@ -10,6 +10,8 @@ from __future__ import annotations
 import subprocess
 import sys
 
+import pytest
+
 
 def _run_in_fresh_subprocess(script: str) -> tuple[int, str, str]:
     proc = subprocess.run(
@@ -79,6 +81,84 @@ assert 'anthropic' not in sys.modules, 'anthropic was eagerly imported by openai
 m._get_client()
 assert 'openai' in sys.modules
 assert 'anthropic' not in sys.modules
+print('OK')
+"""
+    code, out, err = _run_in_fresh_subprocess(script)
+    assert code == 0, f"subprocess failed: stdout={out!r} stderr={err!r}"
+    assert "OK" in out
+
+
+def test_core_import_does_not_leak_google_or_groq_sdks_to_sys_modules():
+    """`import cantus` must not transitively load google.genai / groq either.
+
+    Extends the v0.2.0 openai/anthropic guarantee to the v0.2.1 batch.
+    NVIDIA is intentionally not listed because its runtime SDK is `openai`
+    (the dedicated `import cantus` openai-isolation test above already
+    covers the NVIDIA path transitively).
+    """
+    script = """
+import sys
+for name in ('google.genai', 'groq'):
+    assert name not in sys.modules, f'{name!r} leaked before import cantus'
+import cantus
+leaked = [m for m in sys.modules if m.startswith(('google.genai', 'groq'))]
+assert not leaked, f'provider SDK leaked after import cantus: {leaked}'
+print('OK')
+"""
+    code, out, err = _run_in_fresh_subprocess(script)
+    assert code == 0, f"subprocess failed: stdout={out!r} stderr={err!r}"
+    assert "OK" in out
+
+
+def _is_module_importable(name: str) -> bool:
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
+@pytest.mark.skipif(
+    not _is_module_importable("google.genai"),
+    reason="google-genai SDK not installed; positive-case smoke needs it",
+)
+def test_explicit_google_adapter_import_loads_google_genai():
+    script = """
+import os
+import sys
+os.environ['GOOGLE_API_KEY'] = 'ai-test'
+assert 'google.genai' not in sys.modules
+from cantus.model.providers.google import GoogleChatModel
+# Class import is cheap — SDK still not loaded.
+assert 'google.genai' not in sys.modules
+m = GoogleChatModel(model_id='gemini-2.0-flash')
+assert 'google.genai' not in sys.modules
+m._get_client()
+assert 'google.genai' in sys.modules
+print('OK')
+"""
+    code, out, err = _run_in_fresh_subprocess(script)
+    assert code == 0, f"subprocess failed: stdout={out!r} stderr={err!r}"
+    assert "OK" in out
+
+
+@pytest.mark.skipif(
+    not _is_module_importable("groq"),
+    reason="groq SDK not installed; positive-case smoke needs it",
+)
+def test_explicit_groq_adapter_import_loads_groq():
+    script = """
+import os
+import sys
+os.environ['GROQ_API_KEY'] = 'gsk-test'
+assert 'groq' not in sys.modules
+from cantus.model.providers.groq import GroqChatModel
+assert 'groq' not in sys.modules
+m = GroqChatModel(model_id='llama-3.3-70b-versatile')
+assert 'groq' not in sys.modules
+m._get_client()
+assert 'groq' in sys.modules
 print('OK')
 """
     code, out, err = _run_in_fresh_subprocess(script)

@@ -69,9 +69,9 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-## Multi-provider quickstart (v0.2.0)
+## Multi-provider quickstart (v0.2.1)
 
-Tier 2 ChatModel adapters let you point the same Agent at OpenAI or Anthropic instead of local Gemma. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
+Tier 2 ChatModel adapters let you point the same Agent at OpenAI, Anthropic, Google Gemini, Groq, or NVIDIA NIM instead of local Gemma. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
 
 OpenAI (install `pip install 'cantus[openai]'`, set `OPENAI_API_KEY`):
 
@@ -95,7 +95,40 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-`cantus[providers]` installs both adapters at once. Google / Groq / NVIDIA adapters land in v0.2.1. cantus intentionally does **not** depend on LiteLLM at any layer.
+Google Gemini (install `pip install 'cantus[google]'`, set `GOOGLE_API_KEY`; uses `google-genai`, **not** the legacy `google-generativeai`):
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("google/gemini-2.0-flash")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+Groq (install `pip install 'cantus[groq]'`, set `GROQ_API_KEY`):
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("groq/llama-3.3-70b-versatile")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+NVIDIA NIM (install `pip install 'cantus[openai]'` — NIM runs on the OpenAI SDK, so there is **no** `cantus[nvidia]` extras; set `NVIDIA_API_KEY`):
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+`cantus[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus five protocols: Skill, Analyzer, Validator, Workflow, Memory">

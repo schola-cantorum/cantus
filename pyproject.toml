@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.2.0"
+version = "0.2.1"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,16 +39,27 @@ memory = [
     "sentence-transformers>=2.5.0",
 ]
 # Tier 2 cloud provider adapters — each opt-in to keep import + supply-chain
-# surface minimal. v0.2.0 ships OpenAI + Anthropic; Google / Groq / NVIDIA
-# land in v0.2.1. LiteLLM is intentionally NOT a dependency at any layer.
+# surface minimal. v0.2.1 ships OpenAI + Anthropic + Google + Groq directly,
+# plus NVIDIA NIM via the OpenAI SDK (no dedicated `nvidia` extras — install
+# via `cantus[openai]`). The `providers` aggregator covers the four primary
+# adapters. LiteLLM is intentionally NOT a dependency at any layer (2026-03
+# 1.82.7/1.82.8 supply-chain incident — see CHANGELOG v0.2.0 Notes).
+# The legacy `google-generativeai` SDK is intentionally NOT used; the `google`
+# extras pulls in `google-genai` exclusively (the new unified Gemini API SDK).
 openai = [
     "openai>=1.50,<2",
 ]
 anthropic = [
     "anthropic>=0.40,<1",
 ]
+google = [
+    "google-genai>=0.3,<1",
+]
+groq = [
+    "groq>=0.11,<1",
+]
 providers = [
-    "cantus[openai,anthropic]",
+    "cantus[openai,anthropic,google,groq]",
 ]
 dev = [
     "pytest>=7.0",

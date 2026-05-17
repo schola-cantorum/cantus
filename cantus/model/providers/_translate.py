@@ -207,6 +207,121 @@ def from_anthropic_response(raw: Any) -> ChatResponse:
 
 
 # ---------------------------------------------------------------------------
+# Google Gemini (google-genai SDK)
+# ---------------------------------------------------------------------------
+
+_GOOGLE_FINISH_TO_STOP: dict[str, str] = {
+    "STOP": "end_turn",
+    "MAX_TOKENS": "max_tokens",
+    "SAFETY": "error",
+    "TOOL_CALL": "tool_use",
+    "RECITATION": "error",
+}
+
+
+def to_google_messages(
+    messages: list[Message],
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Convert Tier 2 Messages to google-genai `generate_content` format.
+
+    Returns ``(system_instruction, contents)`` because google-genai puts the
+    system prompt in a top-level kwarg, not inside ``contents``. Multiple
+    system messages are concatenated with newlines (the first system message
+    wins on its own; subsequent ones are appended).
+    """
+    system_parts: list[str] = []
+    out: list[dict[str, Any]] = []
+    for msg in messages:
+        if msg.role == "system":
+            system_parts.append(msg.content)
+            continue
+
+        if msg.role == "tool":
+            out.append(
+                {
+                    "role": "function",
+                    "parts": [
+                        {
+                            "function_response": {
+                                "name": msg.name,
+                                "response": {"result": msg.content},
+                            }
+                        }
+                    ],
+                }
+            )
+            continue
+
+        google_role = "model" if msg.role == "assistant" else msg.role
+        parts: list[dict[str, Any]] = []
+        if msg.content:
+            parts.append({"text": msg.content})
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                parts.append(
+                    {"function_call": {"name": tc.name, "args": tc.arguments}}
+                )
+        out.append({"role": google_role, "parts": parts})
+
+    system = "\n".join(system_parts) if system_parts else None
+    return system, out
+
+
+def from_google_response(raw: Any) -> ChatResponse:
+    """Convert a google-genai `GenerateContentResponse` to ChatResponse.
+
+    Gemini wire shape: ``candidates[0].content.parts`` is a heterogeneous list
+    of ``{"text": ...}`` and ``{"function_call": {"name", "args"}}`` blocks.
+    `function_call` blocks lack an explicit call id, so the call's `name` is
+    reused as the cantus `ToolCall.id` (Gemini relies on positional matching
+    for tool results, not opaque ids).
+    """
+    data = _as_dict(raw)
+    candidates = data.get("candidates") or []
+    if not candidates:
+        message = Message(role="assistant", content="")
+        return ChatResponse(message=message, stop_reason="error", usage=None, raw=raw)
+
+    cand = candidates[0]
+    content = cand.get("content") or {}
+    parts = content.get("parts") or []
+
+    text_parts: list[str] = []
+    tool_calls: list[ToolCall] = []
+    for part in parts:
+        if "text" in part and part["text"] is not None:
+            text_parts.append(part["text"])
+        elif "function_call" in part:
+            fc = part["function_call"]
+            tool_calls.append(
+                ToolCall(
+                    id=fc["name"],
+                    name=fc["name"],
+                    arguments=fc.get("args") or {},
+                )
+            )
+
+    finish_raw = cand.get("finish_reason", "STOP")
+    stop_reason = _GOOGLE_FINISH_TO_STOP.get(finish_raw, "error")
+
+    usage_raw = data.get("usage_metadata")
+    if usage_raw is not None:
+        usage: dict[str, int] | None = {
+            "input_tokens": int(usage_raw.get("prompt_token_count", 0)),
+            "output_tokens": int(usage_raw.get("candidates_token_count", 0)),
+        }
+    else:
+        usage = None
+
+    message = Message(
+        role="assistant",
+        content="".join(text_parts),
+        tool_calls=tool_calls,
+    )
+    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 

@@ -4,6 +4,86 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-05-17
+
+PATCH release that completes the v0.2.0 multi-provider scope. v0.2.0 shipped
+OpenAI + Anthropic; this release adds Google Gemini, Groq, and NVIDIA NIM
+direct-connect adapters. The dual-tier `ChatModel` Protocol, `ChatModelAsHandle`
+bridge, `load_chat_model` factory, and Environment profiles from v0.2.0 are
+**unchanged** — this is purely additive.
+
+### Added
+
+- **`GoogleChatModel` adapter** (`cantus.model.providers.google`) — direct
+  adapter against the `google-genai` SDK (`from google import genai`,
+  `client.models.generate_content`). Resolves API key from explicit
+  `api_key=` kwarg then `GOOGLE_API_KEY` env var; raises `MissingAPIKeyError`
+  when both are absent. Extracts system messages as the top-level
+  `system_instruction=` kwarg via `to_google_messages`. Translates
+  `assistant` → Gemini `model` and `tool` → Gemini `function` with
+  `function_response` parts.
+- **`GroqChatModel` adapter** (`cantus.model.providers.groq`) — direct adapter
+  against the `groq` SDK's Chat Completions endpoint. Reuses the existing
+  `to_openai_messages` / `from_openai_response` pure functions (Groq is
+  OpenAI-compatible at the wire layer). Resolves `GROQ_API_KEY` from env.
+- **`NvidiaChatModel` adapter** (`cantus.model.providers.nvidia`) — thin
+  subclass of `OpenAIChatModel` that hard-codes
+  `base_url="https://integrate.api.nvidia.com/v1"` and reads `NVIDIA_API_KEY`.
+  All `chat` / `stream` / translator behavior is inherited unchanged.
+- **`to_google_messages` / `from_google_response` translators**
+  (`cantus.model.providers._translate`) — pure functions for Gemini's
+  `contents` / `parts` wire shape. Maps Gemini `STOP` / `MAX_TOKENS` /
+  `SAFETY` / `TOOL_CALL` finish reasons to cantus stop reasons.
+- **`google` and `groq` optional extras** in `pyproject.toml` with pinned
+  upper bounds: `google = ["google-genai>=0.3,<1"]`,
+  `groq = ["groq>=0.11,<1"]`. The `providers` aggregator now installs all
+  four primary adapters (`cantus[openai,anthropic,google,groq]`).
+- **`scripts/audit_cassettes.sh`** — secret-pattern scan for provider VCR
+  cassettes; extends the cantus-distribution Pre-push security audit
+  (Authorization / Bearer / `x-api-key` / `x-goog-api-key` / `sk-` / `hf_` /
+  `ghp_` / `AIza` / `AKIA` patterns). Closes the v0.2.0 follow-up to bring
+  cassette paths into the pre-push security gate.
+- **`notebooks/multi_provider_smoke_batch2.ipynb`** — release-time human
+  smoke for Google / Groq / NVIDIA (chat + stream each).
+
+### Changed
+
+- `load_chat_model` factory `_REGISTRY` extended from two to five providers
+  (`openai`, `anthropic`, `google`, `groq`, `nvidia`). Unknown-prefix
+  `ValueError` now lists all five supported prefixes.
+- `load_chat_model("nvidia/...")` missing-extras hint points at
+  `pip install cantus[openai]` (the OpenAI SDK is the actual runtime
+  dependency), **not** a phantom `cantus[nvidia]` group.
+- `cantus.__version__` bumped from `0.2.0` to `0.2.1`.
+- `README.md` and `README.zhTW.md` "Multi-provider quickstart" sections gain
+  Google, Groq, and NVIDIA quickstart code blocks (byte-identical between
+  language variants, matching the v0.2.0 contract).
+
+### Notes
+
+- **NVIDIA NIM ships through `cantus[openai]`**, by design. NIM's endpoint
+  is OpenAI Chat Completions-compatible (`base_url=...`), so the adapter is
+  a thin subclass of `OpenAIChatModel`. Opening a dedicated `cantus[nvidia]`
+  extras would mislead users into installing a phantom `nvidia` SDK package.
+- **Google adapter uses the new `google-genai` SDK**, not the legacy
+  `google-generativeai`. Import path is `from google import genai`. The two
+  SDKs share the `google.*` namespace but expose different APIs
+  (`client.models.generate_content` vs. `GenerativeModel(...).generate_content`).
+  The legacy SDK is intentionally unsupported — silently falling back would
+  surface as an obscure `AttributeError` rather than a clear `ImportError`.
+- **Groq SDK pin `groq>=0.11,<1`** acknowledges Groq's tool-use schema
+  churn during 2025–2026. Re-record cassettes when bumping the upper bound.
+- **LiteLLM is still not a dependency** at any layer (v0.2.0 decision —
+  「不引入 LiteLLM」— driven by the 2026-03 LiteLLM 1.82.7/1.82.8
+  supply-chain incident). Direct adapters keep the supply-chain surface
+  auditable per provider.
+- **`google-generativeai` is still not a dependency** at any layer
+  (intentional, see Google adapter note above).
+- **No `[nvidia]` extras** — `pip install cantus[nvidia]` is intentionally
+  unresolvable so users hit a clear pip error rather than a misleading
+  installation path; README and the factory's missing-extras hint both
+  direct users to `cantus[openai]`.
+
 ## [0.2.0] - 2026-05-17
 
 First framework-化 minor release. Introduces the **dual-tier API** (ARCH-1)

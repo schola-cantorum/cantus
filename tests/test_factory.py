@@ -51,13 +51,33 @@ def fake_anthropic_module():
     _uninstall_fake_module("cantus.model.providers.anthropic")
 
 
+@pytest.fixture
+def fake_google_module():
+    _install_fake_module("cantus.model.providers.google", "GoogleChatModel")
+    yield
+    _uninstall_fake_module("cantus.model.providers.google")
+
+
+@pytest.fixture
+def fake_groq_module():
+    _install_fake_module("cantus.model.providers.groq", "GroqChatModel")
+    yield
+    _uninstall_fake_module("cantus.model.providers.groq")
+
+
+@pytest.fixture
+def fake_nvidia_module():
+    _install_fake_module("cantus.model.providers.nvidia", "NvidiaChatModel")
+    yield
+    _uninstall_fake_module("cantus.model.providers.nvidia")
+
+
 def test_unknown_provider_prefix_raises_value_error_naming_supported():
     with pytest.raises(ValueError) as exc:
-        load_chat_model("groq/llama-3.3-70b")
+        load_chat_model("vertex/gemini-2.0-flash")
     msg = str(exc.value)
-    assert "openai" in msg
-    assert "anthropic" in msg
-    assert "groq" in msg
+    for prefix in ("openai", "anthropic", "google", "groq", "nvidia"):
+        assert prefix in msg, f"supported prefix {prefix!r} missing from {msg!r}"
 
 
 def test_spec_without_slash_raises_value_error_with_format_hint():
@@ -123,3 +143,83 @@ def test_returns_object_that_satisfies_chat_model_protocol(fake_openai_module):
     model = load_chat_model("openai/gpt-4o-mini")
     # _FakeAdapter implements chat/stream/supports_tool_use/model_id
     assert isinstance(model, ChatModel)
+
+
+# ---------- v0.2.1 batch2 prefixes -----------------------------------------
+
+
+def test_google_dispatch_constructs_adapter_via_lazy_import(fake_google_module):
+    model = load_chat_model("google/gemini-2.0-flash")
+    assert isinstance(model, _FakeAdapter)
+    assert model.model_id == "gemini-2.0-flash"
+
+
+def test_groq_dispatch_constructs_adapter_via_lazy_import(fake_groq_module):
+    model = load_chat_model("groq/llama-3.3-70b-versatile")
+    assert isinstance(model, _FakeAdapter)
+    assert model.model_id == "llama-3.3-70b-versatile"
+
+
+def test_nvidia_dispatch_constructs_adapter_via_lazy_import(fake_nvidia_module):
+    model = load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
+    assert isinstance(model, _FakeAdapter)
+    # spec parses as <provider>/<model_id> with split("/", 1), so model_id retains
+    # the embedded slash (NVIDIA's namespaced model_ids like "meta/llama-...")
+    assert model.model_id == "meta/llama-3.3-70b-instruct"
+
+
+def test_missing_google_extras_hint_points_to_cantus_google(monkeypatch):
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.google":
+            raise ImportError("No module named 'google.genai'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.google", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("google/gemini-2.0-flash")
+    assert "pip install cantus[google]" in str(exc.value)
+
+
+def test_missing_groq_extras_hint_points_to_cantus_groq(monkeypatch):
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.groq":
+            raise ImportError("No module named 'groq'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.groq", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("groq/llama-3.3-70b-versatile")
+    assert "pip install cantus[groq]" in str(exc.value)
+
+
+def test_missing_nvidia_extras_hint_points_to_cantus_openai_not_nvidia(monkeypatch):
+    """NIM runs on the openai SDK — extras hint MUST point at cantus[openai]."""
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.nvidia":
+            raise ImportError("No module named 'openai'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.nvidia", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
+    msg = str(exc.value)
+    assert "pip install cantus[openai]" in msg
+    assert "cantus[nvidia]" not in msg
