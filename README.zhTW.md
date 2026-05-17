@@ -90,6 +90,7 @@ print(result.final_answer)
 - [Protocols](./docs/protocols/) —— 五個協定的設計與使用方式
 - [Cookbook](./docs/cookbook/) —— 模式、錯誤處理、教學提示
 - [llms.txt](./llms.txt) —— 給外部 LLM 的 priming 文件
+- [開發者 LLM Wiki](./docs/llm_wiki/index.md) —— cantus 內部貢獻者知識庫（研究、coding style、架構、未來工作）
 
 ## License
 

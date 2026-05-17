@@ -1,0 +1,10 @@
+schema_version: 1.0.0
+active_profile: research
+profile_version: 1.0.0
+wiki_path: docs/llm_wiki
+raw_path: docs/llm_wiki_raw
+init_skill_version: 1.0.0
+init_timestamp: '2026-05-17T11:45:25Z'
+index_backend: wiki-index-grep
+completed_sub_skills:
+- wiki-init

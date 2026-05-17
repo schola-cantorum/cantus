@@ -1,0 +1,32 @@
+manifest_version: 1.0.0
+init_skill_version: 1.0.0
+initialized_at: '2026-05-17T11:45:25Z'
+active_profile: research
+profile_version: 1.0.0
+schema_version: 1.0.0
+target_dir: /Users/phoenix/dev/edu-projects/colab-llm-agent/libs/cantus
+wiki_path: docs/llm_wiki
+raw_path: docs/llm_wiki_raw
+scaffolded_files:
+- path: AGENTS.md
+  sha256: efe730a391c4598a80b9f27dee74a70e5afa3857605efca2a549c047ae4d57d4
+  role: agent_instruction
+- path: docs/llm_wiki/index.md
+  sha256: c244d76a234920f396443015138419d724f3567204e538ce89deaa55f13071c0
+  role: core
+- path: docs/llm_wiki/log.md
+  sha256: f7f3667b5bedcc12f848dc734b5ec004f1fdd4a41c9d5d369480cd0540ac50ca
+  role: core
+- path: docs/llm_wiki/synthesis.md
+  sha256: 4422cf37403cf746b27228f5fdd036cfcc331044eafae087423f9e291ea77b71
+  role: profile
+- path: docs/llm_wiki_raw/.gitkeep
+  sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  role: raw_placeholder
+- path: regen-manifest.yaml
+  sha256: 44507e9501d3dc732d82cefe40383e76dddbf0df079143057d65ce97a24c358a
+  role: other
+extensions: []
+suppressions:
+  pointer_files: true
+  gitignore: true

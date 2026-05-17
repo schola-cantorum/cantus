@@ -90,6 +90,7 @@ Full docs live in [`docs/`](./docs/):
 - [Protocols](./docs/protocols/) — design and usage of all five protocols
 - [Cookbook](./docs/cookbook/) — patterns, error recipes, teaching tips
 - [llms.txt](./llms.txt) — priming document for external LLMs
+- [Developer LLM Wiki](./docs/llm_wiki/index.md) — internal contributor knowledge base (research, coding style, architecture, future work)
 
 ## License
 
