@@ -8,3 +8,6 @@ init_timestamp: '2026-05-17T11:45:25Z'
 index_backend: wiki-index-grep
 completed_sub_skills:
 - wiki-init
+- wiki-validator
+last_validated: '2026-05-17T11:56:28Z'
+last_verdict: pass
