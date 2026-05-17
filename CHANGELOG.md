@@ -4,6 +4,40 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-05-17
+
+Documentation-only release that bundles two long-standing dev/contributor needs
+into a single patch tag: the cantus internal LLM Wiki (a curated knowledge base
+for contributors and LLM agents working on the framework), and the previously
+unreleased Traditional Chinese README variant carried over from commit
+`744b4a7`. **No code changes, no API changes** — runtime, protocols, grammar,
+and model loader are byte-for-byte identical to `v0.1.3`.
+
+### Added
+
+- **`docs/llm_wiki/` internal developer knowledge base** with `research/`,
+  `coding_style/`, `architecture/`, and `future_work/` sections. Every research
+  entry pins verified source URLs (10 entries spanning Anthropic Building
+  Effective Agents, OpenClaw, OpenHarness, OpenHands SDK, SOUL.md, MCP, the
+  LiteLLM March 2026 supply-chain incident, FastAPI + Pydantic, Cloudflare
+  Tunnel vs ngrok, and Google Chat HTTP/Pub-Sub). The `coding_style/` section
+  anchors on Linus Torvalds' four philosophical principles with a Python
+  adaptation table and a worked indirect-pointer linked-list example. The
+  `architecture/` section ships the authoritative ARCH-1 (two-tier API) and
+  ARCH-2 (10-item cross-capability integration audit) definitions that every
+  v0.2+ change proposal will link back to. The `future_work/` roadmap
+  enumerates the 9 ordered changes planned through v0.5.0. Scaffolded via the
+  `/wiki` suite (`wiki-init` with a custom `.profile.yaml` that overrides the
+  shipped `research` profile to add `required_dirs` for the four cantus
+  categories) and validated via `wiki-validator` on every commit.
+- **`README.zhTW.md` Traditional Chinese variant** with bidirectional language
+  switch (carries over commit `744b4a7` from v0.1.3-1, previously unreleased).
+  The English and Traditional Chinese READMEs share byte-identical Install
+  commands, Quickstart code, and Open-in-Colab URL fragments so copy-paste
+  produces identical behavior across both variants. Both READMEs gain a new
+  link to `docs/llm_wiki/index.md` in their Documentation section, marking the
+  wiki as the developer / contributor entry point.
+
 ## [0.1.3] - 2026-05-11
 
 This release bundles ready-to-run Colab notebooks and visual identity assets into
