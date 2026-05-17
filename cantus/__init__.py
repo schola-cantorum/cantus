@@ -1,6 +1,6 @@
-"""cantus — LLM agent harness teaching framework for Google Colab."""
+"""cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-__version__ = "0.1.4"
+__version__ = "0.2.0"
 
 from cantus.core.action import (
     Action,
@@ -18,7 +18,11 @@ from cantus.core.observation import (
 )
 from cantus.core.registry import Registry, get_registry
 from cantus.core.result import Result
+from cantus.env import CloudOnlyEnvironment, ColabEnvironment, LocalEnvironment
 from cantus.inspect import Inspector
+from cantus.model.bridge import ChatModelAsHandle
+from cantus.model.chat import ChatModel, ChatResponse, Message, ToolCall
+from cantus.model.factory import load_chat_model
 from cantus.protocols.analyzer import (
     Analyzer,
     analyzer,
@@ -76,12 +80,24 @@ __all__ = [
     "MaxIterationsObservation",
     "EventStream",
     "Agent",
+    "AgentState",
     "Inspector",
     # Registry
     "Registry",
     "get_registry",
     # Result type for validators
     "Result",
+    # Tier 2 ChatModel
+    "ChatModel",
+    "Message",
+    "ToolCall",
+    "ChatResponse",
+    "ChatModelAsHandle",
+    "load_chat_model",
+    # Environment profiles
+    "ColabEnvironment",
+    "LocalEnvironment",
+    "CloudOnlyEnvironment",
 ]
 
 

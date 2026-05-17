@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.1.4"><img alt="release v0.1.4" src="https://img.shields.io/badge/release-v0.1.4-blue"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.2.0"><img alt="release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
   <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
@@ -68,6 +68,34 @@ agent = Agent(model=model_handle)
 result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
+
+## 多 provider 快速上手（v0.2.0）
+
+Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI 或 Anthropic，不再侷限於本地 Gemma。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
+
+OpenAI（`pip install 'cantus[openai]'`，並設定 `OPENAI_API_KEY`）：
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("openai/gpt-4o-mini")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+Anthropic（`pip install 'cantus[anthropic]'`，並設定 `ANTHROPIC_API_KEY`）：
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("anthropic/claude-sonnet-4-6")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+`cantus[providers]` 可一次安裝兩家 adapter。Google / Groq / NVIDIA adapter 排在 v0.2.1。cantus 在任何 layer **皆不**相依 LiteLLM。
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus 五協定：Skill、Analyzer、Validator、Workflow、Memory">

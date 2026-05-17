@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.1.4"><img alt="release v0.1.4" src="https://img.shields.io/badge/release-v0.1.4-blue"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.2.0"><img alt="release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
   <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
@@ -68,6 +68,34 @@ agent = Agent(model=model_handle)
 result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
+
+## Multi-provider quickstart (v0.2.0)
+
+Tier 2 ChatModel adapters let you point the same Agent at OpenAI or Anthropic instead of local Gemma. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
+
+OpenAI (install `pip install 'cantus[openai]'`, set `OPENAI_API_KEY`):
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("openai/gpt-4o-mini")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+Anthropic (install `pip install 'cantus[anthropic]'`, set `ANTHROPIC_API_KEY`):
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+chat = load_chat_model("anthropic/claude-sonnet-4-6")
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+result = agent.run("What is 17 plus 25?")
+print(result.final_answer)
+```
+
+`cantus[providers]` installs both adapters at once. Google / Groq / NVIDIA adapters land in v0.2.1. cantus intentionally does **not** depend on LiteLLM at any layer.
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus five protocols: Skill, Analyzer, Validator, Workflow, Memory">

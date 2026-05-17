@@ -11,9 +11,7 @@ Variant strings: "E4B" → google/gemma-4-E4B-it; "E2B" → google/gemma-4-E2B-i
 
 from __future__ import annotations
 
-import os
 import sys
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -66,6 +64,10 @@ def mount_drive_and_load(
 ) -> ModelHandle:
     """Mount Drive (if running under Colab) and load the named variant.
 
+    Thin backward-compatible wrapper around `ColabEnvironment().prepare_model(...)` —
+    the signature, exception types, and observable behavior match v0.1.x exactly,
+    and no DeprecationWarning is emitted in v0.2.0.
+
     Parameters:
         variant: "E4B" or "E2B".
         allow_hub_fallback: when True, fall back to HF Hub download if
@@ -82,38 +84,12 @@ def mount_drive_and_load(
         MountError: Drive mount failed in a Colab session.
         ModelNotFoundError: variant dir absent and fallback disabled.
     """
-    if variant not in VARIANT_TO_HF_REPO:
-        raise ValueError(
-            f"Unknown variant {variant!r}. Choose one of: {sorted(VARIANT_TO_HF_REPO)}"
-        )
+    from cantus.env.colab import ColabEnvironment
 
-    if _running_in_colab():
-        try:
-            _mount_colab_drive()
-        except Exception as exc:
-            raise MountError(
-                "無法掛載 Google Drive。請在 Colab 左側點選『掛載 Drive』並重試。"
-                f" Inner: {type(exc).__name__}: {exc}"
-            ) from exc
-
-    root = Path(drive_root or os.environ.get(SHARED_DRIVE_ROOT_ENV) or DEFAULT_DRIVE_ROOT)
-    target = root / VARIANT_TO_DIRNAME[variant]
-
-    if target.exists():
-        return _load_from_local(target, variant)
-
-    if allow_hub_fallback:
-        warnings.warn(
-            f"找不到 Drive 路徑 {target}；改從 Hugging Face Hub 下載 "
-            f"{VARIANT_TO_HF_REPO[variant]}。",
-            stacklevel=2,
-        )
-        return _load_from_hub(VARIANT_TO_HF_REPO[variant], variant)
-
-    raise ModelNotFoundError(
-        f"找不到模型權重於 {target}。請確認老師已將 4-bit 量化版本放在 Shared Drive，"
-        f"或於呼叫時設 allow_hub_fallback=True 從 Hugging Face Hub 下載 "
-        f"{VARIANT_TO_HF_REPO[variant]}。"
+    return ColabEnvironment().prepare_model(
+        variant,
+        allow_hub_fallback=allow_hub_fallback,
+        drive_root=drive_root,
     )
 
 

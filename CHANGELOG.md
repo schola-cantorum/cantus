@@ -4,6 +4,123 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-17
+
+First framework-化 minor release. Introduces the **dual-tier API** (ARCH-1)
+that the discussion `openspec/discussions/cantus-framework-shift.md` froze on
+2026-05-17 as the design principle for all v0.2+ work. v0.1.x notebooks and
+the existing `mount_drive_and_load()` entry point remain **100% behavior- and
+signature-compatible** — no `DeprecationWarning` is emitted in v0.2.0.
+
+### Added
+
+- **Tier 2 `ChatModel` Protocol** (`cantus.model.chat`) — chat-style
+  multi-provider interface with `chat(messages, tools=None) -> ChatResponse`
+  and `stream(messages, tools=None) -> Iterator[str]`. Three companion
+  dataclasses: `Message` (role + content + tool_calls), `ToolCall` (id, name,
+  parsed-JSON arguments), and `ChatResponse` (message + stop_reason + usage +
+  provider-native `raw` escape hatch). Re-exported at top-level `cantus`.
+- **`ChatModelAsHandle` bridge** (`cantus.model.bridge`) — wraps a Tier 2
+  `ChatModel` so it satisfies the existing Tier 1 `ModelHandle` Protocol,
+  letting any `Agent` consume a cloud provider without a single line of
+  Agent change.
+- **`load_chat_model("provider/model_id")` factory** (`cantus.model.factory`)
+  — lazy-import dispatch with friendly missing-extras errors of the form
+  `pip install cantus[openai]`. v0.2.0 accepts the `openai` and `anthropic`
+  prefixes; unknown prefixes raise `ValueError` naming the supported set.
+- **`OpenAIChatModel` adapter** (`cantus.model.providers.openai`) — direct
+  adapter against the `openai` SDK's Chat Completions API (not the Responses
+  API; revisit in v0.3.x). Accepts `base_url` from day one so v0.2.1 NVIDIA
+  NIM can reuse it without an API change. Resolves API key from explicit
+  `api_key=` kwarg then `OPENAI_API_KEY` env var; raises `MissingAPIKeyError`
+  with a Chinese guidance message when both are absent.
+- **`AnthropicChatModel` adapter** (`cantus.model.providers.anthropic`) —
+  direct adapter against the `anthropic` SDK's Messages API. Correctly
+  extracts system messages from the `messages` list and passes them as the
+  top-level `system=` kwarg. Same auth resolution + `MissingAPIKeyError`
+  shape as the OpenAI adapter, against `ANTHROPIC_API_KEY`.
+- **Environment profile module** (`cantus.env`) with three classes:
+  `ColabEnvironment` (mounts Drive when in Colab, then loads locally with
+  4-bit quantization — equivalent to the legacy `mount_drive_and_load`),
+  `LocalEnvironment` (same load path, never mounts Drive), and
+  `CloudOnlyEnvironment` (refuses to load locally; redirects callers to
+  `load_chat_model('provider/...')` and verifiably does NOT import
+  transformers / bitsandbytes / torch).
+- **Three new optional-dependency groups** in `pyproject.toml`:
+  `openai` (`openai>=1.50,<2`), `anthropic` (`anthropic>=0.40,<1`), and
+  `providers` (aggregator pulling both). The `dev` group gains
+  `pytest-recording>=0.13` and `respx>=0.21`.
+- **ARCH-2 integration smoke test** (`tests/test_integration_smoke.py`)
+  proves that `import cantus` does NOT transitively load `openai` or
+  `anthropic`, and that the SDK only loads on first `_get_client()` call —
+  protecting the Tier 1 teaching path from cloud-SDK import cost.
+- **Multi-provider quickstart README section** in both `README.md` and
+  `README.zhTW.md`, with byte-identical OpenAI + Anthropic code blocks.
+  v0.1.x Gemma quickstart preserved unchanged above it.
+- **Manual smoke notebook** `notebooks/multi_provider_smoke.ipynb` that the
+  release manager runs by hand against real provider endpoints before
+  tagging v0.2.0 (one cell each for OpenAI / Anthropic chat + stream + a
+  bridge round-trip through `Agent`).
+
+### Changed
+
+- **`mount_drive_and_load()`** internally refactored to a thin delegate of
+  `ColabEnvironment().prepare_model(...)`. Signature, return type, exception
+  types (`ValueError`, `MountError`, `ModelNotFoundError`), Chinese error
+  messages, and `CANTUS_MODEL_ROOT` environment variable resolution are
+  byte-for-byte preserved. **No `DeprecationWarning` is emitted** —
+  v0.1.x notebooks run unchanged on v0.2.0. The existing
+  `tests/test_loader.py` suite passes without a single modification.
+- **`cantus.__init__`** exports the new Tier 2 symbols (`ChatModel`,
+  `Message`, `ToolCall`, `ChatResponse`, `ChatModelAsHandle`,
+  `load_chat_model`) plus the three Environment profiles. The version
+  string is bumped to `0.2.0`. `AgentState` is now also re-exported for
+  consistency with `Agent`.
+
+### Notes
+
+- **No LiteLLM at any layer.** The 2026-03 LiteLLM supply-chain compromise
+  (malicious code in versions 1.82.7 / 1.82.8) makes adding LiteLLM as
+  either a hard or optional dependency a non-trivial governance burden:
+  the framework would need to ship its own version-range check, document a
+  refusal policy, and educate users on detecting bad versions. v0.2.0
+  instead ships direct provider SDK adapters with their own optional
+  extras, accepting the trade-off of writing one adapter per provider in
+  exchange for a clean supply-chain story. See
+  `openspec/discussions/cantus-framework-shift.md` lines 290 and 359–367
+  for the framing.
+- **ARCH-1 dual-tier API** is now a load-bearing principle. Tier 1
+  (`ModelHandle.generate(prompt) -> str`) stays the teaching entrypoint
+  because students should be able to plug in any `.generate`-shaped object
+  including a 5-line mock. Tier 2 (`ChatModel.chat / stream / tool use`)
+  is the industry-aligned surface. The two MUST connect through the
+  explicit `ChatModelAsHandle` bridge — `Agent` is **not** taught to
+  recognise `ChatModel`, because adding an `isinstance` branch would
+  pollute Tier 1 with Tier 2 knowledge.
+- **Test strategy: SDK-level mocks, not VCR cassettes (yet).** Provider
+  contract tests under `tests/providers/` use `monkeypatch` on the SDK
+  client classes rather than recorded HTTP cassettes. CI does not hold any
+  real API keys; hand-crafted cassettes were rejected as fragile vs. the
+  signal they would carry. The cassette infrastructure (`conftest.py` with
+  `filter_headers` for `authorization` / `x-api-key` / `api-key` /
+  `x-goog-api-key`, and `record_mode='none'`) IS in place so v0.2.1 can
+  record real cassettes when adding Google / Groq / NVIDIA against the
+  same gate. **Follow-up for v0.2.1**: when the first real cassettes
+  land, extend the cantus-distribution pre-push secret-pattern hook
+  (currently `sk-`, `Bearer `, `api_key`, `authorization:`) to cover
+  `tests/providers/cassettes/**` paths.
+- **Deferred to v0.2.1** (`cantus-multi-provider-di-batch2`): Google
+  (`google-genai`, NOT the older `google-generativeai`), Groq, and
+  NVIDIA NIM (which is the `openai` SDK pointed at
+  `https://integrate.api.nvidia.com/v1` — `OpenAIChatModel.base_url`
+  already supports this from day one).
+- **Deferred to v0.3.x**: Anthropic content blocks (images, citations,
+  thinking) — currently reachable via `ChatResponse.raw`. OpenAI Responses
+  API. Tool-call streaming deltas (`stream()` yields text only).
+- **Deferred to v0.4.1**: unified secret management via `pydantic-settings`
+  (belongs to the `cantus-serve-security` capability — pulling it forward
+  would have broken the planned capability ordering).
+
 ## [0.1.4] - 2026-05-17
 
 Documentation-only release that bundles two long-standing dev/contributor needs

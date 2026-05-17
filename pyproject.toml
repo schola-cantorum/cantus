@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.1.4"
+version = "0.2.0"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,11 +38,25 @@ memory = [
     "rank-bm25>=0.2.2",
     "sentence-transformers>=2.5.0",
 ]
+# Tier 2 cloud provider adapters — each opt-in to keep import + supply-chain
+# surface minimal. v0.2.0 ships OpenAI + Anthropic; Google / Groq / NVIDIA
+# land in v0.2.1. LiteLLM is intentionally NOT a dependency at any layer.
+openai = [
+    "openai>=1.50,<2",
+]
+anthropic = [
+    "anthropic>=0.40,<1",
+]
+providers = [
+    "cantus[openai,anthropic]",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pytest-recording>=0.13",
+    "respx>=0.21",
 ]
-all = ["cantus[runtime,memory,dev]"]
+all = ["cantus[runtime,memory,providers,dev]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
