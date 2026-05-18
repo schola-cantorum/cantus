@@ -96,10 +96,18 @@ def test_expose_rejects_non_skill(fake_openhands):
 
 
 # ---------------------------------------------------------------------------
-# import_openhands_action is intentionally NOT exported in v0.3.3
+# import_openhands_action is permanently not exported (v0.3.4 batch3a decision)
 # ---------------------------------------------------------------------------
 
 
 def test_import_openhands_action_not_exported(fake_openhands):
+    """Permanent design decision, not a deferred punt.
+
+    `openhands.events.Action` is a declarative event record dispatched by the
+    OpenHands host runtime; it exposes no `__call__` that cantus
+    `Skill.run(**kwargs)` could delegate to. Wrapping an Action as a Skill is
+    a semantic mismatch — adapters are pure conversion utilities, not
+    runtime re-implementations.
+    """
     with pytest.raises(ImportError):
         from cantus.adapters.openhands import import_openhands_action  # noqa: F401

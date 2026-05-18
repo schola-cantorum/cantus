@@ -1,9 +1,16 @@
-"""OpenHands adapter — `expose_as_openhands_action` (export-only in v0.3.3).
+"""OpenHands adapter — ``expose_as_openhands_action`` (export-only, permanent).
 
-The import direction (OpenHands action -> cantus Skill) is intentionally
-deferred to v0.3.4 batch3 — OpenHands actions are host-side runtime
-constructs and the semantics of "wrapping a runtime action as a cantus
-tool" are not well defined.
+The import direction (OpenHands Action -> cantus Skill) is permanently not
+applicable. ``openhands.events.Action`` is a declarative event record
+dispatched by the OpenHands host runtime; it exposes no ``__call__`` that
+cantus ``Skill.run(**kwargs)`` could delegate to. Wrapping an Action as a
+Skill would require cantus to re-implement OpenHands' host-side dispatch
+loop, which is outside the adapter layer's purview ("adapters are pure
+conversion utilities" per the v0.3.2 ``adapter-layer`` capability).
+
+This decision was finalised in v0.3.4 batch3a after the v0.3.3 "deferred to
+v0.3.4" language was reviewed; users wanting cantus Skills inside an
+OpenHands runtime should use :func:`expose_as_openhands_action` instead.
 """
 
 from __future__ import annotations

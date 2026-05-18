@@ -1,5 +1,7 @@
 # `cantus.adapters` 跨框架 batch2（v0.3.3）
 
+> **Superseded（部分）by [`adapters-batch3.md`](./adapters-batch3.md) (v0.3.4)**：HF import 方向已在 v0.3.4 補上、OpenHands import 方向永久放棄。本文件保留作為 v0.3.3 設計的歷史快照；最新雙向矩陣請看 batch3 文件。
+
 ## 套件總覽
 
 v0.3.3 在 v0.3.2 的三件 MVP（MCP server / MCP client / Anthropic Memory）之上補上四個主流 agent stack 的 bridge：LangChain / DSPy / HuggingFace / OpenHands。共六個新 callable，每個對應一個 `cantus[<name>]` extras：

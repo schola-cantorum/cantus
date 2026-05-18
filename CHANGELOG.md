@@ -4,6 +4,77 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-05-18
+
+PATCH release. **PATCH additive — no BREAKING.** Closes the cross-framework
+adapter matrix by adding the HuggingFace import direction (`import_hf_tool`),
+and converts the v0.3.3 "deferred to v0.3.4 batch3" wording for the OpenHands
+import direction into a permanent "not applicable" decision. All v0.3.0,
+v0.3.1, v0.3.2, and v0.3.3 imports, constructors, and behaviours remain
+byte-identical.
+
+### Added
+
+- `cantus.adapters.import_hf_tool(tool: transformers.Tool) -> Skill` — wraps a
+  HuggingFace `transformers.Tool` as a cantus Skill (requires
+  `cantus[huggingface]`). Adds a `_HuggingFaceRemoteSkill(_RemoteSkillBase)`
+  internal subclass that derives the v0.3.0 JSON Schema from `tool.inputs`
+  (every declared input field becomes required, mirroring HF's lack of an
+  "optional input" concept) and dispatches `skill(**kwargs)` to
+  `tool(**kwargs)`. Errors during dispatch surface as
+  `RuntimeError("huggingface_remote_error: ...")`; schema parsing errors
+  surface as `RuntimeError("huggingface_handshake_failed: ...")`; non-Tool
+  inputs surface as `TypeError("import_hf_tool expects transformers.Tool")`.
+- `docs/protocols/adapters-batch3.md` — new design document covering the
+  v0.3.4 close-out, including the four-framework bidirectional matrix and
+  the OpenHands "not applicable" rationale.
+- `MIGRATION_v0.3.3_to_v0.3.4.md` — user-facing migration note with usage
+  examples for `import_hf_tool` and guidance on the OpenHands export-only
+  path.
+
+### Changed
+
+- `cantus.adapters.openhands` docstring now describes the OpenHands import
+  direction as permanently not applicable (was: "deferred to v0.3.4 batch3").
+  `openhands.events.Action` is a declarative event record dispatched by the
+  OpenHands host runtime; it exposes no `__call__` that
+  `Skill.run(**kwargs)` could delegate to, so wrapping it as a Skill is a
+  semantic mismatch rather than a tooling gap.
+- `cantus.adapters.huggingface` docstring rewritten — the v0.3.3 "import
+  direction deferred" paragraph is removed; the module now documents the
+  bidirectional contract and points at `_RemoteSkillBase` as the import-path
+  shared base.
+- `cantus.adapters.__init__` docstring expanded to enumerate ten top-level
+  callables (3 from v0.3.2 + 6 from v0.3.3 + 1 from v0.3.4) and to spell
+  out the OpenHands export-only stance.
+- `docs/protocols/adapters-batch2.md` carries a supersede note pointing
+  readers at `adapters-batch3.md` for the current HF / OpenHands import
+  story.
+- `openspec/specs/adapter-layer-batch2/spec.md` (in the main repo) gains a
+  new Requirement `import_hf_tool wraps HuggingFace transformers Tool as
+  cantus Skill`, and the `expose_as_hf_tool` / `expose_as_openhands_action`
+  Requirements have their "deferred to v0.3.4 batch3 evaluation" language
+  removed; the OpenHands counterpart now explains the omission as a
+  permanent semantic mismatch.
+
+### Removed
+
+- `tests/adapters/test_huggingface.py::test_import_hf_tool_not_exported` —
+  the v0.3.3 "defensive ImportError" test is gone; the symbol is now
+  exported. The OpenHands counterpart (`test_import_openhands_action_not_exported`)
+  stays, with its docstring updated to call out the permanence of the
+  decision.
+
+### Not changed
+
+- `cantus.adapters._RemoteSkillBase` is untouched; v0.3.4 only adds a new
+  concrete subclass.
+- All LangChain / DSPy / MCP / Anthropic Memory adapter modules and tests
+  are byte-identical with v0.3.3.
+- `Registry.KINDS` remains `("skill",)`.
+- No new dependencies or extras; `cantus[huggingface]` (`transformers>=4.40,<5`)
+  is reused.
+
 ## [0.3.3] - 2026-05-18
 
 MINOR release. **MINOR additive — no BREAKING.** Extends `cantus.adapters`
