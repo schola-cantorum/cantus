@@ -267,10 +267,47 @@ def test_v030_names_still_in_all():
         assert name in cantus.__all__, f"v0.3.0 name {name!r} dropped from __all__"
 
 
+# --- v0.3.2: cantus.adapters subpackage ---------------------------------
+
+
+def test_v032_adapters_three_callables_importable():
+    from cantus.adapters import (
+        expose_as_anthropic_memory_tool,
+        export_as_mcp_server,
+        import_mcp_server,
+    )
+
+    assert callable(export_as_mcp_server)
+    assert callable(import_mcp_server)
+    assert callable(expose_as_anthropic_memory_tool)
+
+
+def test_v032_anthropic_memory_works_without_mcp_sdk():
+    """`expose_as_anthropic_memory_tool` MUST NOT require the mcp SDK."""
+    from cantus import ShortTermMemory
+    from cantus.adapters import expose_as_anthropic_memory_tool
+
+    tool_dict = expose_as_anthropic_memory_tool(ShortTermMemory(n=2))
+    assert set(tool_dict.keys()) == {"type", "name", "description", "commands"}
+
+
+def test_v032_mcp_gate_requires_extras(monkeypatch):
+    """`cantus.adapters.mcp` (the gate module) raises ImportError without mcp SDK."""
+    import sys
+
+    for mod_name in list(sys.modules.keys()):
+        if mod_name == "cantus.adapters.mcp" or mod_name.startswith("cantus.adapters.mcp."):
+            del sys.modules[mod_name]
+    monkeypatch.setitem(sys.modules, "mcp", None)
+
+    with pytest.raises(ImportError, match=r"pip install cantus\[mcp\]"):
+        import cantus.adapters.mcp  # noqa: F401
+
+
 # --- version stamp ------------------------------------------------------
 
 
-def test_version_is_0_3_1():
+def test_version_is_0_3_2():
     import cantus
 
-    assert cantus.__version__ == "0.3.1"
+    assert cantus.__version__ == "0.3.2"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.3.1"
+version = "0.3.2"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -57,6 +57,12 @@ google = [
 ]
 groq = [
     "groq>=0.11,<1",
+]
+# v0.3.2 — `cantus.adapters.mcp` requires the official Anthropic MCP SDK.
+# The range covers both the 0.1.x betas and the 1.x stable line, capped
+# below 2 to insulate against a major-version rewrite.
+mcp = [
+    "mcp>=0.1,<2",
 ]
 providers = [
     "cantus[openai,anthropic,google,groq]",

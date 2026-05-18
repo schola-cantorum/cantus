@@ -37,6 +37,11 @@ class Skill:
 
     name: str = ""
     description: str = ""
+    # v0.3.2: provenance marker so callers (Inspector, log, adapter audit)
+    # can distinguish locally-defined Skills from MCP-imported remote Skills.
+    # `cantus.adapters.import_mcp_server` returns Skill subclasses with
+    # `is_remote = True`; bare `@skill` / class-first Skills stay False.
+    is_remote: bool = False
 
     def __init__(
         self,

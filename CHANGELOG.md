@@ -4,6 +4,58 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-05-18
+
+MINOR release. **MINOR additive — no BREAKING.** Adds the
+`cantus.adapters` subpackage with three MVP bridges: MCP server +
+MCP client + Anthropic Memory tool dict. All v0.3.0 and v0.3.1
+imports, constructors, and behaviours remain byte-identical.
+
+### Added
+
+- `cantus.adapters` subpackage with three top-level callables:
+  - `export_as_mcp_server(skills, *, name, version) -> McpServer`
+    wraps cantus Skills as a stdio / streamable-HTTP MCP server.
+  - `import_mcp_server(*, transport, command_or_url) -> list[Skill]`
+    connects to a remote MCP server and returns each remote tool as
+    a cantus Skill with `is_remote = True`.
+  - `expose_as_anthropic_memory_tool(memory) -> dict` returns the
+    Anthropic Memory tool spec dict (4-action `view`/`create`/
+    `str_replace`/`delete`); pure-Python, no SDK dependency.
+- `cantus[mcp]` extras pinning `mcp>=0.1,<2` — required for any
+  `cantus.adapters.mcp_*` use; `expose_as_anthropic_memory_tool`
+  works in the core install.
+- `cantus.adapters.mcp` gate module that raises `ImportError("...
+  pip install cantus[mcp]")` when the SDK is missing.
+- `Skill.is_remote: bool = False` class attribute; MCP-imported
+  Skills override to `True`. The marker is NOT leaked into
+  `spec_for_llm()` — v0.3.0 shape contract `{"name", "description",
+  "args_schema"}` is preserved across adapter import and use.
+
+### Security
+
+- `export_as_mcp_server` rejects `name` / `version` values that fail
+  the regex `^[A-Za-z0-9][A-Za-z0-9._-]*$` (length 1-64) — guards
+  against JSON-RPC payload injection.
+- `import_mcp_server(transport="stdio", ...)` rejects shell
+  metacharacters (`|`, `>`, `<`, `&`, `;`, `$`, backtick, newline)
+  in `command_or_url` — `subprocess.Popen` is never invoked via a
+  shell.
+- `import_mcp_server(transport="http", ...)` rejects URLs whose
+  scheme is not `http` / `https` or whose netloc is empty.
+- `McpServer.run(transport="http")` fails loud with
+  `OSError("Address already in use")` on a busy port; the framework
+  does NOT silently hang or retry.
+
+### Unchanged
+
+- All v0.3.0 / v0.3.1 imports continue to resolve identically.
+- `Skill.spec_for_llm()` JSON shape stays
+  `{"name", "description", "args_schema"}` before and after any
+  `cantus.adapters` submodule is imported.
+- `Registry.KINDS` remains `("skill",)` — adapters do NOT introduce
+  a new protocol kind.
+
 ## [0.3.1] - 2026-05-18
 
 MINOR release. **PATCH-equivalent additive — no BREAKING.** Adds the
