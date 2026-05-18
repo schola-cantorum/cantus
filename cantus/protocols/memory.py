@@ -21,15 +21,45 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
+from datetime import datetime
+from typing import Any, Literal
+
+_ALLOWED_TURN_TYPES = ("user", "assistant")
 
 
 @dataclass(frozen=True)
 class Turn:
-    """One conversational turn — user input + agent reply."""
+    """One conversational turn — user input + agent reply.
+
+    v0.3.1 extends the v0.3.0 ABI with two optional metadata fields
+    (`timestamp`, `type`). v0.3.0 call sites such as
+    `Turn(user="hi", assistant="hello")` continue to construct without
+    change; `type` is derived from non-empty content when omitted.
+    """
 
     user: str
     assistant: str
+    timestamp: datetime | None = None
+    type: Literal["user", "assistant"] | None = None
+
+    def __post_init__(self) -> None:
+        if self.type is not None and self.type not in _ALLOWED_TURN_TYPES:
+            raise ValueError(
+                f"unsupported Turn type: {self.type!r} "
+                f"(allowed: {list(_ALLOWED_TURN_TYPES)!r})"
+            )
+
+        if not self.user.strip() and not self.assistant.strip():
+            raise ValueError(
+                "empty Turn: both user and assistant are empty after strip()"
+            )
+
+        if self.type is None:
+            if self.user.strip() and not self.assistant.strip():
+                derived: Literal["user", "assistant"] = "user"
+            else:
+                derived = "assistant"
+            object.__setattr__(self, "type", derived)
 
 
 class Memory:
@@ -139,3 +169,23 @@ class EmbeddingMemory(Memory):
 def _tokenize(text: str) -> list[str]:
     """Simple whitespace tokenizer; sufficient for BM25 in mixed CJK / English."""
     return text.lower().split()
+
+
+# v0.3.1: re-export the new lower-tier `MarkdownMemory` and the upper-tier
+# `AutoMemory` from sibling modules so that
+# `from cantus.protocols.memory import MarkdownMemory, AutoMemory` works,
+# matching the memory-protocol spec scenario. The sibling modules only
+# depend on names defined above this line (`Memory`, `Turn`), so the
+# circular import is safe.
+from cantus.protocols.memory_markdown import MarkdownMemory  # noqa: E402
+from cantus.protocols.memory_auto import AutoMemory  # noqa: E402
+
+__all__ = [
+    "Turn",
+    "Memory",
+    "ShortTermMemory",
+    "BM25Memory",
+    "EmbeddingMemory",
+    "MarkdownMemory",
+    "AutoMemory",
+]

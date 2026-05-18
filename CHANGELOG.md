@@ -4,6 +4,60 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-18
+
+MINOR release. **PATCH-equivalent additive — no BREAKING.** Adds the
+Memory dual-tier API, the `Soul` identity abstraction, and an opt-in
+JSON-Lines persistence plug for `EventStream`. All v0.3.0 imports,
+constructors, and behaviours remain byte-identical when the new
+keywords / classes are not used.
+
+### Added
+
+- `cantus.protocols.memory.MarkdownMemory(path, top_k=10)` — file-backed
+  lower-tier Memory with frontmatter chunks and a resolve-then-classify
+  safe-path policy that rejects path traversal, Unix system roots
+  (`/etc`, `/sys`, `/proc`, `/dev`, `/root`, plus macOS `/private/*`
+  canonical equivalents), FIFO / socket / block-device entries, and
+  Windows UNC paths.
+- `cantus.protocols.memory.AutoMemory(backend)` — upper-tier wrapper
+  that exposes 4 LLM-facing `Skill` tools (`view`, `create`,
+  `str_replace`, `delete`) mirroring the Anthropic Memory tool spec.
+  `AutoMemory` uses composition (NOT inheritance) and returns a cached
+  `tools` list whose docstring carries the literal `"LLM has full CRUD
+  access"` foot-gun warning.
+- `cantus.identity.Soul` and `Soul.from_file(path)` / `Soul.from_text(text)`
+  parsers for the six-section SOUL.md format (`Name & Role`,
+  `Personality`, `Rules`, `Tools`, `Output format`, `Handoffs`).
+  Case-sensitive H2 matching; failures raise `SoulParseError` with
+  `missing_sections`, `duplicates`, and `unexpected` lists.
+- `cantus.core.event_stream_persistence.JsonLinesPersistence(path)` —
+  optional append-only JSON-Lines persistence plug with `os.fsync` after
+  every write, POSIX `0o600` file mode on first creation, and a
+  serialise-before-open contract that prevents partial writes on
+  non-serialisable input.
+- `Agent.__init__` now accepts a keyword-only `soul: Soul | None = None`.
+  When supplied, the agent prepends `soul.to_system_prompt() + "\n\n"`
+  to the system prompt; when `None` (default), system-prompt construction
+  is byte-identical to v0.3.0.
+- `Turn` dataclass gains two optional metadata fields: `timestamp:
+  datetime | None` and `type: Literal["user", "assistant"] | None`. The
+  `type` Literal is restricted to the two derivable values; `"system"`
+  and `"tool"` are explicitly rejected to keep `Turn` semantically
+  unambiguous. Whitespace-only Turn(user="   ", assistant="") raises
+  `ValueError("empty Turn ...")`.
+
+### Unchanged
+
+- All v0.3.0 imports continue to resolve identically (`from cantus
+  import Skill, Memory, Agent, skill`, `from cantus.hooks import ...`,
+  `from cantus.workflows import ...`).
+- `from cantus import memory` and `from cantus import register_memory`
+  still raise `ImportError` — Memory remains class-only entry per the
+  v0.3.0 `agent-protocols` Requirement.
+- In-memory `EventStream` is unchanged; `JsonLinesPersistence` is a
+  separate opt-in plug that host code drives explicitly.
+
 ## [0.3.0] - 2026-05-18
 
 MAJOR release. **BREAKING** — protocol surface reorganized: `Analyzer` and

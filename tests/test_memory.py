@@ -1,5 +1,7 @@
 """Memory: class-only protocol with three reference implementations."""
 
+from datetime import datetime
+
 import pytest
 
 from cantus.protocols.memory import (
@@ -61,3 +63,56 @@ def test_no_memory_decorator_at_module_level():
 
     assert not hasattr(mod, "memory") or not callable(getattr(mod, "memory", None))
     assert not hasattr(mod, "register_memory")
+
+
+# --- v0.3.1: Turn dataclass extension ----------------------------------
+
+
+def test_turn_v030_byte_identical():
+    """v0.3.0 constructor `Turn(user=..., assistant=...)` continues to work."""
+    t = Turn(user="hello", assistant="hi")
+    assert t.user == "hello"
+    assert t.assistant == "hi"
+    assert t.timestamp is None
+    assert t.type == "assistant"
+
+
+def test_turn_type_derivation():
+    """Derivation rule: user-only -> 'user'; assistant-only -> 'assistant';
+    both -> 'assistant'; explicit type wins."""
+    assert Turn(user="q", assistant="").type == "user"
+    assert Turn(user="", assistant="a").type == "assistant"
+    assert Turn(user="q", assistant="a").type == "assistant"
+    assert Turn(user="q", assistant="", type="user").type == "user"
+
+    ts = datetime(2026, 5, 18, 12, 0)
+    explicit = Turn(user="hello", assistant="", timestamp=ts, type="user")
+    assert explicit.timestamp == ts
+    assert explicit.type == "user"
+
+
+def test_turn_empty_raises():
+    """Both fields empty -> ValueError with 'empty Turn' substring."""
+    with pytest.raises(ValueError, match="empty Turn"):
+        Turn(user="", assistant="")
+
+
+def test_turn_whitespace_rejected():
+    """Whitespace-only fields -> ValueError; rejection holds even with explicit type."""
+    with pytest.raises(ValueError, match="empty Turn"):
+        Turn(user="   ", assistant="\t\n")
+
+    with pytest.raises(ValueError, match="empty Turn"):
+        Turn(user="   ", assistant="", type="user")
+
+
+def test_turn_type_literal_rejects_system_and_tool():
+    """Literal["user", "assistant"] -> any other string is rejected."""
+    with pytest.raises((ValueError, TypeError), match="unsupported Turn type"):
+        Turn(user="x", assistant="", type="system")  # type: ignore[arg-type]
+
+    with pytest.raises((ValueError, TypeError), match="unsupported Turn type"):
+        Turn(user="x", assistant="", type="tool")  # type: ignore[arg-type]
+
+    with pytest.raises((ValueError, TypeError), match="unsupported Turn type"):
+        Turn(user="x", assistant="", type="anything-else")  # type: ignore[arg-type]

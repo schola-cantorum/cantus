@@ -185,10 +185,92 @@ def test_memory_has_no_function_pass_entry():
         from cantus import register_memory  # noqa: F401
 
 
-# --- v0.3.0 version stamp -----------------------------------------------
+# --- v0.3.1: new public surface -----------------------------------------
 
 
-def test_version_is_0_3_0():
+def test_v031_memory_implementations_importable():
+    from cantus import AutoMemory, MarkdownMemory
+    from cantus.protocols.memory import AutoMemory as A2
+    from cantus.protocols.memory import MarkdownMemory as M2
+
+    assert AutoMemory is A2
+    assert MarkdownMemory is M2
+
+
+def test_v031_identity_module_importable():
+    from cantus import Soul, SoulParseError
+    from cantus.identity import Soul as S2
+    from cantus.identity import SoulParseError as E2
+
+    assert Soul is S2
+    assert SoulParseError is E2
+
+
+def test_v031_event_stream_persistence_importable():
+    from cantus import JsonLinesPersistence
+    from cantus.core.event_stream_persistence import JsonLinesPersistence as J2
+
+    assert JsonLinesPersistence is J2
+
+
+def test_v031_all_includes_new_names():
     import cantus
 
-    assert cantus.__version__ == "0.3.0"
+    for name in (
+        "MarkdownMemory",
+        "AutoMemory",
+        "Soul",
+        "SoulParseError",
+        "JsonLinesPersistence",
+    ):
+        assert name in cantus.__all__, f"{name} missing from cantus.__all__"
+
+
+def test_v030_names_still_in_all():
+    """v0.3.1 is additive; the v0.3.0 public surface must not regress."""
+    import cantus
+
+    for name in (
+        "skill",
+        "debug",
+        "register_skill",
+        "Skill",
+        "Memory",
+        "ShortTermMemory",
+        "BM25Memory",
+        "EmbeddingMemory",
+        "Action",
+        "CallSkillAction",
+        "FinalAnswerAction",
+        "Observation",
+        "SkillObservation",
+        "ToolErrorObservation",
+        "ValidationErrorObservation",
+        "MaxIterationsObservation",
+        "EventStream",
+        "Agent",
+        "AgentState",
+        "Inspector",
+        "Registry",
+        "get_registry",
+        "Result",
+        "ChatModel",
+        "Message",
+        "ToolCall",
+        "ChatResponse",
+        "ChatModelAsHandle",
+        "load_chat_model",
+        "ColabEnvironment",
+        "LocalEnvironment",
+        "CloudOnlyEnvironment",
+    ):
+        assert name in cantus.__all__, f"v0.3.0 name {name!r} dropped from __all__"
+
+
+# --- version stamp ------------------------------------------------------
+
+
+def test_version_is_0_3_1():
+    import cantus
+
+    assert cantus.__version__ == "0.3.1"

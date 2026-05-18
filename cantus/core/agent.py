@@ -16,7 +16,7 @@ import copy
 import json
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Protocol, Union
+from typing import TYPE_CHECKING, Any, Protocol, Union
 
 from cantus.core.action import (
     Action,
@@ -32,6 +32,9 @@ from cantus.core.observation import (
     ValidationErrorObservation,
 )
 from cantus.core.registry import Registry, get_registry
+
+if TYPE_CHECKING:
+    from cantus.identity import Soul
 
 
 def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
@@ -75,6 +78,7 @@ class Agent:
 
     model: ModelHandle
     registry: Registry = field(default_factory=get_registry)
+    soul: "Soul | None" = field(default=None, kw_only=True)
 
     def step(self, state: AgentState) -> Union[Action, Observation]:
         """One decision step: ask the model for the next action.
@@ -182,7 +186,7 @@ class Agent:
         # `chat_template` on the loaded model; we keep this generic for
         # easier testing with a MockModel.
         spec = self.registry.spec_for_llm()
-        return json.dumps(
+        baseline = json.dumps(
             {
                 "tools": spec,
                 "query": state.query,
@@ -190,6 +194,9 @@ class Agent:
             },
             ensure_ascii=False,
         )
+        if self.soul is not None:
+            return self.soul.to_system_prompt() + "\n\n" + baseline
+        return baseline
 
     def _parse_action(self, raw: str) -> Union[Action, Observation]:
         """Parse LLM output into an Action or a parse-error Observation.

@@ -1,6 +1,6 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from cantus.core.action import (
     Action,
@@ -9,6 +9,7 @@ from cantus.core.action import (
 )
 from cantus.core.agent import Agent, AgentState
 from cantus.core.event_stream import EventStream
+from cantus.core.event_stream_persistence import JsonLinesPersistence
 from cantus.core.observation import (
     MaxIterationsObservation,
     Observation,
@@ -19,14 +20,17 @@ from cantus.core.observation import (
 from cantus.core.registry import Registry, get_registry
 from cantus.core.result import Result
 from cantus.env import CloudOnlyEnvironment, ColabEnvironment, LocalEnvironment
+from cantus.identity import Soul, SoulParseError
 from cantus.inspect import Inspector
 from cantus.model.bridge import ChatModelAsHandle
 from cantus.model.chat import ChatModel, ChatResponse, Message, ToolCall
 from cantus.model.factory import load_chat_model
 from cantus.protocols.debug import debug
 from cantus.protocols.memory import (
+    AutoMemory,
     BM25Memory,
     EmbeddingMemory,
+    MarkdownMemory,
     Memory,
     ShortTermMemory,
 )
@@ -43,10 +47,17 @@ __all__ = [
     # Analyzer/Validator are imported from cantus.hooks)
     "Skill",
     "Memory",
-    # Memory implementations
+    # Memory implementations (v0.3.1: MarkdownMemory + AutoMemory join)
     "ShortTermMemory",
     "BM25Memory",
     "EmbeddingMemory",
+    "MarkdownMemory",
+    "AutoMemory",
+    # Identity (v0.3.1)
+    "Soul",
+    "SoulParseError",
+    # EventStream persistence plug (v0.3.1)
+    "JsonLinesPersistence",
     # Runtime
     "Action",
     "CallSkillAction",
