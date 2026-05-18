@@ -6,10 +6,12 @@
 
 ```
 +-----------------------------------------------------+
-|  User Code        @skill / @workflow / @validator   |  <- decorator-first
+|  User Code        @skill / @memory + analyzer /     |  <- decorator-first
+|                   validator hook helpers            |
 +-----------------------------------------------------+
-|  Protocols        skill | analyzer | validator |    |  <- 五件 protocol
-|                   workflow | tool                   |
+|  Protocols        skill | memory（兩個 protocol     |  <- 雙 kind + hook
+|                   kind）+ analyzer / validator hook |     helper + workflows
+|                   helper + cantus.workflows         |     building block
 +-----------------------------------------------------+
 |  Core Runtime     Agent / EventStream / Action /    |  <- bounded loop
 |                   Observation / Registry / Result   |
@@ -21,17 +23,18 @@
 
 最上層是使用者程式碼，透過 decorator 把純 Python function 註冊成 protocol；中間兩層是 framework 提供的 runtime；最底層是 Colab 環境本身（model handle、Drive mount、stdout）。
 
-## 五件 Protocol
+## 兩個 Protocol Kind + Hook Helper + Workflows Building Block
 
-| Protocol    | 角色                                       | 回傳型別          |
-| ----------- | ------------------------------------------ | ----------------- |
-| `skill`     | 一個原子能力，例如查表、呼叫 API           | 任意值            |
-| `analyzer`  | 對輸入做純讀分析，產出結構化 insight       | dataclass / dict  |
-| `validator` | 檢查上一步輸出是否合格，可觸發 retry       | `Result(ok, ...)` |
-| `workflow`  | 把 skill / analyzer / validator 串成流程   | 任意值            |
-| `tool`      | 對 LLM 公開的 function-call schema wrapper | 任意值            |
+| 類別                       | 角色                                                                           | 回傳型別          |
+| -------------------------- | ------------------------------------------------------------------------------ | ----------------- |
+| `skill`（protocol kind）   | 一個原子能力，例如查表、呼叫 API                                               | 任意值            |
+| `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory 等）          | 各 memory 介面    |
+| `analyzer`（hook helper）  | 在進入 agent loop 之前對輸入做純讀分析，產出結構化 insight                     | dataclass / dict  |
+| `validator`（hook helper） | 檢查 agent 輸出是否合格，可觸發 retry                                          | `Result(ok, ...)` |
+| `cantus.workflows`         | building block 命名空間，提供把 skill / analyzer / validator 串成流程的範本    | 任意值            |
+| `tool`                     | 對 LLM 公開的 function-call schema wrapper                                     | 任意值            |
 
-`skill` / `analyzer` / `validator` / `workflow` 都是 function-based，只需 decorator；`tool` 則是給 LLM function-calling 的對外介面。
+v0.3.0 之後 cantus 只剩兩個 protocol kind（`skill` 與 `memory`）；`analyzer` / `validator` 改以 hook helper 形式存在，流程編排則放進 `cantus.workflows` building block。`tool` 仍是給 LLM function-calling 的對外介面。
 
 ## 與 OpenHands / smolagents 的關係
 
@@ -43,9 +46,9 @@
 
 ## 文件樹結構
 
-- `overview.md`（本檔）：四層架構、五件 protocol、相關專案比較
+- `overview.md`（本檔）：四層架構、雙 protocol kind + hook helper + workflows building block、相關專案比較
 - `quickstart.md`：30 秒從 import 到第一次 agent run
-- `protocols/{skill,analyzer,validator,workflow,memory,debug}.md`：每件 protocol 的三入口範例與常見錯誤
+- `protocols/{skill,analyzer,validator,memory,debug}.md`：兩個 protocol kind（skill / memory）與 hook helper（analyzer / validator）的三入口範例與常見錯誤；流程編排範本則放在 `cantus.workflows` building block
 - `core/{agent,event-stream,inspector}.md`：runtime 內部資料結構
 - `cookbook/{patterns,errors,tips}.md`：常見組合與排錯
 - `llms-txt.md`：`docs/llms.txt` 是什麼、為何存在、如何用作老師端可行性測試

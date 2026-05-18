@@ -17,15 +17,13 @@ Five behaviors merged into `agent-runtime` canonical spec:
 
 from __future__ import annotations
 
-import copy
 import json
 from dataclasses import dataclass
 
 import pytest
 
-from cantus.core.action import CallSkillAction, FinalAnswerAction
+from cantus.core.action import FinalAnswerAction
 from cantus.core.agent import Agent
-from cantus.core.event_stream import EventStream
 from cantus.core.observation import (
     MaxIterationsObservation,
     ValidationErrorObservation,

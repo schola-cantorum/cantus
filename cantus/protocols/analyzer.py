@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from cantus.core.registry import get_registry
 from cantus.protocols._common import (
     build_args_model_from_callable,
     first_paragraph,
@@ -50,24 +49,25 @@ class Analyzer:
 
 
 def analyzer(fn: Callable[..., Any]) -> Analyzer:
-    """Decorator entry: wrap a function as an `Analyzer` and register it."""
-    instance = _from_function(fn)
-    get_registry().register("analyzer", instance)
-    return instance
+    """Decorator entry: wrap a function as a reusable `Analyzer` hook helper.
+
+    v0.3.0: This decorator no longer mutates the runtime registry. Attach
+    the returned instance to a `Skill` via `@skill(pre_hook=...)` to make
+    it run as part of skill dispatch.
+    """
+    return _from_function(fn)
 
 
 def register_analyzer(fn: Callable[..., Any]) -> Analyzer:
     """Function-pass entry."""
-    instance = _from_function(fn)
-    get_registry().register("analyzer", instance)
-    return instance
+    return _from_function(fn)
 
 
 def _from_function(fn: Callable[..., Any]) -> Analyzer:
     name = fn.__name__
 
     def _run(self: Analyzer, *args: Any, **kwargs: Any) -> Any:
-        return type(self)._fn(*args, **kwargs)
+        return type(self)._fn(*args, **kwargs)  # type: ignore[attr-defined]
 
     cls_attrs: dict[str, Any] = {
         "name": name,

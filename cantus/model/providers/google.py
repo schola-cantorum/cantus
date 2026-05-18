@@ -43,7 +43,7 @@ class GoogleChatModel:
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from google import genai  # type: ignore[import-not-found]
+            from google import genai  # type: ignore[import-not-found,attr-defined,import-untyped]
 
             self._client = genai.Client(api_key=self._api_key, **self._client_kwargs)
         return self._client

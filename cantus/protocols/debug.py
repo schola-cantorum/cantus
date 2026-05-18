@@ -1,14 +1,13 @@
-"""@debug — stack on top of any protocol decorator to print a structured trace.
+"""@debug — stack on top of a Skill (or hook helper) to print a structured trace.
 
     @debug
     @skill
     def search_book(title: str) -> str: ...
 
-When stacked, every invocation prints `[debug] <name> args=... result=...`
-to stdout. The decorator works with any of `Skill`, `Analyzer`,
-`Validator`, `Workflow` (and their function-derived synthetic
-subclasses). Memory is class-only and not wrapped here; if you want to
-trace memory access, override `recall` in your subclass.
+v0.3.0: `@workflow` was removed; orchestration is now via `cantus.workflows`
+building blocks which are plain Python — wrap their underlying Skills with
+`@debug` if you want to trace orchestration steps. `@debug` accepts `Skill`,
+`Analyzer`, and `Validator` (the latter two as hook helpers).
 """
 
 from __future__ import annotations
@@ -20,15 +19,14 @@ from typing import Any
 from cantus.protocols.analyzer import Analyzer
 from cantus.protocols.skill import Skill
 from cantus.protocols.validator import Validator
-from cantus.protocols.workflow import Workflow
 
-_TRACEABLE = (Skill, Analyzer, Validator, Workflow)
+_TRACEABLE = (Skill, Analyzer, Validator)
 
 
 def debug(target: Any) -> Any:
     """Decorator: wrap a registered protocol instance to print a trace on each call.
 
-    Stack on top of `@skill`, `@analyzer`, `@validator`, or `@workflow`:
+    Stack on top of `@skill`, `@analyzer`, or `@validator`:
 
         @debug
         @skill
@@ -39,8 +37,8 @@ def debug(target: Any) -> Any:
     """
     if not isinstance(target, _TRACEABLE):
         raise TypeError(
-            f"@debug can only wrap a registered protocol "
-            f"(Skill, Analyzer, Validator, Workflow); got {type(target).__name__}. "
+            f"@debug can only wrap a Skill or hook helper "
+            f"(Skill, Analyzer, Validator); got {type(target).__name__}. "
             f"Make sure @debug is on top: `@debug` then `@skill`."
         )
 
@@ -67,7 +65,7 @@ def debug(target: Any) -> Any:
 
     # Replace `run` on the instance — __call__ delegates to run().
     target.run = traced  # type: ignore[method-assign]
-    target._debug_enabled = True  # type: ignore[attr-defined]
+    target._debug_enabled = True  # type: ignore[union-attr,attr-defined]
     return target
 
 

@@ -1,6 +1,6 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 from cantus.core.action import (
     Action,
@@ -23,11 +23,6 @@ from cantus.inspect import Inspector
 from cantus.model.bridge import ChatModelAsHandle
 from cantus.model.chat import ChatModel, ChatResponse, Message, ToolCall
 from cantus.model.factory import load_chat_model
-from cantus.protocols.analyzer import (
-    Analyzer,
-    analyzer,
-    register_analyzer,
-)
 from cantus.protocols.debug import debug
 from cantus.protocols.memory import (
     BM25Memory,
@@ -36,34 +31,17 @@ from cantus.protocols.memory import (
     ShortTermMemory,
 )
 from cantus.protocols.skill import Skill, register_skill, skill
-from cantus.protocols.validator import (
-    Validator,
-    register_validator,
-    validator,
-)
-from cantus.protocols.workflow import (
-    Workflow,
-    register_workflow,
-    workflow,
-)
 
 __all__ = [
-    # Decorator entries
+    # Decorator entries (v0.3.0: Skill + debug only at top level;
+    # analyzer/validator are now imported from cantus.hooks)
     "skill",
-    "analyzer",
-    "validator",
-    "workflow",
     "debug",
     # Function-pass entries
     "register_skill",
-    "register_analyzer",
-    "register_validator",
-    "register_workflow",
-    # Class-first base classes
+    # Class-first base classes (top level: Skill + Memory only;
+    # Analyzer/Validator are imported from cantus.hooks)
     "Skill",
-    "Analyzer",
-    "Validator",
-    "Workflow",
     "Memory",
     # Memory implementations
     "ShortTermMemory",
@@ -85,7 +63,7 @@ __all__ = [
     # Registry
     "Registry",
     "get_registry",
-    # Result type for validators
+    # Result type
     "Result",
     # Tier 2 ChatModel
     "ChatModel",

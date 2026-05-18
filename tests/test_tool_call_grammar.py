@@ -4,7 +4,6 @@ import json
 
 import pytest
 
-from cantus.core.registry import get_registry
 from cantus.grammar.tool_call import (
     GrammarError,
     build_schema,

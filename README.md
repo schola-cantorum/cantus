@@ -18,7 +18,7 @@
 
 > A polyphonic framework for composing LLM agent harnesses — designed for teaching on Google Colab.
 
-Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Five protocols (Skill / Analyzer / Validator / Workflow / Memory) let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
+Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Two protocol kinds (Skill / Memory) plus hook helpers (Analyzer / Validator) and the `cantus.workflows` building blocks let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
 
 The Chinese-speaking LLM community refers to prompt engineering as *詠唱* (incantation). Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
 
@@ -131,16 +131,24 @@ print(result.final_answer)
 `cantus[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
 
 <p align="center">
-  <img src="assets/banner_protocols.jpeg" alt="Cantus five protocols: Skill, Analyzer, Validator, Workflow, Memory">
+  <img src="assets/banner_protocols.jpeg" alt="Cantus protocol kinds (Skill, Memory) plus Analyzer / Validator hook helpers and cantus.workflows building blocks">
 </p>
 
-## The five protocols (one sentence each)
+## Two protocol kinds + hook helpers + workflows building blocks
+
+Two protocol kinds (the things cantus formally registers and dispatches):
 
 - **Skill** — a function the agent can call (tool use). Decorate with `@skill` or subclass `Skill`.
+- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`.
+
+Hook helpers (pre- / post-loop tooling, not protocol kinds):
+
 - **Analyzer** — turn user input into a structured result before entering the agent loop. Use `@analyzer` or subclass `Analyzer`.
 - **Validator** — post-process the agent's output, returning a `Result` that decides pass or retry. Use `@validator` or subclass `Validator`.
-- **Workflow** — a fixed flow that chains skills, analyzers, and validators. Use `@workflow` or subclass `Workflow`.
-- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`.
+
+Workflows building block:
+
+- **`cantus.workflows`** — composition templates that chain skills, analyzers, and validators into a fixed flow. No longer a protocol kind in v0.3.0; pick the building block that fits your scenario.
 
 ## Documentation
 
@@ -148,7 +156,7 @@ Full docs live in [`docs/`](./docs/):
 
 - [Overview](./docs/overview.md) — architecture and design philosophy
 - [Quickstart](./docs/quickstart.md) — from zero to first agent in 10 minutes
-- [Protocols](./docs/protocols/) — design and usage of all five protocols
+- [Protocols](./docs/protocols/) — design and usage of the two protocol kinds and the Analyzer / Validator hook helpers (workflow composition lives under `cantus.workflows`)
 - [Cookbook](./docs/cookbook/) — patterns, error recipes, teaching tips
 - [llms.txt](./llms.txt) — priming document for external LLMs
 - [Developer LLM Wiki](./docs/llm_wiki/index.md) — internal contributor knowledge base (research, coding style, architecture, future work)

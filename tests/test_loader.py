@@ -1,6 +1,5 @@
 """Loader: variant validation, missing path errors, fallback opt-in."""
 
-import os
 from pathlib import Path
 
 import pytest

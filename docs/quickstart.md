@@ -5,7 +5,7 @@
 ## 完整範例
 
 ```python
-from cantus import skill, workflow, Agent, mount_drive_and_load
+from cantus import skill, Agent, mount_drive_and_load
 
 # 1. 載入 Gemma 4（會自動 mount Google Drive 取 cache）
 model = mount_drive_and_load(variant="E2B")  # or "E4B"
@@ -21,12 +21,8 @@ def add(a: int, b: int) -> int:
     """
     return a + b
 
-# 3. 寫一個 workflow：把 skill 串成一條流程
-@workflow
-def add_twice(x: int, y: int, z: int) -> int:
-    """先加兩次，再回報總和。"""
-    first = add(a=x, b=y)
-    return add(a=first, b=z)
+# 3. 需要把 skill 串成流程，可用 cantus.workflows building block；
+#    本範例只示範單一 skill，串接範例見 cookbook。
 
 # 4. 把 model handle 餵給 Agent，用自然語言 query 啟動 loop
 agent = Agent(model=model)
@@ -51,6 +47,6 @@ Inspector(state.stream).summary()     # 印出 action / observation 統計
 
 - `max_iterations=8`：bounded loop 最多跑 8 步，避免 LLM 死循環
 - `max_retries=3`：當 validator 回傳 `Result(ok=False)`，最多自動重試 3 次
-- 所有 skill / workflow 例外會被包成 `ToolErrorObservation` 餵回 prompt，不會炸出 loop
+- 所有 skill 與 `cantus.workflows` building block 例外會被包成 `ToolErrorObservation` 餵回 prompt，不會炸出 loop
 
 只要這支 cell 能跑完，你就具備了所有後續章節需要的 mental model。

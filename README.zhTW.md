@@ -18,7 +18,7 @@
 
 > 為 Google Colab 教學設計、用來編排 LLM agent harness 的複音（polyphonic）框架。
 
-Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent 框架。五個協定（Skill ／ Analyzer ／ Validator ／ Workflow ／ Memory）讓學員與 operator 能在 Google Colab 上組合 agent，背後由 4-bit 量化的 Gemma 4 模型支撐。
+Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent 框架。兩個 protocol kind（Skill ／ Memory）加上 hook helper（Analyzer ／ Validator）與 `cantus.workflows` building block，讓學員與 operator 能在 Google Colab 上組合 agent，背後由 4-bit 量化的 Gemma 4 模型支撐。
 
 中文 LLM 社群把 prompt engineering 稱作「*詠唱*」。Cantus 把 agent 的組合視為一段複音聖詠 —— 每個協定是一條聲部，合起來就形成一個會回唱的 agent。
 
@@ -131,16 +131,24 @@ print(result.final_answer)
 `cantus[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
 
 <p align="center">
-  <img src="assets/banner_protocols.jpeg" alt="Cantus 五協定：Skill、Analyzer、Validator、Workflow、Memory">
+  <img src="assets/banner_protocols.jpeg" alt="Cantus 雙 protocol kind（Skill、Memory）加上 Analyzer ／ Validator hook helper 與 cantus.workflows building block">
 </p>
 
-## 五個協定（一句話介紹）
+## 雙 protocol kind ＋ hook helper ＋ workflows building block
+
+兩個 protocol kind（cantus 正式註冊與 dispatch 的對象）：
 
 - **Skill** —— agent 可以呼叫的函式（tool use）。以 `@skill` 裝飾或繼承 `Skill` 類別。
+- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`。
+
+Hook helper（pre- ／ post-loop 工具，不屬於 protocol kind）：
+
 - **Analyzer** —— 在進入 agent loop 之前，把使用者輸入轉換成結構化結果。用 `@analyzer` 或繼承 `Analyzer`。
 - **Validator** —— 後處理 agent 的輸出，回傳一個 `Result` 決定通過或重試。用 `@validator` 或繼承 `Validator`。
-- **Workflow** —— 串接 skills、analyzers、validators 的固定流程。用 `@workflow` 或繼承 `Workflow`。
-- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`。
+
+Workflows building block：
+
+- **`cantus.workflows`** —— 串接 skills、analyzers、validators 的編排範本。v0.3.0 之後不再是 protocol kind，依場景挑選合適的 building block 即可。
 
 ## Documentation
 
@@ -148,7 +156,7 @@ print(result.final_answer)
 
 - [Overview](./docs/overview.md) —— 架構與設計哲學
 - [Quickstart](./docs/quickstart.md) —— 10 分鐘從零打造第一個 agent
-- [Protocols](./docs/protocols/) —— 五個協定的設計與使用方式
+- [Protocols](./docs/protocols/) —— 兩個 protocol kind 與 Analyzer ／ Validator hook helper 的設計與使用方式（流程編排請見 `cantus.workflows`）
 - [Cookbook](./docs/cookbook/) —— 模式、錯誤處理、教學提示
 - [llms.txt](./llms.txt) —— 給外部 LLM 的 priming 文件
 - [開發者 LLM Wiki](./docs/llm_wiki/index.md) —— cantus 內部貢獻者知識庫（研究、coding style、架構、未來工作）

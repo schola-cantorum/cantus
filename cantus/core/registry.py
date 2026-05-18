@@ -13,18 +13,29 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-ProtocolKind = str  # one of: "skill", "analyzer", "validator", "workflow"
+ProtocolKind = str  # v0.3.0: only "skill" is valid
+
+_LEGACY_KINDS = frozenset({"analyzer", "validator", "workflow"})
 
 
 class Registry:
     """Catalog of registered protocol instances, indexed by kind and name."""
 
-    KINDS = ("skill", "analyzer", "validator", "workflow")
+    KINDS = ("skill",)
 
     def __init__(self) -> None:
         self._by_kind: dict[ProtocolKind, dict[str, Any]] = defaultdict(dict)
 
     def register(self, kind: ProtocolKind, instance: Any) -> None:
+        if kind in _LEGACY_KINDS:
+            raise ValueError(
+                f"Protocol kind {kind!r} was removed in cantus v0.3.0. "
+                f"Analyzer and Validator are now Skill hook helpers: attach via "
+                f"`@skill(pre_hook=...)` or `@skill(post_hook=...)`. "
+                f"Workflow orchestration moved to the `cantus.workflows` package "
+                f"(PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer). "
+                f"See MIGRATION_v0.2_to_v0.3.md."
+            )
         if kind not in self.KINDS:
             raise ValueError(f"Unknown protocol kind: {kind!r}. Valid: {self.KINDS}")
         name = getattr(instance, "name", None)

@@ -7,8 +7,6 @@ patterns and the audit exits non-zero on any match.
 
 from __future__ import annotations
 
-import os
-import shutil
 import stat
 import subprocess
 import textwrap

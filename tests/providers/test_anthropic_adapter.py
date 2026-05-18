@@ -6,8 +6,6 @@ cassettes; see test_openai_adapter.py for the same rationale.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from types import SimpleNamespace
 from typing import Any
 
 import pytest

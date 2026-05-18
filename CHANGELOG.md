@@ -4,6 +4,69 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-18
+
+MAJOR release. **BREAKING** — protocol surface reorganized: `Analyzer` and
+`Validator` are demoted from top-level protocol kinds to `Skill` pre/post hook
+helpers; the `@workflow` decorator is removed and replaced by explicit
+`cantus.workflows` building blocks (`PromptChain`, `Router`, `Parallel`,
+`OrchestratorWorker`, `EvaluatorOptimizer`). See
+[`MIGRATION_v0.2_to_v0.3.md`](./MIGRATION_v0.2_to_v0.3.md) for the mechanical
+conversion recipe.
+
+### BREAKING
+
+- `from cantus import Workflow, workflow, register_workflow` → `ImportError`.
+  `cantus.protocols.workflow` is hard-removed.
+- `from cantus import Analyzer, Validator, analyzer, validator,
+  register_analyzer, register_validator` → `ImportError`. Use
+  `from cantus.hooks import …` instead.
+- `Registry.KINDS` shrunk from `("skill", "analyzer", "validator", "workflow")`
+  to `("skill",)`. `Registry.register("analyzer"|"validator"|"workflow", …)`
+  raises `ValueError` with a migration hint pointing at `pre_hook=` / `post_hook=`
+  / `cantus.workflows`.
+- The agent loop no longer scans four protocol kinds. `Agent._dispatch_skill`
+  now performs a single `registry.lookup("skill", …)` followed by a linear
+  `pre_hook → body → post_hook` chain.
+- `@debug` no longer accepts `@workflow` as a stack target (it can't — the
+  decorator no longer exists). Still works on `@skill`, `@analyzer`,
+  `@validator`.
+
+### Added
+
+- `cantus.hooks` submodule: re-exports `analyzer`, `validator`, `Analyzer`,
+  `Validator`, `Result`, and `ReservedValidatorNameError` from a single
+  namespace that emphasises their hook-helper role.
+- `cantus.workflows` package: five orchestration primitives ported from
+  Anthropic's *Building Effective Agents* playbook. Each is a plain Python
+  class with a `.run(input) → output` method; none of them touch the runtime
+  registry.
+- `Skill` instances gain `_pre_hook` and `_post_hook` attributes. The `@skill`
+  decorator now accepts both bare (`@skill`) and parameterised
+  (`@skill(pre_hook=…, post_hook=…)`) forms.
+- `Skill.spec_for_llm()` JSON shape is preserved — top-level keys remain
+  exactly `{"name", "description", "args_schema"}` regardless of hook
+  attachment. A fixture-backed snapshot test guards this for downstream
+  adapter consumers (v0.3.2 `cantus-adapter-layer`).
+
+### Changed
+
+- `Agent._dispatch_skill` body shrunk and straight-lined: no per-kind
+  `if`/`elif` ladder, no four-kind fallback scan. Hook exceptions are wrapped
+  as `ToolErrorObservation` with `pre_hook` / `post_hook` labels in the
+  message. A `post_hook` returning `Result(ok=False, …)` still produces a
+  `ValidationErrorObservation` carrying the hook function's name.
+- `@analyzer` and `@validator` decorators are no longer registry side-effects;
+  they return reusable callable helpers. The `RESERVED_VALIDATOR_NAMES` guard
+  (`non_empty_final_answer`, `action_parse`) continues to apply.
+
+### Removed
+
+- `cantus.protocols.workflow` module (hard-removed; no deprecated shim).
+- `Workflow` class, `@workflow` decorator, `register_workflow` function.
+- Top-level re-exports of `Analyzer`, `Validator`, `analyzer`, `validator`,
+  `register_analyzer`, `register_validator` from the `cantus` package.
+
 ## [0.2.1] - 2026-05-17
 
 PATCH release that completes the v0.2.0 multi-provider scope. v0.2.0 shipped

@@ -10,8 +10,8 @@ from cantus.core.observation import (
     ValidationErrorObservation,
 )
 from cantus.core.result import Result
+from cantus.hooks import validator
 from cantus.protocols.skill import skill
-from cantus.protocols.validator import validator
 
 
 @dataclass
@@ -74,22 +74,28 @@ def test_unknown_skill_name_at_parse_emits_action_parse_validation_error():
     assert any("search_book" in e.feedback for e in val_errors)
 
 
-def test_validator_failure_emits_validation_error_and_retries():
+def test_validator_post_hook_failure_emits_validation_error_and_retries():
+    """v0.3.0: Validator attaches as a Skill post_hook; Result(ok=False) yields ValidationErrorObservation."""
     fail_count = {"n": 0}
 
     @validator
-    def always_fails(_x: int) -> Result:
+    def always_fails(value: int) -> Result:
         """Fails until called twice."""
         fail_count["n"] += 1
         if fail_count["n"] < 2:
             return Result.failure("not yet")
-        return Result.success(_x)
+        return Result.success(value)
+
+    @skill(post_hook=always_fails)
+    def passthrough(value: int) -> int:
+        """Pass the value through."""
+        return value
 
     agent = Agent(
         model=ScriptedModel(
             [
-                _action("always_fails", {"_x": 1}),
-                _action("always_fails", {"_x": 1}),
+                _action("passthrough", {"value": 1}),
+                _action("passthrough", {"value": 1}),
                 _final("done"),
             ]
         )
@@ -99,4 +105,5 @@ def test_validator_failure_emits_validation_error_and_retries():
     successes = [e for e in state.stream if isinstance(e, SkillObservation)]
     assert len(val_errors) == 1
     assert val_errors[0].feedback == "not yet"
+    assert val_errors[0].validator_name == "always_fails"
     assert len(successes) == 1  # second call succeeded

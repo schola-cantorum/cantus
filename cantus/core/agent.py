@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import json
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Protocol, Union
 
@@ -31,6 +32,20 @@ from cantus.core.observation import (
     ValidationErrorObservation,
 )
 from cantus.core.registry import Registry, get_registry
+
+
+def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
+    """Print a `[debug] <role> '<hook_name>' …` line for @debug-wrapped hooks.
+
+    Called from `_dispatch_skill` when a `pre_hook` / `post_hook` has been
+    wrapped with `@debug`. The hook's own `@debug` traced wrapper still fires
+    afterwards and prints its own args/result line; this label is the
+    role-tagged announcement that the spec scenario requires.
+    """
+    hook_name = getattr(hook, "name", None) or getattr(hook, "__name__", "?")
+    sys.stdout.write(
+        f"[debug] {role} '{hook_name}' invoked from skill '{skill_name}'\n"
+    )
 
 
 class ModelHandle(Protocol):
@@ -319,16 +334,15 @@ class Agent:
         )
 
     def _dispatch_skill(self, action: CallSkillAction) -> Observation:
-        """Run a CallSkillAction; wrap any failure as the right Observation."""
-        # Skills may live in any of the four function-based kinds: skill,
-        # analyzer, validator, workflow. We look in skill first, then
-        # validators (since the agent may invoke a validator after a
-        # skill call), then workflows for top-level orchestration.
-        for kind in ("skill", "validator", "analyzer", "workflow"):
-            instance = self.registry.lookup(kind, action.skill_name)
-            if instance is not None:
-                break
-        else:
+        """Run a CallSkillAction; wrap any failure as the right Observation.
+
+        v0.3.0 dispatch: single registry lookup under "skill", followed by a
+        linear `pre_hook → body → post_hook` chain. No per-kind branching.
+        """
+        from cantus.core.result import Result
+
+        instance = self.registry.lookup("skill", action.skill_name)
+        if instance is None:
             available = self.registry.names_for("skill")
             return ToolErrorObservation(
                 skill_name=action.skill_name,
@@ -347,21 +361,51 @@ class Agent:
                 message=f"args validation failed: {type(exc).__name__}: {exc}",
             )
 
+        pre_hook = getattr(instance, "_pre_hook", None)
+        if pre_hook is not None:
+            if getattr(pre_hook, "_debug_enabled", False):
+                _emit_hook_debug_label("pre_hook", pre_hook, action.skill_name)
+            try:
+                pre_out = pre_hook(**args) if isinstance(args, dict) else pre_hook(args)
+            except Exception as exc:
+                return ToolErrorObservation(
+                    skill_name=action.skill_name,
+                    message=f"pre_hook {type(exc).__name__}: {exc}",
+                )
+            args = pre_out if isinstance(pre_out, dict) else {"_pre_hook_value": pre_out}
+
         try:
-            result = instance(**args)
+            if "_pre_hook_value" in args:
+                result = instance(args["_pre_hook_value"])
+            else:
+                result = instance(**args)
         except Exception as exc:
             return ToolErrorObservation(
                 skill_name=action.skill_name,
                 message=f"{type(exc).__name__}: {exc}",
             )
 
-        # If this was a validator, fold its Result into the right Observation.
-        from cantus.core.result import Result
+        post_hook = getattr(instance, "_post_hook", None)
+        if post_hook is not None:
+            if getattr(post_hook, "_debug_enabled", False):
+                _emit_hook_debug_label("post_hook", post_hook, action.skill_name)
+            try:
+                result = post_hook(result)
+            except Exception as exc:
+                return ToolErrorObservation(
+                    skill_name=action.skill_name,
+                    message=f"post_hook {type(exc).__name__}: {exc}",
+                )
 
         if isinstance(result, Result):
             if not result.ok:
+                hook_name = (
+                    getattr(post_hook, "name", None)
+                    or getattr(post_hook, "__name__", None)
+                    or action.skill_name
+                )
                 return ValidationErrorObservation(
-                    validator_name=action.skill_name,
+                    validator_name=hook_name,
                     feedback=result.feedback or "validation failed",
                 )
             return SkillObservation(skill_name=action.skill_name, result=result.value)

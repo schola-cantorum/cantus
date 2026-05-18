@@ -85,7 +85,7 @@ def from_openai_response(raw: Any) -> ChatResponse:
     else:
         usage = None
 
-    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)
+    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)  # type: ignore[arg-type]
 
 
 def extract_tool_calls_openai(message_dict: dict[str, Any]) -> list[ToolCall]:
@@ -203,7 +203,7 @@ def from_anthropic_response(raw: Any) -> ChatResponse:
         content="".join(text_parts),
         tool_calls=tool_calls,
     )
-    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)
+    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ def from_google_response(raw: Any) -> ChatResponse:
         content="".join(text_parts),
         tool_calls=tool_calls,
     )
-    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)
+    return ChatResponse(message=message, stop_reason=stop_reason, usage=usage, raw=raw)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

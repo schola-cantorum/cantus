@@ -77,14 +77,87 @@ def test_register_requires_name():
         reg.register("skill", Anon())
 
 
-def test_five_kinds_distinct_roles():
-    """The five protocol kinds are distinct, importable, and non-overlapping."""
-    from cantus import Analyzer, Memory, Skill, Validator, Workflow
+def test_two_kinds_distinct_roles():
+    """v0.3.0: Skill and Memory are the two top-level protocol kinds, non-overlapping.
 
-    kinds = (Skill, Analyzer, Validator, Workflow, Memory)
-    # No protocol class is a subclass of another (job-distinct).
+    Analyzer/Validator are hook helpers (imported from cantus.hooks), not kinds.
+    Workflow was removed entirely; orchestration moved to cantus.workflows.
+    """
+    from cantus import Memory, Skill
+
+    kinds = (Skill, Memory)
     for i, a in enumerate(kinds):
         for j, b in enumerate(kinds):
             if i == j:
                 continue
             assert not issubclass(a, b), f"{a.__name__} should not subclass {b.__name__}"
+
+
+# --- v0.3.0: KINDS shrunk to ("skill",) --------------------------------
+
+
+def test_registry_kinds_only_contains_skill():
+    """v0.3.0: Registry.KINDS SHALL contain exactly the single value 'skill'."""
+    assert Registry.KINDS == ("skill",)
+
+
+def test_register_legacy_kind_rejected_analyzer():
+    """v0.3.0: registering 'analyzer' SHALL raise ValueError with a migration hint."""
+    import pytest
+
+    reg = Registry()
+
+    class Dummy:
+        name = "x"
+
+    with pytest.raises(ValueError) as excinfo:
+        reg.register("analyzer", Dummy())
+    msg = str(excinfo.value)
+    assert "pre_hook" in msg
+    assert "post_hook" in msg
+    assert "cantus.workflows" in msg
+
+
+def test_register_legacy_kind_rejected_validator():
+    """v0.3.0: registering 'validator' SHALL raise ValueError with a migration hint."""
+    import pytest
+
+    reg = Registry()
+
+    class Dummy:
+        name = "x"
+
+    with pytest.raises(ValueError) as excinfo:
+        reg.register("validator", Dummy())
+    msg = str(excinfo.value)
+    assert "pre_hook" in msg
+    assert "post_hook" in msg
+    assert "cantus.workflows" in msg
+
+
+def test_register_legacy_kind_rejected_workflow():
+    """v0.3.0: registering 'workflow' SHALL raise ValueError with a migration hint."""
+    import pytest
+
+    reg = Registry()
+
+    class Dummy:
+        name = "x"
+
+    with pytest.raises(ValueError) as excinfo:
+        reg.register("workflow", Dummy())
+    msg = str(excinfo.value)
+    assert "pre_hook" in msg
+    assert "post_hook" in msg
+    assert "cantus.workflows" in msg
+
+
+def test_register_skill_still_accepted():
+    """v0.3.0: 'skill' SHALL remain the only valid kind."""
+    reg = Registry()
+
+    class Dummy:
+        name = "ok"
+
+    reg.register("skill", Dummy())
+    assert "ok" in reg.names_for("skill")

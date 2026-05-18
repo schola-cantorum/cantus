@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.2.1"
+version = "0.3.0"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -66,6 +66,8 @@ dev = [
     "pytest-cov>=4.0",
     "pytest-recording>=0.13",
     "respx>=0.21",
+    "mypy>=1.10",
+    "ruff>=0.5",
 ]
 all = ["cantus[runtime,memory,providers,dev]"]
 
@@ -76,3 +78,8 @@ include = ["cantus*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+
+[tool.ruff.lint.per-file-ignores]
+# Colab notebooks interleave `%pip install` magics with imports (E402) and
+# pre-load names that Cell 3 student templates uncomment later (F401).
+"notebooks/*.ipynb" = ["E402", "F401"]

@@ -38,13 +38,20 @@ class Skill:
     name: str = ""
     description: str = ""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        pre_hook: Callable[..., Any] | None = None,
+        post_hook: Callable[..., Any] | None = None,
+    ) -> None:
         if not self.name:
             self.name = type(self).__name__
         if not self.description:
             doc = (type(self).__doc__ or "").strip()
             self.description = first_paragraph(doc)
         self._args_model = build_args_model_from_callable(self.run, self.name)
+        self._pre_hook = pre_hook
+        self._post_hook = post_hook
 
     def run(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError("Subclass must implement run()")
@@ -63,16 +70,41 @@ class Skill:
         return self._args_model(**args).model_dump()
 
 
-def skill(fn: Callable[..., Any]) -> Skill:
-    """Decorator entry: wrap a plain function as a `Skill` and register it."""
-    instance = _from_function(fn)
-    get_registry().register("skill", instance)
-    return instance
+def skill(
+    fn: Callable[..., Any] | None = None,
+    *,
+    pre_hook: Callable[..., Any] | None = None,
+    post_hook: Callable[..., Any] | None = None,
+) -> Skill | Callable[[Callable[..., Any]], Skill]:
+    """Decorator entry: wrap a plain function as a `Skill` and register it.
+
+    Supports both bare `@skill` and `@skill(pre_hook=..., post_hook=...)`.
+    """
+    if fn is None:
+        def decorator(actual_fn: Callable[..., Any]) -> Skill:
+            return _build_and_register(actual_fn, pre_hook, post_hook)
+        return decorator
+    return _build_and_register(fn, pre_hook, post_hook)
 
 
-def register_skill(fn: Callable[..., Any]) -> Skill:
+def register_skill(
+    fn: Callable[..., Any],
+    *,
+    pre_hook: Callable[..., Any] | None = None,
+    post_hook: Callable[..., Any] | None = None,
+) -> Skill:
     """Function-pass entry: same as `@skill` but called explicitly."""
+    return _build_and_register(fn, pre_hook, post_hook)
+
+
+def _build_and_register(
+    fn: Callable[..., Any],
+    pre_hook: Callable[..., Any] | None,
+    post_hook: Callable[..., Any] | None,
+) -> Skill:
     instance = _from_function(fn)
+    instance._pre_hook = pre_hook
+    instance._post_hook = post_hook
     get_registry().register("skill", instance)
     return instance
 
@@ -83,7 +115,7 @@ def _from_function(fn: Callable[..., Any]) -> Skill:
     args_descriptions = parse_args_block(fn.__doc__ or "")
 
     def _run(self: Skill, *args: Any, **kwargs: Any) -> Any:
-        return type(self)._fn(*args, **kwargs)
+        return type(self)._fn(*args, **kwargs)  # type: ignore[attr-defined]
 
     cls_attrs: dict[str, Any] = {
         "name": name,

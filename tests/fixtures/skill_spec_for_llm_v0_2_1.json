@@ -1,0 +1,22 @@
+{
+  "args_schema": {
+    "properties": {
+      "lang": {
+        "default": "zh-TW",
+        "title": "Lang",
+        "type": "string"
+      },
+      "title": {
+        "title": "Title",
+        "type": "string"
+      }
+    },
+    "required": [
+      "title"
+    ],
+    "title": "SearchBookArgs",
+    "type": "object"
+  },
+  "description": "Search the catalog.",
+  "name": "search_book"
+}

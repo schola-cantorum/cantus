@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from cantus.core.registry import get_registry
 from cantus.core.result import Result
 from cantus.protocols._common import (
     build_args_model_from_callable,
@@ -79,26 +78,28 @@ class Validator:
 
 
 def validator(fn: Callable[..., Result]) -> Validator:
-    """Decorator entry: wrap a function as a `Validator` and register it."""
+    """Decorator entry: wrap a function as a reusable `Validator` hook helper.
+
+    v0.3.0: This decorator no longer mutates the runtime registry. Attach
+    the returned instance to a `Skill` via `@skill(post_hook=...)` to make
+    it run as part of skill dispatch. The reserved-name guard SHALL
+    continue to apply.
+    """
     _guard_reserved_name(fn.__name__)
-    instance = _from_function(fn)
-    get_registry().register("validator", instance)
-    return instance
+    return _from_function(fn)
 
 
 def register_validator(fn: Callable[..., Result]) -> Validator:
     """Function-pass entry."""
     _guard_reserved_name(fn.__name__)
-    instance = _from_function(fn)
-    get_registry().register("validator", instance)
-    return instance
+    return _from_function(fn)
 
 
 def _from_function(fn: Callable[..., Result]) -> Validator:
     name = fn.__name__
 
     def _run(self: Validator, *args: Any, **kwargs: Any) -> Result:
-        return type(self)._fn(*args, **kwargs)
+        return type(self)._fn(*args, **kwargs)  # type: ignore[attr-defined]
 
     cls_attrs: dict[str, Any] = {
         "name": name,

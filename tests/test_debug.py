@@ -1,7 +1,5 @@
 """@debug stacking on protocols emits stdout trace."""
 
-import io
-import sys
 
 from cantus.protocols.debug import debug
 from cantus.protocols.skill import skill
