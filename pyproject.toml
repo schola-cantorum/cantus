@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.3.2"
+version = "0.3.3"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -63,6 +63,30 @@ groq = [
 # below 2 to insulate against a major-version rewrite.
 mcp = [
     "mcp>=0.1,<2",
+]
+# v0.3.3 — cross-framework adapter batch2. Each extras group pins the
+# minimum framework SDK release needed by its sibling cantus.adapters
+# module; the upper bound caps below the next major version line.
+#
+# `langchain-core` (not the `langchain` aggregator) — the BaseTool surface
+# moved to langchain-core in 0.1.x and is the minimal pin for `cantus[langchain]`.
+# `dspy-ai` is the canonical PyPI name for the DSPy framework.
+# `transformers>=4.40` is the first release with a stable `transformers.Tool`
+# interface; cantus[runtime] already pins a higher floor (>=4.53), so pip
+# unification at install time keeps a single resolved version.
+# `openhands` (umbrella package, not `openhands-sdk`) bundles the
+# `openhands.events.Action` types cantus targets.
+langchain = [
+    "langchain-core>=0.3,<1",
+]
+dspy = [
+    "dspy-ai>=2.5,<3",
+]
+huggingface = [
+    "transformers>=4.40,<5",
+]
+openhands = [
+    "openhands>=1.16,<2",
 ]
 providers = [
     "cantus[openai,anthropic,google,groq]",

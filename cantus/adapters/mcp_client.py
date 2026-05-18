@@ -25,6 +25,7 @@ from __future__ import annotations
 import urllib.parse
 from typing import Any, Literal
 
+from cantus.adapters._remote_skill import _RemoteSkillBase
 from cantus.protocols.skill import Skill
 
 _SHELL_METACHARS: tuple[str, ...] = ("|", ">", "<", "&", ";", "$", "`", "\n", "\r")
@@ -88,10 +89,8 @@ def _call_remote_tool(
     )
 
 
-class _RemoteSkill(Skill):
+class _RemoteSkill(_RemoteSkillBase):
     """cantus Skill wrapper for an MCP tool exposed by a remote server."""
-
-    is_remote = True
 
     def __init__(
         self,
@@ -102,31 +101,13 @@ class _RemoteSkill(Skill):
         transport: str,
         command_or_url: str,
     ) -> None:
-        # Intentionally bypass Skill.__init__: we do NOT want signature
-        # introspection because the remote tool's schema is authoritative.
-        self.name = tool_name
-        self.description = description
-        self._input_schema = input_schema
+        super().__init__(
+            name=tool_name,
+            description=description,
+            args_schema_dict=input_schema,
+        )
         self._transport = transport
         self._command_or_url = command_or_url
-        self._pre_hook = None
-        self._post_hook = None
-
-    def spec_for_llm(self) -> dict[str, Any]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "args_schema": self._input_schema,
-        }
-
-    def validate_args(self, args: dict[str, Any]) -> dict[str, Any]:
-        # The remote server is authoritative for argument validation;
-        # cantus only enforces that args is a dict at the protocol layer.
-        if not isinstance(args, dict):
-            raise TypeError(
-                f"remote MCP tool args must be a dict, got {type(args).__name__}"
-            )
-        return dict(args)
 
     def run(self, **kwargs: Any) -> Any:
         try:

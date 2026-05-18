@@ -4,6 +4,63 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-05-18
+
+MINOR release. **MINOR additive — no BREAKING.** Extends `cantus.adapters`
+with six cross-framework callables (LangChain / DSPy / HuggingFace /
+OpenHands) and lifts the v0.3.2 `_RemoteSkill` pattern into a private
+`_RemoteSkillBase` shared base. All v0.3.0, v0.3.1, and v0.3.2 imports,
+constructors, and behaviours remain byte-identical.
+
+### Added
+
+- `cantus.adapters` gains six new top-level callables (in addition to
+  the three v0.3.2 callables):
+  - `expose_as_langchain_tool(skill) -> BaseTool` and
+    `import_langchain_tool(tool) -> Skill` — bidirectional bridge to
+    `langchain_core.tools.BaseTool`.
+  - `expose_as_dspy_tool(skill) -> dspy.Tool` and
+    `import_dspy_tool(tool) -> Skill` — bidirectional bridge to
+    `dspy.Tool` with a `{str, int, float, bool}` ↔ JSON Schema type
+    mapping.
+  - `expose_as_hf_tool(skill) -> transformers.Tool` — export-only
+    bridge to HuggingFace `transformers.Tool` (import direction
+    deferred to v0.3.4 batch3).
+  - `expose_as_openhands_action(skill) -> openhands.events.Action` —
+    export-only bridge to OpenHands actions (import direction deferred
+    to v0.3.4 batch3).
+- `cantus.adapters._remote_skill._RemoteSkillBase` — private shared
+  base for every `import_*` adapter. Subclass to add new `import_*`
+  bridges without re-implementing the v0.3.0 `Skill.spec_for_llm()`
+  shape contract or the `is_remote = True` marker. The class is private
+  (leading underscore in the module name) and is intentionally NOT
+  re-exported from `cantus.adapters.__init__`.
+- `cantus.adapters.mcp_client._RemoteSkill` now inherits from
+  `_RemoteSkillBase` — refactor only; v0.3.2 observable behaviour
+  remains byte-identical and the existing `test_mcp_client.py`
+  test suite passes without modification.
+- Four new extras groups in `pyproject.toml`:
+  - `cantus[langchain]` → `langchain-core>=0.3,<1`
+  - `cantus[dspy]` → `dspy-ai>=2.5,<3`
+  - `cantus[huggingface]` → `transformers>=4.40,<5`
+  - `cantus[openhands]` → `openhands>=1.16,<2`
+  Each adapter module gates on its respective SDK at import time; a
+  missing SDK surfaces as `ImportError("... pip install cantus[<name>]")`.
+
+### Unchanged
+
+- All v0.3.0 / v0.3.1 / v0.3.2 imports continue to resolve identically.
+- `Skill.spec_for_llm()` JSON shape stays
+  `{"name", "description", "args_schema"}` before and after any
+  `cantus.adapters.*` submodule is imported — the existing
+  `test_skill_spec_for_llm_invariant.py` contract is extended to cover
+  all nine adapter modules (3 v0.3.2 + 5 v0.3.3).
+- `Registry.KINDS` remains `("skill",)` — batch2 adapters do NOT
+  introduce a new protocol kind.
+- The `providers` aggregator continues to install only OpenAI /
+  Anthropic / Google / Groq; the four batch2 extras require explicit
+  opt-in.
+
 ## [0.3.2] - 2026-05-18
 
 MINOR release. **MINOR additive — no BREAKING.** Adds the

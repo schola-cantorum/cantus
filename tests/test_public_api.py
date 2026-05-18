@@ -304,10 +304,68 @@ def test_v032_mcp_gate_requires_extras(monkeypatch):
         import cantus.adapters.mcp  # noqa: F401
 
 
+# --- v0.3.3: cantus.adapters batch2 cross-framework callables -----------
+
+
+def test_v033_adapters_six_batch2_callables_importable():
+    """The six batch2 callables are importable as lazy stubs from cantus.adapters."""
+    from cantus.adapters import (
+        expose_as_dspy_tool,
+        expose_as_hf_tool,
+        expose_as_langchain_tool,
+        expose_as_openhands_action,
+        import_dspy_tool,
+        import_langchain_tool,
+    )
+
+    for fn in (
+        expose_as_langchain_tool,
+        import_langchain_tool,
+        expose_as_dspy_tool,
+        import_dspy_tool,
+        expose_as_hf_tool,
+        expose_as_openhands_action,
+    ):
+        assert callable(fn)
+
+
+@pytest.mark.parametrize(
+    "module_name, extras",
+    [
+        ("cantus.adapters.langchain", "langchain"),
+        ("cantus.adapters.dspy", "dspy"),
+        ("cantus.adapters.huggingface", "huggingface"),
+        ("cantus.adapters.openhands", "openhands"),
+    ],
+)
+def test_v033_batch2_gates_require_extras(monkeypatch, module_name, extras):
+    """Each batch2 adapter module raises actionable ImportError without its SDK."""
+    import importlib
+    import sys
+
+    # Map the cantus adapter module to the underlying framework SDK module.
+    sdk_module = {
+        "cantus.adapters.langchain": "langchain_core",
+        "cantus.adapters.dspy": "dspy",
+        "cantus.adapters.huggingface": "transformers",
+        "cantus.adapters.openhands": "openhands",
+    }[module_name]
+
+    for mod_name in list(sys.modules.keys()):
+        if mod_name == module_name:
+            del sys.modules[mod_name]
+        if mod_name == sdk_module or mod_name.startswith(f"{sdk_module}."):
+            del sys.modules[mod_name]
+    monkeypatch.setitem(sys.modules, sdk_module, None)
+
+    with pytest.raises(ImportError, match=rf"pip install cantus\[{extras}\]"):
+        importlib.import_module(module_name)
+
+
 # --- version stamp ------------------------------------------------------
 
 
-def test_version_is_0_3_2():
+def test_version_is_0_3_3():
     import cantus
 
-    assert cantus.__version__ == "0.3.2"
+    assert cantus.__version__ == "0.3.3"
