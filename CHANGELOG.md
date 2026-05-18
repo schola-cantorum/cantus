@@ -4,6 +4,73 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-05-18 — Quality Baseline
+
+PATCH release. **ADDITIVE — no BREAKING change, no new dependencies, no new
+optional extras, no cantus public callable change.** Ships the v0.3.x
+educational arc's deferred quality infrastructure so the next feature arc
+starts on a verifiable baseline.
+
+### Added
+
+- `cantus/py.typed` — PEP 561 inline-typed marker. Downstream consumers running
+  `mypy --strict` against code that imports cantus symbols now see cantus'
+  declared annotations instead of `Any`. The marker is bundled into the wheel
+  via a new `[tool.setuptools.package-data]` entry (`cantus = ["py.typed"]`)
+  so `python -m build` produces wheels that ship the marker.
+- `[tool.mypy]` baseline configuration in `pyproject.toml`. Pins
+  `python_version = "3.10"`, enables `warn_unused_ignores`,
+  `warn_redundant_casts`, and `check_untyped_defs`, leaves
+  `disallow_untyped_defs = false` (strict mode is deferred to v0.4.x), and
+  declares `[[tool.mypy.overrides]]` setting `ignore_missing_imports = true`
+  for the lazy-import adapter SDKs (`mcp.*`, `langchain_core.*`, `dspy.*`,
+  `transformers.*`, `openhands.*`, `anthropic.*`, `openai.*`,
+  `google.genai.*`, `groq.*`) so a bare `cantus[dev]` install can run
+  `mypy cantus` without optional extras installed.
+- `[tool.coverage.run]` and `[tool.coverage.report]` baseline configuration.
+  Branch coverage is enabled (`branch = true`); the report shows missing
+  lines and excludes `pragma: no cover`, `if TYPE_CHECKING:`, and
+  `raise NotImplementedError` from coverage accounting. No `fail_under`
+  threshold is set in this release — baseline data is collected first.
+- `pytest` addopts now trigger coverage by default
+  (`--cov=cantus --cov-report=term-missing --cov-report=xml`). Running
+  `pytest tests/` without any flag emits a terminal coverage section and a
+  `coverage.xml` artifact in the working directory.
+- `MIGRATION_v0.3.4_to_v0.3.5.md` — user-facing migration note documenting
+  the ADDITIVE nature of this release and the new dev workflow signals.
+
+### Changed
+
+- `docs/protocols/adapters-batch2.md` — the existing v0.3.4 supersede
+  blockquote at the top of the file is reformatted to lead with
+  `**Status:** Superseded by [adapters-batch3.md](./adapters-batch3.md)
+  (cantus v0.3.4) for the HuggingFace and OpenHands import directions;
+  preserved as a v0.3.3 historical snapshot of the batch2 surface.` so the
+  file is unambiguously identifiable as a historical snapshot at a glance.
+  The spec body below the note is byte-identical.
+
+### Internal
+
+- Added `tests/test_distribution_config.py` with six assertions covering the
+  PEP 561 marker, the setuptools package-data wiring, the mypy baseline, the
+  coverage baseline, the pytest addopts contract, and the v0.3.5 version
+  pin. These tests double as the verification target for the
+  `Cantus ships PEP 561 py.typed marker and baseline tool configuration`
+  Requirement.
+
+### Notes
+
+- Strict mypy (`strict = true`) is intentionally deferred to v0.4.x — it
+  requires an audit + annotation pass on cantus' Protocol classes and
+  `getattr`-driven adapter shims.
+- Coverage `fail_under` threshold is intentionally deferred until a
+  multi-release baseline has been collected; setting it now would either
+  inflate CI false positives (threshold too high) or anchor regressions
+  (threshold too low).
+- Maintainers adding a new optional-extras adapter SDK SHALL append its
+  top-level module glob to `[[tool.mypy.overrides]]` so `mypy cantus`
+  continues to pass on a bare `cantus[dev]` install.
+
 ## [0.3.4] - 2026-05-18
 
 PATCH release. **PATCH additive — no BREAKING.** Closes the cross-framework

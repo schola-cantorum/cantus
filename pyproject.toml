@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.3.4"
+version = "0.3.5"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -105,9 +105,63 @@ all = ["cantus[runtime,memory,providers,dev]"]
 where = ["."]
 include = ["cantus*"]
 
+# PEP 561: ship the `py.typed` marker inside the cantus wheel so downstream
+# consumers with strict type checking can see cantus' inline annotations
+# instead of treating every cantus import as `Any`. Added in v0.3.5
+# (cantus-quality-baseline). Keep this entry in sync if additional package-
+# data files are introduced later.
+[tool.setuptools.package-data]
+cantus = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+# v0.3.5 (cantus-quality-baseline): pytest emits a terminal `coverage`
+# section and a `coverage.xml` artifact on every default invocation; no
+# `fail_under` threshold yet — we collect baseline data first.
+addopts = "-v --tb=short --cov=cantus --cov-report=term-missing --cov-report=xml"
+
+[tool.coverage.run]
+source = ["cantus"]
+branch = true
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+# v0.3.5 mypy baseline. Strict mode is intentionally NOT enabled in this
+# version (deferred to v0.4.x — strict requires an audit + annotation pass
+# on cantus itself); we ship the minimum settings that make `mypy cantus`
+# reproducible across developers and let downstream consumers exercise the
+# `py.typed` surface. If a new optional-extras adapter SDK is added, append
+# its top-level package glob to the overrides list below so a bare
+# `cantus[dev]` install does not fail on the lazy-import shim.
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = [
+    "mcp.*",
+    "langchain_core.*",
+    "dspy.*",
+    "transformers.*",
+    "openhands.*",
+    "anthropic.*",
+    "openai.*",
+    "google.genai.*",
+    "groq.*",
+]
+ignore_missing_imports = true
 
 [tool.ruff.lint.per-file-ignores]
 # Colab notebooks interleave `%pip install` magics with imports (E402) and

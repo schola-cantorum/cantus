@@ -15,6 +15,7 @@ wheels/
 .tox/
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 .cache
 *.cover
