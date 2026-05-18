@@ -4,6 +4,63 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-05-18 — Internal Cleanup
+
+**ADDITIVE — no public API change, no BREAKING, no new dependencies, no new
+optional extras, no user-facing surface change.** Clears the 15 redundant
+`# type: ignore[...]` comments that the v0.3.5 `warn_unused_ignores = true`
+mypy baseline started reporting, so `mypy cantus` runs cleanly with no
+`[unused-ignore]` warnings on a `cantus[dev]` install.
+
+### Internal
+
+- `cantus/adapters/openhands.py` — removed `# type: ignore[import-not-found]`
+  from the SDK-gate `from openhands.events import Action` (mypy override
+  `openhands.*` already covers the missing-import case).
+- `cantus/adapters/mcp.py` — removed `# type: ignore[import-not-found]` from
+  the SDK-gate `import mcp as _mcp` and removed `# type: ignore[misc]` from
+  the `server.tool(...)` decorator call.
+- `cantus/adapters/langchain.py` — removed `# type: ignore[import-not-found]`
+  from both SDK-gate imports (`import langchain_core`,
+  `from langchain_core.tools import BaseTool`) and removed
+  `# type: ignore[misc, valid-type]` from the `class _ExposedLangChainTool(BaseTool)`
+  declaration.
+- `cantus/adapters/dspy.py` — removed `# type: ignore[import-not-found]` from
+  the SDK-gate `import dspy`.
+- `cantus/adapters/huggingface.py` — narrowed
+  `# type: ignore[import-not-found,attr-defined]` to
+  `# type: ignore[attr-defined]` (the `import-not-found` code is now redundant
+  under the `transformers.*` mypy override; `attr-defined` is still needed
+  for the dynamic `Tool` name exposure).
+- `cantus/protocols/debug.py` — narrowed
+  `# type: ignore[union-attr,attr-defined]` to `# type: ignore[union-attr]`
+  on the `target._debug_enabled = True` monkey-patch.
+- `cantus/model/loader.py` — removed `# type: ignore` from the lazy `import
+  torch` and `from transformers import (...)` block inside
+  `_load_with_quant_config()`.
+- `cantus/model/providers/openai.py`, `groq.py`, `anthropic.py` — removed
+  `# type: ignore[import-not-found]` from the `_get_client()` lazy imports.
+- `cantus/model/providers/google.py` — narrowed
+  `# type: ignore[import-not-found,attr-defined,import-untyped]` to
+  `# type: ignore[attr-defined,import-untyped]` on the lazy
+  `from google import genai` import.
+
+### Notes
+
+- The `cantus[all]` + `cantus[openhands]` optional-extras pair is currently
+  unresolvable by `uv` / `pip` due to a transitive
+  `fastmcp` → `websockets>=15.0.1` requirement clashing with
+  `google-genai` → `websockets<15.0.dev0`. This is a release engineering
+  issue surfaced (not introduced) by v0.3.6 and is tracked as a separate
+  follow-up; it is intentionally out of scope for this internal-cleanup
+  release. As a workaround, `uv run --frozen --extra dev` reuses the existing
+  lockfile and bypasses the conflict.
+- Strict mypy (`strict = true`) remains deferred to v0.4.x — narrowing
+  individual ignores does not move that gate.
+- Maintainers adding new ignores SHALL prefer the narrowest error-code list
+  possible (`# type: ignore[specific-code]` over bare `# type: ignore`) so
+  that `warn_unused_ignores` can surface drift in future cantus releases.
+
 ## [0.3.5] - 2026-05-18 — Quality Baseline
 
 PATCH release. **ADDITIVE — no BREAKING change, no new dependencies, no new

@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    import mcp as _mcp  # type: ignore[import-not-found]
+    import mcp as _mcp
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.mcp requires the mcp SDK. "
@@ -65,7 +65,7 @@ def _start_server(
         # SDK 1.x style: `Server.tool()` decorator binds a callable. The
         # cantus Skill is captured in a fresh closure per tool so each
         # tool dispatches to its own backing Skill.
-        server.tool(  # type: ignore[misc]
+        server.tool(
             name=tool["name"],
             description=tool["description"],
             inputSchema=tool["inputSchema"],

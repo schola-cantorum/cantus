@@ -17,7 +17,7 @@ from __future__ import annotations
 
 
 try:  # SDK gate.
-    from openhands.events import Action  # type: ignore[import-not-found]
+    from openhands.events import Action
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.openhands requires the openhands SDK. "

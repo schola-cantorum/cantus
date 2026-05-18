@@ -65,7 +65,7 @@ def debug(target: Any) -> Any:
 
     # Replace `run` on the instance — __call__ delegates to run().
     target.run = traced  # type: ignore[method-assign]
-    target._debug_enabled = True  # type: ignore[union-attr,attr-defined]
+    target._debug_enabled = True  # type: ignore[union-attr]
     return target
 
 

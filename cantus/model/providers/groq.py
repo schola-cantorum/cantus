@@ -38,7 +38,7 @@ class GroqChatModel:
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from groq import Groq  # type: ignore[import-not-found]
+            from groq import Groq
 
             self._client = Groq(api_key=self._api_key, **self._client_kwargs)
         return self._client

@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 try:  # SDK gate — fail loud the moment this module is imported.
-    import dspy  # type: ignore[import-not-found]
+    import dspy
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.dspy requires the dspy-ai SDK. "

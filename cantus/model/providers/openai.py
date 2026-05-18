@@ -42,7 +42,7 @@ class OpenAIChatModel:
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from openai import OpenAI  # type: ignore[import-not-found]
+            from openai import OpenAI
 
             init_kwargs: dict[str, Any] = {"api_key": self._api_key}
             if self._base_url is not None:

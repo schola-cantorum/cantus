@@ -41,7 +41,7 @@ class AnthropicChatModel:
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from anthropic import Anthropic  # type: ignore[import-not-found]
+            from anthropic import Anthropic
 
             self._client = Anthropic(api_key=self._api_key, **self._client_kwargs)
         return self._client

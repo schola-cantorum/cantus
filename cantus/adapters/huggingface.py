@@ -19,7 +19,7 @@ from typing import Any
 
 
 try:  # SDK gate.
-    from transformers import Tool  # type: ignore[import-not-found,attr-defined]
+    from transformers import Tool  # type: ignore[attr-defined]
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.huggingface requires the transformers SDK. "

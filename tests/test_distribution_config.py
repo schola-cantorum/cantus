@@ -107,4 +107,4 @@ def test_pytest_addopts_triggers_cov() -> None:
 
 def test_pyproject_version_bumped_to_0_3_5() -> None:
     cfg = _load_pyproject()
-    assert cfg["project"]["version"] == "0.3.5"
+    assert cfg["project"]["version"] == "0.3.6"

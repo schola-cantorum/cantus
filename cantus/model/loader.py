@@ -115,8 +115,8 @@ def _load_from_hub(repo_id: str, variant: str) -> ModelHandle:
 
 def _load_with_quant_config(model_id_or_path: str, variant: str) -> ModelHandle:
     try:
-        import torch  # type: ignore
-        from transformers import (  # type: ignore
+        import torch
+        from transformers import (
             AutoModelForCausalLM,
             AutoProcessor,
             AutoTokenizer,

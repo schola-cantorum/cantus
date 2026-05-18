@@ -14,8 +14,8 @@ from __future__ import annotations
 from typing import Any
 
 try:  # SDK gate — fail loud the moment this module is imported.
-    import langchain_core  # type: ignore[import-not-found]
-    from langchain_core.tools import BaseTool  # type: ignore[import-not-found]
+    import langchain_core
+    from langchain_core.tools import BaseTool
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.langchain requires the langchain-core SDK. "
@@ -74,7 +74,7 @@ def expose_as_langchain_tool(skill: Skill) -> BaseTool:
         model_name=f"{spec['name']}Args",
     )
 
-    class _ExposedLangChainTool(BaseTool):  # type: ignore[misc, valid-type]
+    class _ExposedLangChainTool(BaseTool):
         name: str = spec["name"]
         description: str = spec["description"]
         args_schema: type = args_model
