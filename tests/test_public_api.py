@@ -365,7 +365,7 @@ def test_v033_batch2_gates_require_extras(monkeypatch, module_name, extras):
 # --- version stamp ------------------------------------------------------
 
 
-def test_version_is_0_3_4():
+def test_version_is_0_4_0() -> None:
     import cantus
 
-    assert cantus.__version__ == "0.3.4"
+    assert cantus.__version__ == "0.4.0"

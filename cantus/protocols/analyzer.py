@@ -77,6 +77,6 @@ def _from_function(fn: Callable[..., Any]) -> Analyzer:
         "run": _run,
     }
     Synthetic = type(pascal(name), (Analyzer,), cls_attrs)
-    instance = Synthetic()
+    instance: Analyzer = Synthetic()
     instance._args_model = build_args_model_from_callable(fn, name)
     return instance

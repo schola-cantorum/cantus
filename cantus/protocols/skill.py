@@ -65,14 +65,16 @@ class Skill:
         return self.run(*args, **kwargs)
 
     def spec_for_llm(self) -> dict[str, Any]:
+        schema: dict[str, Any] = self._args_model.model_json_schema()
         return {
             "name": self.name,
             "description": self.description,
-            "args_schema": self._args_model.model_json_schema(),
+            "args_schema": schema,
         }
 
     def validate_args(self, args: dict[str, Any]) -> dict[str, Any]:
-        return self._args_model(**args).model_dump()
+        dumped: dict[str, Any] = self._args_model(**args).model_dump()
+        return dumped
 
 
 def skill(
@@ -131,6 +133,6 @@ def _from_function(fn: Callable[..., Any]) -> Skill:
         "run": _run,
     }
     SyntheticSkill = type(pascal(name), (Skill,), cls_attrs)
-    instance = SyntheticSkill()
+    instance: Skill = SyntheticSkill()
     instance._args_model = build_args_model_from_callable(fn, name)
     return instance

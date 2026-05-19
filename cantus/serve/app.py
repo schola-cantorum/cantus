@@ -1,0 +1,131 @@
+"""cantus.serve.app — FastAPI app factory.
+
+The `serve(registry, *, channels=None, settings=None) -> FastAPI` callable is
+the public entry point of the cantus-serve-core capability. It builds a
+FastAPI application that:
+
+* exposes one POST endpoint per registered Skill at
+  ``/skills/{spec_for_llm.name}`` whose request body schema is byte-identical
+  to ``Skill.spec_for_llm()["args_schema"]``;
+* attaches the optional ``channels`` list to ``app.state.channels`` so host
+  code can wire up out-of-band consumers without re-running ``serve()``;
+* mounts dashboard read-only endpoints (``/skills``, ``/health``, ``/events``)
+  via :func:`cantus.serve.dashboard.register_dashboard_routes` when
+  ``Settings.dashboard`` is True.
+
+The Skill-invoke endpoint uses :class:`fastapi.Request` (rather than a
+declared Pydantic body) so FastAPI does not auto-generate a request schema
+that could drift from the cantus ``args_schema``. The byte-identical schema
+is then injected through ``openapi_extra``.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import FastAPI, Request
+
+from cantus.config import Settings
+from cantus.core.registry import Registry
+from cantus.serve.channel import Channel
+from cantus.serve.dashboard import (
+    RESERVED_DASHBOARD_NAMES,
+    register_dashboard_routes,
+)
+
+_TYPE_ERROR = "cantus.serve expects a Registry instance"
+_RESERVED_VALUE_ERROR = (
+    "Skill name {name!r} collides with a reserved dashboard path "
+    "(reserved dashboard path)"
+)
+
+
+def serve(
+    registry: Registry,
+    *,
+    channels: list[Channel] | None = None,
+    settings: Settings | None = None,
+) -> FastAPI:
+    """Build a FastAPI app that exposes the cantus Skill registry over HTTP.
+
+    Parameters:
+        registry: Skill registry to expose.
+        channels: Optional Channel implementations to attach to ``app.state``.
+        settings: Optional Settings object; defaults to ``Settings()`` which
+            reads ``CANTUS_SERVE_*`` env variables.
+
+    Returns:
+        Configured :class:`fastapi.FastAPI` instance ready for
+        ``uvicorn.run(app, host=settings.host, port=settings.port)``.
+
+    Raises:
+        TypeError: if ``registry`` is not a :class:`cantus.core.registry.Registry`.
+        ValueError: if any registered Skill's ``spec_for_llm()["name"]`` collides
+            with a reserved dashboard path (``"skills"``, ``"health"``, or
+            ``"events"``). The message contains the literal substring
+            ``"reserved dashboard path"``.
+    """
+    if not isinstance(registry, Registry):
+        raise TypeError(_TYPE_ERROR)
+
+    effective_settings = settings if settings is not None else Settings()
+
+    import cantus
+
+    app: FastAPI = FastAPI(
+        title="cantus",
+        version=cantus.__version__,
+        docs_url=effective_settings.docs_url,
+        openapi_url=effective_settings.openapi_url,
+        redoc_url=effective_settings.redoc_url,
+    )
+    app.state.channels = list(channels) if channels else []
+
+    skill_names: list[str] = registry.names_for("skill")
+    for name in skill_names:
+        if name in RESERVED_DASHBOARD_NAMES:
+            raise ValueError(_RESERVED_VALUE_ERROR.format(name=name))
+
+    for name in skill_names:
+        skill_instance = registry.lookup("skill", name)
+        if skill_instance is None:
+            # registry.names_for guarantees presence; this is defensive only.
+            continue
+        _register_skill_endpoint(app, skill_instance)
+
+    if effective_settings.dashboard:
+        register_dashboard_routes(app, registry, effective_settings)
+
+    return app
+
+
+def _register_skill_endpoint(app: FastAPI, skill_instance: Any) -> None:
+    spec: dict[str, Any] = skill_instance.spec_for_llm()
+    name: str = spec["name"]
+    args_schema: dict[str, Any] = spec["args_schema"]
+    description: str = spec.get("description") or f"Invoke cantus Skill {name!r}"
+
+    async def endpoint(request: Request) -> dict[str, Any]:
+        body = await request.json()
+        if not isinstance(body, dict):
+            body = {}
+        result: Any = skill_instance.run(**body)
+        return {"result": result}
+
+    app.add_api_route(
+        path=f"/skills/{name}",
+        endpoint=endpoint,
+        methods=["POST"],
+        name=f"invoke_skill_{name}",
+        summary=f"Invoke Skill: {name}",
+        description=description,
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": args_schema}},
+            },
+        },
+    )
+
+
+__all__ = ["serve"]

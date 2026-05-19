@@ -54,7 +54,10 @@ class ModelHandle:
             raise RuntimeError("ModelHandle has no model; was it stub-loaded?")
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
         out = self.model.generate(**inputs, max_new_tokens=kwargs.get("max_new_tokens", 256))
-        return self.tokenizer.decode(out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True)
+        decoded: str = self.tokenizer.decode(
+            out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
+        )
+        return decoded
 
 
 def mount_drive_and_load(
@@ -128,7 +131,7 @@ def _load_with_quant_config(model_id_or_path: str, variant: str) -> ModelHandle:
             "Install with: pip install 'cantus[runtime]'"
         ) from exc
 
-    quant = BitsAndBytesConfig(
+    quant = BitsAndBytesConfig(  # type: ignore[no-untyped-call]
         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
@@ -140,7 +143,7 @@ def _load_with_quant_config(model_id_or_path: str, variant: str) -> ModelHandle:
         device_map="auto",
     )
     try:
-        processor = AutoProcessor.from_pretrained(model_id_or_path)
+        processor = AutoProcessor.from_pretrained(model_id_or_path)  # type: ignore[no-untyped-call]
     except Exception:
         processor = None
     return ModelHandle(

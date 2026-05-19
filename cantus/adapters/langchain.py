@@ -57,8 +57,10 @@ def _build_args_model_from_json_schema(
             fields[prop_name] = (py_type | None, None)
     if not fields:
         # `create_model` with no fields is legal but uninformative.
-        return create_model(model_name)
-    return create_model(model_name, **fields)
+        empty: type = create_model(model_name)
+        return empty
+    built: type = create_model(model_name, **fields)
+    return built
 
 
 def expose_as_langchain_tool(skill: Skill) -> BaseTool:
@@ -74,7 +76,7 @@ def expose_as_langchain_tool(skill: Skill) -> BaseTool:
         model_name=f"{spec['name']}Args",
     )
 
-    class _ExposedLangChainTool(BaseTool):
+    class _ExposedLangChainTool(BaseTool):  # type: ignore[misc]
         name: str = spec["name"]
         description: str = spec["description"]
         args_schema: type = args_model

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.3.6"
+version = "0.4.0"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -86,7 +86,25 @@ huggingface = [
     "transformers>=4.40,<5",
 ]
 openhands = [
-    "openhands>=1.16,<2",
+    # openhands>=1.16.0 only publishes wheels for python >=3.12,<3.13. The
+    # marker scopes this dependency to that interpreter window so universal
+    # uv resolution succeeds on the wider `requires-python = ">=3.10"`
+    # surface (py3.10 / 3.11 / 3.13 see an empty extras group rather than an
+    # unsatisfiable requirement). Users on those interpreters who want the
+    # openhands adapter must upgrade their interpreter to 3.12 first; the
+    # cantus.adapters.openhands lazy-import gate emits a clear ImportError
+    # if the SDK is missing at runtime.
+    "openhands>=1.16,<2; python_version >= '3.12' and python_version < '3.13'",
+]
+# v0.4.0 — `cantus.serve` / `cantus.config` framework entrypoint. Pulls
+# the FastAPI web framework, the Uvicorn ASGI server, and the
+# pydantic-settings BaseSettings package (pydantic 2.x sibling) so that
+# `cantus.serve(registry)` can expose Skill endpoints + Swagger UI and
+# `cantus.config.Settings` can read `CANTUS_SERVE_*` env variables.
+serve = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "pydantic-settings>=2.4,<3",
 ]
 providers = [
     "cantus[openai,anthropic,google,groq]",
@@ -134,20 +152,18 @@ exclude_lines = [
     "raise NotImplementedError",
 ]
 
-# v0.3.5 mypy baseline. Strict mode is intentionally NOT enabled in this
-# version (deferred to v0.4.x — strict requires an audit + annotation pass
-# on cantus itself); we ship the minimum settings that make `mypy cantus`
-# reproducible across developers and let downstream consumers exercise the
-# `py.typed` surface. If a new optional-extras adapter SDK is added, append
-# its top-level package glob to the overrides list below so a bare
-# `cantus[dev]` install does not fail on the lazy-import shim.
+# v0.4.0 mypy strict baseline. Promoted from `disallow_untyped_defs = false`
+# (v0.3.5 baseline) to `strict = true`: cantus public surface must satisfy
+# strict-mode semantics so downstream `mypy --strict` consumers see precise
+# types instead of `Any`-leaking signatures. The v0.3.5 baseline kept the
+# coverage / pytest plumbing and override block identical; only the strict
+# flag flipped (see cantus-distribution `Cantus ships PEP 561 py.typed
+# marker and strict typing configuration` Requirement).
 [tool.mypy]
 python_version = "3.10"
 warn_unused_ignores = true
 warn_redundant_casts = true
-disallow_untyped_defs = false
-check_untyped_defs = true
-ignore_missing_imports = false
+strict = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -160,8 +176,35 @@ module = [
     "openai.*",
     "google.genai.*",
     "groq.*",
+    "fastapi.*",
+    "uvicorn.*",
+    "pydantic_settings.*",
 ]
 ignore_missing_imports = true
+
+# v0.4.0 — uv-specific extras conflict declaration. The `cantus[google]`
+# extras pulls google-genai (transitive `websockets>=13.0,<15.0.dev0`),
+# while `cantus[openhands]` pulls openhands → openhands-sdk → fastmcp
+# (transitive `websockets>=15.0.1`). The two transitive constraints are
+# unsatisfiable together. The `cantus-distribution` capability
+# `pyproject declares uv-style extras conflicts for known incompatible groups`
+# Requirement names `[all]` and `[openhands]` as the minimum cluster; we
+# additionally name the underlying `[google]` extras and the `[providers]`
+# aggregator (which transitively pulls `[google]`) so a fresh `uv sync` on
+# a freshly cloned cantus checkout — i.e. the onboarding path — resolves
+# without emitting any "cantus[…] and cantus[openhands] are incompatible"
+# error variant. Each extras group remains individually installable. pip
+# does not perform universal resolution and ignores the `[tool.uv]` table,
+# so pip consumers are unaffected.
+[tool.uv]
+conflicts = [
+    [{ extra = "all" }, { extra = "openhands" }],
+    [{ extra = "providers" }, { extra = "openhands" }],
+    [{ extra = "openai" }, { extra = "openhands" }],
+    [{ extra = "anthropic" }, { extra = "openhands" }],
+    [{ extra = "google" }, { extra = "openhands" }],
+    [{ extra = "groq" }, { extra = "openhands" }],
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Colab notebooks interleave `%pip install` magics with imports (E402) and

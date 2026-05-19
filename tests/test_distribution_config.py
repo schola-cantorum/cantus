@@ -1,10 +1,11 @@
-"""Distribution config tests for cantus v0.3.5 quality baseline.
+"""Distribution config tests for cantus v0.4.0 strict typing baseline.
 
 Validates that the pyproject.toml carries the PEP 561 py.typed package-data,
-the mypy baseline configuration with optional-extras overrides, the coverage
+the strict mypy configuration with the v0.4.0 extras overrides (which now
+include the serve-layer SDKs fastapi/uvicorn/pydantic_settings), the coverage
 baseline configuration, the pytest addopts that trigger coverage on every
-default run, and the v0.3.5 version bump. Each test corresponds to a single
-scenario from the `Cantus ships PEP 561 py.typed marker and baseline tool
+default run, and the v0.4.0 version bump. Each test corresponds to a single
+scenario from the `Cantus ships PEP 561 py.typed marker and strict typing
 configuration` Requirement in cantus-distribution.
 """
 
@@ -48,29 +49,41 @@ def test_pyproject_has_setuptools_package_data_for_py_typed() -> None:
     )
 
 
-def test_pyproject_has_mypy_baseline() -> None:
+def test_pyproject_has_mypy_strict_configuration() -> None:
     cfg = _load_pyproject()
     mypy = cfg.get("tool", {}).get("mypy")
     assert mypy is not None, "[tool.mypy] section missing"
     assert mypy.get("python_version") == "3.10"
     assert mypy.get("warn_unused_ignores") is True
     assert mypy.get("warn_redundant_casts") is True
-    assert mypy.get("check_untyped_defs") is True
-    assert mypy.get("disallow_untyped_defs") is False
+    assert mypy.get("strict") is True, (
+        "v0.4.0 promotes mypy from disallow_untyped_defs=false baseline to strict=true"
+    )
     overrides = mypy.get("overrides", [])
     assert overrides, "[[tool.mypy.overrides]] must declare at least one entry"
-    mcp_override = next(
-        (
-            o
-            for o in overrides
-            if "mcp.*" in (o.get("module") or [])
-        ),
-        None,
+    flat_modules = {m for o in overrides for m in (o.get("module") or [])}
+    required = {
+        "mcp.*",
+        "langchain_core.*",
+        "dspy.*",
+        "transformers.*",
+        "openhands.*",
+        "anthropic.*",
+        "openai.*",
+        "google.genai.*",
+        "groq.*",
+        "fastapi.*",
+        "uvicorn.*",
+        "pydantic_settings.*",
+    }
+    missing = required - flat_modules
+    assert not missing, (
+        f"[[tool.mypy.overrides]] missing required globs for lazy-import shims: {sorted(missing)}"
     )
-    assert mcp_override is not None, (
-        "[[tool.mypy.overrides]] must cover 'mcp.*' so a bare cantus[dev] install does not fail on the lazy adapter import"
-    )
-    assert mcp_override.get("ignore_missing_imports") is True
+    for o in overrides:
+        if "mcp.*" in (o.get("module") or []):
+            assert o.get("ignore_missing_imports") is True
+            break
 
 
 def test_pyproject_has_coverage_baseline() -> None:
@@ -105,6 +118,64 @@ def test_pytest_addopts_triggers_cov() -> None:
     )
 
 
-def test_pyproject_version_bumped_to_0_3_5() -> None:
+def test_mypy_strict_rejects_untyped_def_regression(tmp_path: Path) -> None:
+    """Regression scenario for `Cantus ships PEP 561 py.typed marker and strict
+    typing configuration`: introducing an untyped def under the strict config
+    must exit non-zero with `"Function is missing a return type annotation"`.
+
+    Runs mypy in an isolated tmp dir with a minimal mypy.ini that mirrors the
+    v0.4.0 pyproject strict knobs, so the test does not depend on the cantus
+    source tree being strict-clean (which is asserted separately).
+    """
+    import shutil
+    import subprocess
+
+    mypy_bin = shutil.which("mypy")
+    if mypy_bin is None:
+        pytest.skip("mypy not on PATH — install via cantus[dev] before running")
+
+    fixture = tmp_path / "untyped_def_fixture.py"
+    # Param is typed; return type is missing — strict mode must surface the
+    # literal "Function is missing a return type annotation" phrase named by
+    # the cantus-distribution Requirement scenario. (A fully-untyped def
+    # `def foo(x): ...` would instead produce "Function is missing a type
+    # annotation", which is a different `[no-untyped-def]` variant.)
+    fixture.write_text("def foo(x: int):\n    return x + 1\n")
+
+    cfg = tmp_path / "mypy.ini"
+    cfg.write_text(
+        "[mypy]\n"
+        "python_version = 3.10\n"
+        "strict = True\n"
+        "warn_unused_ignores = True\n"
+        "warn_redundant_casts = True\n"
+    )
+
+    result = subprocess.run(
+        [mypy_bin, "--config-file", str(cfg), str(fixture)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert result.returncode != 0, (
+        f"mypy strict expected to reject untyped def; got exit 0. stdout={result.stdout!r}"
+    )
+    assert "Function is missing a return type annotation" in combined, (
+        "mypy strict must surface the literal 'Function is missing a return type annotation' "
+        f"for `def foo(x): ...`; got:\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+    )
+
+
+def test_pyproject_version_bumped_to_0_4_0() -> None:
     cfg = _load_pyproject()
-    assert cfg["project"]["version"] == "0.3.6"
+    assert cfg["project"]["version"] == "0.4.0"
+
+
+def test_dunder_version_aligned_with_pyproject() -> None:
+    import cantus
+
+    cfg = _load_pyproject()
+    assert cantus.__version__ == cfg["project"]["version"], (
+        "cantus.__version__ must equal pyproject.toml [project].version"
+    )

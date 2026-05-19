@@ -331,7 +331,9 @@ def _as_dict(obj: Any) -> dict[str, Any]:
     if isinstance(obj, dict):
         return obj
     if hasattr(obj, "model_dump"):
-        return obj.model_dump()
+        dumped: dict[str, Any] = obj.model_dump()
+        return dumped
     if hasattr(obj, "to_dict"):
-        return obj.to_dict()
+        dumped = obj.to_dict()
+        return dumped
     raise TypeError(f"cannot normalise object of type {type(obj).__name__} to dict")

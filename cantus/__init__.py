@@ -1,6 +1,13 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-__version__ = "0.3.4"
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from cantus.model.loader import ModelHandle
+
+__version__ = "0.4.0"
 
 from cantus.core.action import (
     Action,
@@ -87,16 +94,38 @@ __all__ = [
     "ColabEnvironment",
     "LocalEnvironment",
     "CloudOnlyEnvironment",
+    # Serve layer (v0.4.0, lazy-loaded; require `pip install cantus[serve]`)
+    "serve",
+    "config",
 ]
 
 
-def mount_drive_and_load(*args, **kwargs):
+def __getattr__(name: str) -> Any:
+    """PEP 562 lazy loader for the v0.4.0 serve layer.
+
+    `cantus.serve` and `cantus.config` are exposed at the top level but
+    imported on first attribute access so that a base ``import cantus``
+    does not require ``fastapi`` / ``uvicorn`` / ``pydantic-settings``.
+    Missing extras still surface as ``ImportError`` with the literal
+    substring ``"pip install cantus[serve]"`` from the gate inside the
+    target module.
+    """
+    if name in {"serve", "config"}:
+        import importlib
+
+        module = importlib.import_module(f"cantus.{name}")
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module 'cantus' has no attribute {name!r}")
+
+
+def mount_drive_and_load(*args: object, **kwargs: object) -> ModelHandle:
     """Mount Google Drive and load Gemma 4 weights — see model.loader."""
     from cantus.model.loader import mount_drive_and_load as _impl
 
-    return _impl(*args, **kwargs)
+    return _impl(*args, **kwargs)  # type: ignore[arg-type]
 
 
-def load_gemma(*args, **kwargs):
+def load_gemma(*args: object, **kwargs: object) -> ModelHandle:
     """Alias of mount_drive_and_load for direct hub loading scenarios."""
     return mount_drive_and_load(*args, **kwargs)

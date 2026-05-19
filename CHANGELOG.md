@@ -4,6 +4,48 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-20 — cantus-serve-core
+
+新增 `cantus.serve()` FastAPI app factory、`cantus.config` 12-factor 設定、Channel Protocol 抽象與 `cantus[serve]` extras；同支同步啟用 mypy `strict = true`、收尾 `cantus[all]` ⊗ `cantus[openhands]` extras resolver conflict。
+
+### Added
+
+- `cantus.serve(registry, *, channels=None, settings=None) -> FastAPI` — 將 Skill registry 自動 expose 為 REST endpoint，每個 Skill 變成 `POST /skills/<spec_for_llm.name>`，body 走 JSON、回傳 `{"result": ...}`；自動產出 OpenAPI 文件 + Swagger UI（`/docs`）/ ReDoc（`/redoc`）。非 `Registry` 入參 raise `TypeError("cantus.serve expects a Registry")`。
+- `cantus.config.Settings`（`pydantic_settings.BaseSettings`）— 12-factor 設定物件，env prefix `CANTUS_SERVE_`，欄位 `host="127.0.0.1"` / `port=8765` / `dashboard=True` / `docs_url="/docs"` / `openapi_url="/openapi.json"` / `redoc_url="/redoc"`。
+- Dashboard read-only endpoint：`GET /skills`（registry 內 Skill spec 列表）、`GET /health`（含 `cantus_version`）、`GET /events`（支援 `limit` / `offset` query，host code 可透過 `app.state.event_persistence = JsonLinesPersistence(...)` 自掛持久化來源）。`Settings(dashboard=False)` 可整組關閉、Skill invoke endpoint 不受影響。
+- 保留名稱守衛：`spec_for_llm()["name"]` 為 `skills` / `health` / `events` 的 Skill 在 `cantus.serve()` 入口 raise `ValueError` 含 `"reserved dashboard path"`。
+- `cantus.serve.channel.Channel`（`typing.Protocol`，`receive() -> dict` + `send(message: dict) -> None`，`@runtime_checkable`）與內建 in-memory FIFO `LocalMockReceiver` 實作，作為 ARCH-2 跨 capability smoke test 載具。
+- 新 `cantus[serve]` optional extras 群組（`fastapi>=0.115,<1`、`uvicorn>=0.30,<1`、`pydantic-settings>=2.4,<3`）；lazy-import gate 對齊 `cantus[mcp]` pattern — 未安裝 extras 時噴 `ImportError` 含 `pip install cantus[serve]`。
+- `cantus/__init__.py` 採 PEP 562 `__getattr__` lazy-expose `cantus.serve` 與 `cantus.config`，base install `import cantus` 不需要 serve SDK。
+- 文件：`docs/protocols/serve.md`（Quick start / Configuration / Dashboard endpoints / Channel Protocol）、`MIGRATION_v0.3.6_to_v0.4.0.md`、`README.md` / `README.zhTW.md` 同步 byte-identical Install + Quickstart code block。
+
+### Changed
+
+- `pyproject.toml` 新增 `[tool.uv] conflicts` — 宣告 `cantus[openhands]` 與 `cantus[all]` / `cantus[providers]` / `cantus[openai]` / `cantus[anthropic]` / `cantus[google]` / `cantus[groq]` 兩兩互斥（fastmcp 系列拉 `websockets>=15` vs google-genai 拉 `websockets<15`；openhands>=1.16 拉 `openai>=2.20` vs cantus 自身的 provider extras 仍走業界較穩的 `<2` 上界）。Spec 要求 `[all]` ⊗ `[openhands]` 為最低門檻，本版以「at minimum」之外加全套互斥對組以實際解決 onboarding 痛點。各 extras 仍可獨立安裝；pip 不認 `[tool.uv]` table 但本來就不做 universal resolution，pip 路徑無感。
+- `pyproject.toml` 的 `openhands` extras 加上 PEP 508 環境 marker `python_version >= '3.12' and python_version < '3.13'` — openhands>=1.16.0 上游僅發 py3.12 wheel，sequencing 到 cantus 的 `requires-python = ">=3.10"` 上 universal resolve 需要該 marker 才能在 py3.10 / 3.11 / 3.13 環境讓 extras 解析為空集合（不破壞 `cantus.adapters.openhands` 在 py3.12 環境正常 import 的 surface）。
+- `[tool.mypy]` 從 v0.3.5 `disallow_untyped_defs = false` baseline 升級為 `strict = true`，並補加 `fastapi.*` / `uvicorn.*` / `pydantic_settings.*` 三組 `ignore_missing_imports = true` override。下游若開 `mypy --strict` 跑 cantus 程式碼，public symbols 從 `Any`-leaking 改成精確型別（屬收緊 / ADDITIVE — 過去 `Any`-相容的 narrowing 仍綠；若下游 `# type: ignore[assignment]` 抑制過 cantus 回傳值，可能觸發 `warn_unused_ignores`）。
+- `cantus.__version__` 從 `"0.3.4"`（v0.3.6 期間 `cantus/__init__.py` 與 `pyproject.toml` 出現的 drift）正式對齊回 `"0.4.0"`，並新增 `test_dunder_version_aligned_with_pyproject` 鎖住此 invariant。
+
+### Internal
+
+- 補完 cantus 內部 27 處 type annotation 缺口，橫跨 14 個檔案（`cantus/__init__.py`、`cantus/adapters/langchain.py`、`cantus/model/chat.py` / `factory.py` / `loader.py` / `providers/{anthropic,google,groq,openai,_translate}.py`、`cantus/protocols/{analyzer,memory,skill,validator}.py`），達成 `uv run mypy cantus --strict` 全綠（`Success: no issues found in 60 source files`）。
+- 新增測試：`tests/serve/test_app.py`（8 case）、`tests/serve/test_dashboard.py`（9 case）、`tests/serve/test_channel.py`（9 case）、`tests/serve/test_config.py`（8 case）、`tests/serve/test_lazy_import.py`（6 case）、`tests/serve/test_arch2_smoke.py`（1 case）、`tests/test_pyproject_extras_conflicts.py`（5 case）。既有 459 case 維持綠。
+- `tests/test_distribution_config.py` 新增 `test_mypy_strict_rejects_untyped_def_regression` — 動態注入 untyped def 跑 mypy 驗證 `"Function is missing a return type annotation"` regression scenario。
+
+### Notes — 範圍外（已排程 v0.4.1 cantus-serve-security）
+
+- Auth / authorization gate（本版預設 bind `127.0.0.1`、不掛任何 auth）。
+- Tunnel helpers（cloudflared / ngrok）。
+- Supply-chain CLI（`cantus security audit`）。
+- Secret management（`pydantic_settings.SecretStr`）與 `.env` 檔載入。
+
+### Notes — 範圍外（已排程 v0.4.2 / v0.4.3 channel-gateway）
+
+- 真實 channel 實作（LINE / Telegram / Discord / Google Chat webhook）。
+- WebSocket / Server-Sent Events transport。
+- Hot-reload / 動態 Skill 註冊 endpoint。
+- HTTPS endpoint（由上游反向代理或 v0.4.1 tunnel helpers 處理）。
+
 ## [0.3.6] - 2026-05-18 — Internal Cleanup
 
 **ADDITIVE — no public API change, no BREAKING, no new dependencies, no new

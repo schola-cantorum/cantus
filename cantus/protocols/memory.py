@@ -80,7 +80,7 @@ class ShortTermMemory(Memory):
     """Keep the most recent N turns and return them in chronological order."""
 
     n: int = 10
-    _buffer: deque = field(default_factory=lambda: deque(maxlen=10), init=False)
+    _buffer: deque[Turn] = field(default_factory=lambda: deque(maxlen=10), init=False)
 
     def __post_init__(self) -> None:
         self._buffer = deque(maxlen=self.n)

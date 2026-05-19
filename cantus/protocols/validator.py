@@ -99,7 +99,7 @@ def _from_function(fn: Callable[..., Result]) -> Validator:
     name = fn.__name__
 
     def _run(self: Validator, *args: Any, **kwargs: Any) -> Result:
-        return type(self)._fn(*args, **kwargs)  # type: ignore[attr-defined]
+        return type(self)._fn(*args, **kwargs)  # type: ignore[attr-defined, no-any-return]
 
     cls_attrs: dict[str, Any] = {
         "name": name,
@@ -109,6 +109,6 @@ def _from_function(fn: Callable[..., Result]) -> Validator:
         "run": _run,
     }
     Synthetic = type(pascal(name), (Validator,), cls_attrs)
-    instance = Synthetic()
+    instance: Validator = Synthetic()
     instance._args_model = build_args_model_from_callable(fn, name)
     return instance

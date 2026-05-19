@@ -75,7 +75,8 @@ def load_chat_model(spec: str, **kwargs: Any) -> ChatModel:
         ) from exc
 
     adapter_cls = getattr(module, class_name)
-    return adapter_cls(model_id=model_id, **kwargs)
+    instance: ChatModel = adapter_cls(model_id=model_id, **kwargs)
+    return instance
 
 
 def _parse_spec(spec: str) -> tuple[str, str]:

@@ -52,6 +52,31 @@ The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.4'
 ```
 
+The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`):
+
+```bash
+pip install cantus[serve]
+```
+
+## Serve Quickstart (v0.4.0)
+
+Spin up the bundled FastAPI app on `127.0.0.1:8765` with a fresh `Registry`:
+
+```python
+from cantus import serve
+from cantus.core.registry import Registry
+import uvicorn
+app = serve(Registry())
+uvicorn.run(app, host="127.0.0.1", port=8765)
+```
+
+Hit the health endpoint to confirm the server is up:
+
+```bash
+curl http://localhost:8765/health
+# {"status":"ok","cantus_version":"0.4.0"}
+```
+
 ## 30-second Quickstart
 
 ```python

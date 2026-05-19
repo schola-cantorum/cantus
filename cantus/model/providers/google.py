@@ -51,7 +51,7 @@ class GoogleChatModel:
     def chat(
         self,
         messages: list[Message],
-        tools: list[dict] | None = None,
+        tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> ChatResponse:
         client = self._get_client()
@@ -71,7 +71,7 @@ class GoogleChatModel:
     def stream(
         self,
         messages: list[Message],
-        tools: list[dict] | None = None,
+        tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> Iterator[str]:
         client = self._get_client()
