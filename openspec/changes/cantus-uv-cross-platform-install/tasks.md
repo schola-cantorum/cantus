@@ -30,10 +30,10 @@ Behavior + verification convention:
 ## 4. Spec contract 覆蓋驗證（落實 ADDED Requirements 全部 Scenario 都被 1.x ~ 3.x 覆蓋）
 
 - [ ] 4.1 確認「pyproject runtime extras SHALL gate Linux-only native packages behind sys_platform markers」與「Distribution SHALL ship a tri-platform install smoke matrix」與「Cross-platform desktop quickstart doc SHALL classify as Required English canonical with Optional zh-TW companion」三個 ADDED Requirements 的 Scenario 全部由 1.x / 2.x / 3.x task 的驗證動作覆蓋；驗證：在 PR 描述列出 Scenario 對 CI job log / 本機 smoke run / 文件 review 的對應
-- [ ] 4.2 `spectra analyze cantus-uv-cross-platform-install --json` 無 Critical / Warning finding；驗證：CLI 輸出 `findings: []` 或 severity 全為 Suggestion
+- [x] 4.2 `spectra analyze cantus-uv-cross-platform-install --json` 無 Critical / Warning finding；驗證：CLI 輸出 `findings: []` 或 severity 全為 Suggestion
 
 ## 5. 收尾驗證（不是 audit gate；audit 在 Gate A 階段跑）
 
 - [ ] 5.1 三 OS CI matrix（1.2 的 workflow）在 PR branch push 後跑綠；驗證：PR 頁面顯示 `cross-platform-install / ubuntu-latest`、`cross-platform-install / macos-latest`、`cross-platform-install / windows-latest` 三個 check 皆通過
-- [ ] 5.2 `spectra validate cantus-uv-cross-platform-install` 通過；驗證：CLI 輸出無 error
+- [x] 5.2 `spectra validate cantus-uv-cross-platform-install` 通過；驗證：CLI 輸出無 error
 - [ ] 5.3 在 PR 描述列出對應 Gate A（A 系列三件全 ship 後跑）的驗收項目，方便日後 `/spectra-audit` 與 `/humane-prose-audit` 一次性 review；驗證：PR description 含「Gate A 必過：spectra-audit + humane-prose-audit（對 quickstart-desktop / MIGRATION）」段
