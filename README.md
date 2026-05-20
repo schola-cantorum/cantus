@@ -79,6 +79,10 @@ curl http://localhost:8765/health
 # {"status":"ok","cantus_version":"0.4.0"}
 ```
 
+## Desktop (Win / macOS / Linux)
+
+Desktop and laptop users — see [`docs/quickstart-desktop.md`](./docs/quickstart-desktop.md) for a 5-minute API-key-backed walkthrough that works on Windows, macOS, and Linux. The Colab path below remains the recommended route for 4-bit local Gemma.
+
 ## 30-second Quickstart
 
 ```python

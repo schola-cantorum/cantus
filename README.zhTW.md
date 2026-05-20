@@ -79,6 +79,10 @@ curl http://localhost:8765/health
 # {"status":"ok","cantus_version":"0.4.0"}
 ```
 
+## 桌面（Win / macOS / Linux）
+
+桌面與筆電使用者請看 [`docs/quickstart-desktop.md`](./docs/quickstart-desktop.md)，內含五分鐘 API key 路徑的跨平台 walkthrough，Windows / macOS / Linux 不需設定本機 LLM 就能跑通。下方的 Colab 範例仍是 4-bit 本機 Gemma 的建議路徑。
+
 ## 30-second Quickstart
 
 ```python
