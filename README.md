@@ -3,14 +3,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.2.0"><img alt="release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-blue"></a>
+  <a href="https://pypi.org/project/cantus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus.svg"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.1"><img alt="release v0.4.1" src="https://img.shields.io/badge/release-v0.4.1-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
 
-[繁體中文](README.zhTW.md)
+[Traditional Chinese](README.zhTW.md)
 
 </div>
 
@@ -20,7 +21,7 @@
 
 Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Two protocol kinds (Skill / Memory) plus hook helpers (Analyzer / Validator) and the `cantus.workflows` building blocks let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
 
-The Chinese-speaking LLM community refers to prompt engineering as *詠唱* (incantation). Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
+The Chinese-speaking LLM community refers to prompt engineering as *yǒng chàng* — literally "to chant" or "to incant". Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
 
 ## Open in Colab — 5-minute path
 
@@ -28,28 +29,27 @@ The fastest way to experience Cantus is to launch the bundled notebooks directly
 
 | Notebook | Audience | One-click launch |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/admin_setup.ipynb) |
 
 See [`notebooks/README.md`](./notebooks/README.md) for the recommended order and tag-pinning conventions.
 
 ## Install
 
 ```bash
-# Pin to a tag (recommended — reproducible)
-pip install git+https://github.com/schola-cantorum/cantus@v0.1.4
+# PyPI (recommended — reproducible, no Git clone)
+pip install cantus==0.4.1
 
-# Follow main (latest commit)
+# Git source — escape hatch for tracking main, a feature branch, or a specific commit
+pip install git+https://github.com/schola-cantorum/cantus@v0.4.1
 pip install git+https://github.com/schola-cantorum/cantus@main
-
-# Pin to a commit SHA (bug reproduction)
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
 
 The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 
 ```bash
-pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.4'
+pip install 'cantus[runtime]==0.4.1'
 ```
 
 The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`):
@@ -185,6 +185,22 @@ Full docs live in [`docs/`](./docs/):
 - [Cookbook](./docs/cookbook/) — patterns, error recipes, teaching tips
 - [llms.txt](./llms.txt) — priming document for external LLMs
 - [Developer LLM Wiki](./docs/llm_wiki/index.md) — internal contributor knowledge base (research, coding style, architecture, future work)
+
+### Upgrade Guides
+
+Per-version migration guides for breaking changes between adjacent releases:
+
+- [v0.2 → v0.3](./MIGRATION_v0.2_to_v0.3.md)
+- [v0.3 → v0.3.1](./MIGRATION_v0.3_to_v0.3.1.md)
+- [v0.3 → v0.3.2](./MIGRATION_v0.3_to_v0.3.2.md)
+- [v0.3 → v0.3.3](./MIGRATION_v0.3_to_v0.3.3.md)
+- [v0.3.3 → v0.3.4](./MIGRATION_v0.3.3_to_v0.3.4.md)
+- [v0.3.4 → v0.3.5](./MIGRATION_v0.3.4_to_v0.3.5.md)
+- [v0.3.5 → v0.3.6](./MIGRATION_v0.3.5_to_v0.3.6.md)
+- [v0.3.6 → v0.4.0](./MIGRATION_v0.3.6_to_v0.4.0.md)
+- [v0.4.0 → v0.4.1](./MIGRATION_v0.4.0_to_v0.4.1.md)
+
+The [`CHANGELOG.md`](./CHANGELOG.md) lists everything else (additive features, internal changes, security notes).
 
 ## License
 

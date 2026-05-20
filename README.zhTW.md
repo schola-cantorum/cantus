@@ -3,9 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.2.0"><img alt="release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-blue"></a>
+  <a href="https://pypi.org/project/cantus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus.svg"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.1"><img alt="release v0.4.1" src="https://img.shields.io/badge/release-v0.4.1-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
@@ -28,28 +29,27 @@ Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent
 
 | Notebook | 對象 | 一鍵啟動 |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/admin_setup.ipynb) |
 
 建議的執行順序與 tag pinning 慣例詳見 [`notebooks/README.md`](./notebooks/README.md)。
 
 ## Install
 
 ```bash
-# Pin to a tag (recommended — reproducible)
-pip install git+https://github.com/schola-cantorum/cantus@v0.1.4
+# PyPI（推薦 —— reproducible，不必 clone Git）
+pip install cantus==0.4.1
 
-# Follow main (latest commit)
+# Git 安裝路徑 —— 用於追蹤 main / feature branch / 特定 commit 的 escape hatch
+pip install git+https://github.com/schola-cantorum/cantus@v0.4.1
 pip install git+https://github.com/schola-cantorum/cantus@main
-
-# Pin to a commit SHA (bug reproduction)
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
 
 Runtime extras（Gemma 4 + transformers + bitsandbytes）需要：
 
 ```bash
-pip install 'cantus[runtime] @ git+https://github.com/schola-cantorum/cantus@v0.1.4'
+pip install 'cantus[runtime]==0.4.1'
 ```
 
 Serve extras（v0.4.0 —— FastAPI app factory；會一併安裝 `fastapi`、`uvicorn`、`pydantic-settings`）：
@@ -185,6 +185,22 @@ Workflows building block：
 - [Cookbook](./docs/cookbook/) —— 模式、錯誤處理、教學提示
 - [llms.txt](./llms.txt) —— 給外部 LLM 的 priming 文件
 - [開發者 LLM Wiki](./docs/llm_wiki/index.md) —— cantus 內部貢獻者知識庫（研究、coding style、架構、未來工作）
+
+### 升版指南
+
+相鄰版本之間有 breaking change 時，每一版都會附升版指南：
+
+- [v0.2 → v0.3](./MIGRATION_v0.2_to_v0.3.md)
+- [v0.3 → v0.3.1](./MIGRATION_v0.3_to_v0.3.1.md)
+- [v0.3 → v0.3.2](./MIGRATION_v0.3_to_v0.3.2.md)
+- [v0.3 → v0.3.3](./MIGRATION_v0.3_to_v0.3.3.md)
+- [v0.3.3 → v0.3.4](./MIGRATION_v0.3.3_to_v0.3.4.md)
+- [v0.3.4 → v0.3.5](./MIGRATION_v0.3.4_to_v0.3.5.md)
+- [v0.3.5 → v0.3.6](./MIGRATION_v0.3.5_to_v0.3.6.md)
+- [v0.3.6 → v0.4.0](./MIGRATION_v0.3.6_to_v0.4.0.md)
+- [v0.4.0 → v0.4.1](./MIGRATION_v0.4.0_to_v0.4.1.md)
+
+非 breaking 的所有變動（新增功能、內部變動、安全性 note）都記錄於 [`CHANGELOG.md`](./CHANGELOG.md)。
 
 ## License
 
