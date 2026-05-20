@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from cantus.model.loader import ModelHandle
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 from cantus.core.action import (
     Action,

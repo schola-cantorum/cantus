@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus"
-version = "0.4.0"
+version = "0.4.1"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -105,6 +105,16 @@ serve = [
     "fastapi>=0.115,<1",
     "uvicorn>=0.30,<1",
     "pydantic-settings>=2.4,<3",
+]
+# v0.4.1 cantus-serve-security — documentary alias for the security
+# surface (auth gate + SecretStr token handling). Resolves to the same
+# dependency closure as `cantus[serve]` (no new third-party packages,
+# no new [tool.uv] conflicts entries); downstream code may write
+# `pip install cantus[security]` to communicate intent. The auth gate
+# code lives in `cantus.serve.security` and uses only stdlib (`hmac`,
+# `enum`) plus pydantic's `SecretStr` (already required by serve).
+security = [
+    "cantus[serve]",
 ]
 providers = [
     "cantus[openai,anthropic,google,groq]",

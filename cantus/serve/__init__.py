@@ -18,7 +18,9 @@ except ImportError as exc:
         "Run: pip install cantus[serve]"
     ) from exc
 
+from cantus.config import AuthMode
 from cantus.serve.app import serve
 from cantus.serve.channel import Channel, LocalMockReceiver
+from cantus.serve.security import require_auth
 
-__all__ = ["serve", "Channel", "LocalMockReceiver"]
+__all__ = ["AuthMode", "Channel", "LocalMockReceiver", "require_auth", "serve"]

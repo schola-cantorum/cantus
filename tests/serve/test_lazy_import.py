@@ -59,7 +59,7 @@ def test_import_cantus_succeeds_without_serve_sdks(
     monkeypatch.delitem(sys.modules, "cantus", raising=False)
 
     cantus = importlib.import_module("cantus")
-    assert cantus.__version__ == "0.4.0"
+    assert cantus.__version__ == "0.4.1"
 
 
 # --- cantus.serve gate ---------------------------------------------------
@@ -111,5 +111,17 @@ def test_import_cantus_serve_succeeds_when_all_sdks_present() -> None:
     """Control test — when fastapi/uvicorn/pydantic_settings are installed
     in the cantus[dev,serve] virtualenv, the imports succeed and the public
     surface is reachable."""
-    from cantus.config import Settings  # noqa: F401
-    from cantus.serve import serve  # noqa: F401
+    from cantus.config import AuthMode, Settings  # noqa: F401
+    from cantus.serve import (  # noqa: F401
+        AuthMode as AuthModeReexport,
+        require_auth,
+        serve,
+    )
+
+    # v0.4.1 cantus-serve-security: AuthMode and require_auth are top-level
+    # exports of cantus.serve, re-exported from cantus.config / cantus.serve.security.
+    # Value comparison (not `is`) because other tests in this file reload
+    # cantus.config and break identity across imports.
+    assert AuthModeReexport.NONE.value == AuthMode.NONE.value == "none"
+    assert AuthModeReexport.BEARER.value == AuthMode.BEARER.value == "bearer"
+    assert callable(require_auth)

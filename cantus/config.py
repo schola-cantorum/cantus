@@ -2,14 +2,21 @@
 
 `cantus.config.Settings` is the single configuration object consumed by
 `cantus.serve(...)`. Environment variables prefixed `CANTUS_SERVE_*` populate
-fields with pydantic's standard type coercion. The `env_file` option is
-intentionally NOT enabled in v0.4.0 — secret + .env management lands in
-cantus-serve-security (v0.4.1). The module gates on `pydantic_settings` so a
-missing SDK surfaces a clear ImportError with the install hint, mirroring
-the `cantus.adapters.mcp` pattern.
+fields with pydantic's standard type coercion. v0.4.1 (cantus-serve-security)
+adds the opt-in auth gate fields (`auth_mode`, `api_key`, `bearer_token`,
+`dashboard_requires_auth`) backed by `pydantic.SecretStr` so token values are
+masked in `repr`, JSON dumps, and the generated OpenAPI schema. The `env_file`
+option is still intentionally NOT enabled — `.env` loading remains out of
+scope. The module gates on `pydantic_settings` so a missing SDK surfaces a
+clear ImportError with the install hint, mirroring the `cantus.adapters.mcp`
+pattern.
 """
 
 from __future__ import annotations
+
+from enum import Enum
+
+from pydantic import SecretStr
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +25,24 @@ except ImportError as exc:
         "cantus.config requires pydantic-settings. "
         "Run: pip install cantus[serve]"
     ) from exc
+
+
+class AuthMode(str, Enum):
+    """Authentication mode for `cantus.serve(...)`.
+
+    Three modes:
+
+    * ``NONE`` — no auth gate (v0.4.0 behaviour, the default).
+    * ``BEARER`` — `Authorization: Bearer <token>` header required.
+    * ``API_KEY`` — `X-API-Key: <token>` header required.
+
+    The enum is `str`-valued so pydantic-settings can coerce the
+    `CANTUS_SERVE_AUTH_MODE` env variable (a string) directly to a member.
+    """
+
+    NONE = "none"
+    BEARER = "bearer"
+    API_KEY = "api-key"
 
 
 class Settings(BaseSettings):
@@ -38,5 +63,11 @@ class Settings(BaseSettings):
     openapi_url: str | None = "/openapi.json"
     redoc_url: str | None = "/redoc"
 
+    # v0.4.1 cantus-serve-security: opt-in auth gate.
+    auth_mode: AuthMode = AuthMode.NONE
+    api_key: SecretStr | None = None
+    bearer_token: SecretStr | None = None
+    dashboard_requires_auth: bool = True
 
-__all__ = ["Settings"]
+
+__all__ = ["AuthMode", "Settings"]

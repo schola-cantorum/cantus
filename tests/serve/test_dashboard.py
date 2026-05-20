@@ -195,3 +195,86 @@ def test_skill_named_after_reserved_dashboard_path_is_rejected(
     registry.register("skill", _StubSkill())
     with pytest.raises(ValueError, match="reserved dashboard path"):
         serve(registry)
+
+
+# --- v0.4.1 cantus-serve-security: dashboard_requires_auth toggle --------
+
+
+def test_dashboard_requires_auth_default_true_gates_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Under auth_mode=bearer + default dashboard_requires_auth=True, anonymous
+    requests to /skills, /health, /events all return 401."""
+    import importlib
+
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    for key in [
+        "CANTUS_SERVE_AUTH_MODE",
+        "CANTUS_SERVE_BEARER_TOKEN",
+        "CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "bearer")
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "correct-secret")
+    config_mod = importlib.import_module("cantus.config")
+    importlib.reload(config_mod)
+    Settings = config_mod.Settings
+
+    registry, _s1, _s2 = _registry_with_two_skills()
+    app = serve(registry, settings=Settings())
+    client = TestClient(app)
+
+    for path in ("/skills", "/health", "/events"):
+        resp = client.get(path)
+        assert resp.status_code == 401, (
+            f"dashboard endpoint {path} must reject anonymous request "
+            f"under default dashboard_requires_auth=True"
+        )
+
+    resp = client.get("/health", headers={"Authorization": "Bearer correct-secret"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+
+
+def test_dashboard_requires_auth_false_opens_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Under auth_mode=bearer + dashboard_requires_auth=False, the three
+    dashboard endpoints accept anonymous requests while /skills/{name} still
+    requires auth."""
+    import importlib
+
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    for key in [
+        "CANTUS_SERVE_AUTH_MODE",
+        "CANTUS_SERVE_BEARER_TOKEN",
+        "CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "bearer")
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "correct-secret")
+    monkeypatch.setenv("CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH", "false")
+    config_mod = importlib.import_module("cantus.config")
+    importlib.reload(config_mod)
+    Settings = config_mod.Settings
+
+    registry, s1, _s2 = _registry_with_two_skills()
+    app = serve(registry, settings=Settings())
+    client = TestClient(app)
+
+    for path in ("/skills", "/health", "/events"):
+        resp = client.get(path)
+        assert resp.status_code == 200, (
+            f"dashboard endpoint {path} must accept anonymous request "
+            f"when dashboard_requires_auth=False"
+        )
+
+    skill_name = s1.spec_for_llm()["name"]
+    resp = client.post(f"/skills/{skill_name}", json={"title": "x"})
+    assert resp.status_code == 401

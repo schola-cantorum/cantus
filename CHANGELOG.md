@@ -4,6 +4,49 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-05-20 — cantus-serve-security
+
+補上 v0.4.0 故意延後的 auth gate 與 `pydantic.SecretStr` token 載入。**完全 ADDITIVE** — 沒有 BREAKING、`auth_mode` 預設 `AuthMode.NONE` 維持 v0.4.0 行為，既有 cookbook / examples 無需改動即可升級。
+
+### Added
+
+- `cantus.config.AuthMode`（`str, Enum`；values `"none"` / `"bearer"` / `"api-key"`）— FastAPI auth gate 三模式列舉，str-valued 以便 pydantic-settings 從 `CANTUS_SERVE_AUTH_MODE` 直接 coerce。
+- `cantus.config.Settings` 新增四個欄位：`auth_mode: AuthMode = AuthMode.NONE`、`api_key: SecretStr | None = None`、`bearer_token: SecretStr | None = None`、`dashboard_requires_auth: bool = True`。env prefix 沿用既有 `CANTUS_SERVE_`，對應 env 變數為 `CANTUS_SERVE_AUTH_MODE` / `CANTUS_SERVE_API_KEY` / `CANTUS_SERVE_BEARER_TOKEN` / `CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH`。
+- `cantus.serve.security` 新模組，公開兩個 callable：`require_auth(request: Request) -> None`（FastAPI dependency，讀 `request.app.state.settings` 取 auth 設定）、`validate_auth_config(settings: Settings) -> None`（`cantus.serve()` 啟動前的 fail-fast 檢查，`auth_mode != NONE` 但對應 token 為 `None` 時 raise `ValueError` 含字面 `BEARER_TOKEN` / `API_KEY`）。
+- `cantus.serve.AuthMode` / `cantus.serve.require_auth` — top-level re-export，方便 `from cantus.serve import AuthMode, require_auth` 一行帶到。
+- `cantus[security]` extras — documentary alias，dependency closure 跟 `cantus[serve]` 完全相同（fastapi、uvicorn、pydantic-settings），不引入新第三方套件、不新增 `[tool.uv] conflicts` 條目。下游可寫 `pip install cantus[security]` 表達安裝意圖。
+- 文件：`docs/protocols/serve.md` 新增「Authentication」段（三模式說明 + env 變數表 + bearer / api-key 兩種模式各一份 quick start + dashboard_requires_auth 行為 + Design notes）、`MIGRATION_v0.4.0_to_v0.4.1.md`。
+
+### Changed
+
+- `cantus.serve.app.serve()` 整合 `Depends(require_auth)`：當 `settings.auth_mode != AuthMode.NONE` 時自動把 dependency 掛到 `POST /skills/{name}` 與（依 `settings.dashboard_requires_auth`）dashboard endpoints。`auth_mode = AuthMode.NONE`（預設）路徑 byte-identical 保留 v0.4.0 行為 — `app.state.channels` 不動、Channel Protocol 不動、`POST /skills/{name}` 與 `GET /skills` / `GET /health` / `GET /events` request/response 形狀不動。
+- `cantus.serve.dashboard.register_dashboard_routes()` 新增 `dependencies: list[Depends] | None = None` 關鍵字參數，三個 dashboard route 在註冊時把 `dependencies` 傳給 `@app.get(...)` 對應參數。預設 `None` → 不掛 dependency，行為跟 v0.4.0 一致。
+- `cantus.serve.app.serve()` 在建構 FastAPI app 後設 `app.state.settings = effective_settings`，讓 `require_auth` 從 `request.app.state.settings` 取得 auth 設定（避免 dependency 每次重新 load Settings）。
+- `cantus.__version__` 從 `"0.4.0"` 升到 `"0.4.1"`，`pyproject.toml [project].version` 同步。`test_dunder_version_aligned_with_pyproject` 仍鎖住兩者一致。
+
+### Security
+
+- **Constant-time token compare**：`cantus.serve.security._check_token` 走 `hmac.compare_digest(provided.encode(), expected.encode())`，防 timing-oracle 推測 token 前綴。`==` 比對在某些 Python 實作會 short-circuit 並洩漏長度差。
+- **401 不區分缺/錯 token**：所有認證失敗（缺 header、錯 token、格式錯、未知 mode）一律回 HTTP 401 with body `{"detail": "Authentication required"}` byte-identical。差異化錯誤訊息會幫攻擊者區分「找對 header 名了嗎」vs「猜對 token 內容了嗎」，等於 username enumeration 的類比。
+- **SecretStr 不洩漏**：`api_key` / `bearer_token` 兩個欄位以 `pydantic.SecretStr` 包裝，pydantic 內建 mask 行為確保 `repr(settings)` / `settings.model_dump_json()` / `serve(registry).openapi()` / `cantus.serve` 產生的任何 log line 都不出現 token 明文（測試以 substring 斷言驗證四個 surface）。
+- **Fail-fast on missing / blank token**：`cantus.serve.security.validate_auth_config` 在 `cantus.serve()` 建構 FastAPI app 前執行；`auth_mode != NONE` 但對應 token 為 `None`、空字串、或 whitespace-only 時就 raise `ValueError` 含字面 `BEARER_TOKEN` / `API_KEY` 與 `non-empty` 字樣。避免使用者誤以為 auth 已啟用但實際每個請求都會通過、也擋掉 `CANTUS_SERVE_BEARER_TOKEN=""` 這類 foot-gun 設定。
+- **Dashboard 預設套 auth**：`dashboard_requires_auth = True` 預設值；要把 `/health` 開放給 Prometheus / Grafana 等 monitoring 系統需顯式設 `false`。dashboard 暴露 Skill 名單與健康狀態本身就是 reconnaissance 資訊。
+- **`_check_token` 包 try/except**：`hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))` 外層包 `UnicodeEncodeError` / `ValueError` catch、return `False`。Starlette HTTP header 走 latin-1 decode 實務上不會產出 lone surrogate，但 defensive 處理保留 401 indistinguishability 保證（避免異常被冒出當成 500 形成 oracle）。
+
+### Internal
+
+- 新增測試：`tests/serve/test_security.py`（12 case 矩陣：NONE 預設無 auth、bearer 缺 header 401、bearer 錯 token 401、401 body byte-identical、bearer 對 token 200、api-key 對 / 錯 / 缺三種對應、SecretStr 不洩漏於 repr/JSON/OpenAPI/log、bearer / api-key 兩種 fail-fast、constant-time compare source-level 檢查）。`tests/serve/test_config.py` 新增 7 case（AuthMode 預設、env 解析 bearer / api-key、SecretStr 包裝 bearer_token / api_key、model_dump_json 不洩漏、`dashboard_requires_auth` env 解析）。`tests/serve/test_dashboard.py` 新增 2 case（`dashboard_requires_auth=true` 預設關閘 / `false` 開閘）。`tests/serve/test_lazy_import.py` 既有 happy-path 控制 case 擴成驗證 `AuthMode` + `require_auth` 從 `cantus.serve` 可 import。
+- `tests/test_distribution_config.py` `test_pyproject_version_bumped_to_0_4_0` rename 為 `test_pyproject_version_bumped_to_0_4_1`、值對齊 `"0.4.1"`；`tests/test_public_api.py` `test_version_is_0_4_0` 同 rename 為 `test_version_is_0_4_1`。
+- 整體測試從 v0.4.0 base 的 459 case + serve 41 case 擴成 527 pass / 3 skipped（v0.4.0 既有 case 全部 byte-identical 保留）。
+- `uv run mypy cantus --strict` 全綠（含新 `cantus/serve/security.py` 與 `cantus/config.py` 4 新欄位、`cantus/serve/app.py` 與 `cantus/serve/dashboard.py` 的 `Depends` 整合）。
+
+### Notes — 範圍外（已排程）
+
+- **v0.4.2 `cantus-serve-tunnel`**：cloudflared / ngrok tunnel helper 整合，把 cantus serve 暴露到公網的 deploy 路徑。預期 spawn tunnel 時若偵測到 `auth_mode=NONE` 就以醒目警告或拒絕執行作為第二道防線。
+- **v0.4.3 `cantus-supply-chain-cli`**：`cantus deps` / `cantus audit` / SBOM 生成 CLI，需先解 `[project.scripts]` 入口與 CLI 框架選型（typer / click / argparse stdlib）。
+- **v0.5.x（暫定）**：multi-tenant auth（OAuth 2.0 / JWT / mTLS / OIDC）、per-Skill ACL（RBAC）、rate limiting、CORS / CSRF policy；超出 v0.4.x 教學弧 scope。
+- **HTTPS / TLS termination**：仍走上游 reverse proxy 或 v0.4.2 tunnel helper。
+
 ## [0.4.0] - 2026-05-20 — cantus-serve-core
 
 新增 `cantus.serve()` FastAPI app factory、`cantus.config` 12-factor 設定、Channel Protocol 抽象與 `cantus[serve]` extras；同支同步啟用 mypy `strict = true`、收尾 `cantus[all]` ⊗ `cantus[openhands]` extras resolver conflict。

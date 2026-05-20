@@ -125,3 +125,85 @@ def test_settings_uses_cantus_serve_env_prefix() -> None:
     assert cfg.get("env_prefix") == "CANTUS_SERVE_", (
         f"Settings.model_config.env_prefix must be 'CANTUS_SERVE_'; got: {cfg.get('env_prefix')!r}"
     )
+
+
+# --- v0.4.1 cantus-serve-security: AuthMode + SecretStr -------------------
+
+
+def test_authmode_default_is_none_preserves_v040_zero_auth() -> None:
+    """Defaulting to AuthMode.NONE keeps v0.4.0 zero-auth behavior."""
+    from cantus.config import AuthMode
+
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.auth_mode == AuthMode.NONE
+    assert s.auth_mode.value == "none"
+    assert s.api_key is None
+    assert s.bearer_token is None
+    assert s.dashboard_requires_auth is True
+
+
+def test_authmode_env_coerces_string_to_enum(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cantus.config import AuthMode
+
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "bearer")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.auth_mode == AuthMode.BEARER
+    assert s.auth_mode.value == "bearer"
+
+
+def test_authmode_env_accepts_api_key_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cantus.config import AuthMode
+
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "api-key")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.auth_mode == AuthMode.API_KEY
+    assert s.auth_mode.value == "api-key"
+
+
+def test_bearer_token_env_wraps_in_secretstr(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "correct-secret")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.bearer_token, SecretStr)
+    assert s.bearer_token.get_secret_value() == "correct-secret"
+    # SecretStr masks in repr — must NOT contain the plaintext.
+    assert "correct-secret" not in repr(s.bearer_token)
+    assert "correct-secret" not in repr(s)
+
+
+def test_api_key_env_wraps_in_secretstr(monkeypatch: pytest.MonkeyPatch) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_API_KEY", "correct-key")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.api_key, SecretStr)
+    assert s.api_key.get_secret_value() == "correct-key"
+    assert "correct-key" not in repr(s.api_key)
+    assert "correct-key" not in repr(s)
+
+
+def test_secretstr_fields_do_not_leak_in_model_dump_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "correct-secret")
+    monkeypatch.setenv("CANTUS_SERVE_API_KEY", "correct-key")
+    Settings = _load_settings_class()
+    s = Settings()
+    dumped = s.model_dump_json()
+    assert "correct-secret" not in dumped
+    assert "correct-key" not in dumped
+
+
+def test_dashboard_requires_auth_env_coerces_to_bool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH", "false")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.dashboard_requires_auth is False

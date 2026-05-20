@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.params import Depends as DependsType
 
 from cantus.config import Settings
 from cantus.core.registry import Registry
@@ -32,24 +33,48 @@ def register_dashboard_routes(
     app: FastAPI,
     registry: Registry,
     settings: Settings,
+    *,
+    dependencies: list[DependsType] | None = None,
 ) -> None:
     """Attach the three read-only dashboard endpoints to ``app``.
 
     Caller is responsible for honouring ``settings.dashboard``: if it is
     False this function SHOULD NOT be called (the absence of the routes is
     what makes the endpoints 404).
+
+    ``dependencies`` (added in v0.4.1 cantus-serve-security) is passed
+    through to each route's ``dependencies=`` kwarg; the caller can attach
+    :func:`cantus.serve.security.require_auth` to gate the dashboard behind
+    the configured auth mode.
     """
     import cantus
 
-    @app.get("/skills", summary="List registered Skills", name="dashboard_list_skills")
+    deps: list[DependsType] = list(dependencies) if dependencies else []
+
+    @app.get(
+        "/skills",
+        summary="List registered Skills",
+        name="dashboard_list_skills",
+        dependencies=deps,
+    )
     def list_skills() -> list[dict[str, Any]]:
         return _list_skill_specs(registry)
 
-    @app.get("/health", summary="Liveness + cantus version", name="dashboard_health")
+    @app.get(
+        "/health",
+        summary="Liveness + cantus version",
+        name="dashboard_health",
+        dependencies=deps,
+    )
     def health() -> dict[str, str]:
         return {"status": "ok", "cantus_version": cantus.__version__}
 
-    @app.get("/events", summary="Recent EventStream entries", name="dashboard_events")
+    @app.get(
+        "/events",
+        summary="Recent EventStream entries",
+        name="dashboard_events",
+        dependencies=deps,
+    )
     def events(
         limit: int = Query(default=100, ge=1, le=1000),
         offset: int = Query(default=0, ge=0),

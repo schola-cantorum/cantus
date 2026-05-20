@@ -167,9 +167,9 @@ def test_mypy_strict_rejects_untyped_def_regression(tmp_path: Path) -> None:
     )
 
 
-def test_pyproject_version_bumped_to_0_4_0() -> None:
+def test_pyproject_version_bumped_to_0_4_1() -> None:
     cfg = _load_pyproject()
-    assert cfg["project"]["version"] == "0.4.0"
+    assert cfg["project"]["version"] == "0.4.1"
 
 
 def test_dunder_version_aligned_with_pyproject() -> None:
