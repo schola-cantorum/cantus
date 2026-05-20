@@ -1,0 +1,59 @@
+## 1. Skill hook 擴展與 spec_for_llm 不變性
+
+- [x] 1.1 在 `libs/cantus/cantus/protocols/skill.py` 為 `Skill` 加上 `_pre_hook` / `_post_hook` 實例屬性，並把 `@skill` 與 `register_skill` 重構為支援 `@skill` 與 `@skill(pre_hook=..., post_hook=...)` 兩種寫法的兩階段 decorator。落實「Three entry points for Skill」與「Skill spec generation from signature and docstring」中 hook 加入後 args 型別對齊與 JSON shape 不變的條款。驗證：`uv run pytest libs/cantus/tests/test_skill.py -k hook -v` 全綠。
+- [x] 1.2 建立 v0.2.1 baseline 的 `Skill.spec_for_llm()` JSON snapshot fixture，新增 `tests/test_skill.py::test_spec_for_llm_shape_unchanged` 與 hook 存在時 shape 對齊 v0.2.1 fixture 的 case，確保「Skill spec generation from signature and docstring」中 `args_schema` / `name` / `description` 之外不滲漏 hook 資訊。驗證：`uv run pytest libs/cantus/tests/test_skill.py::test_spec_for_llm_shape_unchanged -v` 通過 string compare。
+
+## 2. Analyzer / Validator 改為 hook helper 並搬到 cantus.hooks
+
+- [x] 2.1 [P] 在 `libs/cantus/cantus/protocols/analyzer.py` 移除 `@analyzer` 與 `Analyzer.__init__` 對 `get_registry().register("analyzer", ...)` 的呼叫；保留 `Analyzer` class 與 docstring/spec 推導。落實 ADDED Requirement「Analyzer and Validator bind to Skill as pre/post hooks」中「decorator 不再 mutate registry」條款（決策「Analyzer / Validator 從 cantus top-level 搬到 cantus.hooks」）。驗證：`uv run pytest libs/cantus/tests/test_analyzer.py -k no_registry_entry -v` 綠。
+- [x] 2.2 [P] 在 `libs/cantus/cantus/protocols/validator.py` 移除 `@validator` 與 `Validator.__init__` 對 registry 的註冊；保留 `Result` 契約與 `RESERVED_VALIDATOR_NAMES` 防護。落實「Analyzer and Validator bind to Skill as pre/post hooks」中 Validator 部分。驗證：`uv run pytest libs/cantus/tests/test_validator.py -v` 綠，包含 reserved-name 防護案例。
+- [x] 2.3 新增 `libs/cantus/cantus/hooks/__init__.py` 對外公開 `analyzer`、`validator`、`Analyzer`、`Validator`、`Result`。實踐決策「Analyzer / Validator 從 cantus top-level 搬到 cantus.hooks」。驗證：`uv run pytest libs/cantus/tests/test_hooks.py -v` 綠（檢驗 `from cantus.hooks import analyzer, validator, Analyzer, Validator, Result` 全部成功），且 `from cantus import analyzer` 引發 `ImportError`。
+
+## 3. Registry 收窄與 dispatch 直線化
+
+- [x] 3.1 在 `libs/cantus/cantus/core/registry.py` 把 `Registry.KINDS` 從 `("skill", "analyzer", "validator", "workflow")` 收窄為 `("skill",)`，並讓 `register()` 對舊 kind 三者 raise `ValueError`，訊息字串含 `pre_hook` / `post_hook` / `cantus.workflows`。落實 ADDED Requirement「Two protocol kinds with distinct semantic roles」中 KINDS 與 migration hint 條款（決策「Registry.KINDS 一次收窄到 `("skill",)`」）。驗證：`uv run pytest libs/cantus/tests/test_registry.py -k legacy_kind_rejected -v` 綠，且斷言三個訊息子串都命中。
+- [x] 3.2 重構 `libs/cantus/cantus/core/agent.py` 的 `Agent._dispatch_skill` 為單一 `self.registry.lookup("skill", action.skill_name)` 與 hook 直線鏈：`pre_hook(args) → instance(**args) → post_hook(result)`。`Result(ok=False, ...)` 仍折回 `ValidationErrorObservation`；hook 例外折回 `ToolErrorObservation` 並在 message 區分 `pre_hook` / `post_hook`。落實「Analyzer and Validator bind to Skill as pre/post hooks」核心 dispatch 契約（決策「Pre/post hook 綁定於 Skill 而非獨立 middleware 註冊表」與「Hook 命名採用 pre_hook / post_hook」）。驗證：code review 確認移除 4-kind `for kind in ...` 迴圈與所有 per-kind `if/elif`；`uv run pytest libs/cantus/tests/test_agent_step.py libs/cantus/tests/test_agent_run.py libs/cantus/tests/test_error_loop.py libs/cantus/tests/test_failure_handling.py -v` 全綠。
+- [x] 3.3 新增 `libs/cantus/tests/test_hooks.py` 涵蓋三個關鍵場景：pre_hook 改寫 args 後 skill body 正確收到 typed 參數；post_hook 回傳 `Result(ok=False, ...)` 產生 `ValidationErrorObservation`；analyzer/validator 名稱不出現在 `get_registry().names_for("skill")`。落實「Analyzer and Validator bind to Skill as pre/post hooks」的所有 scenarios。驗證：`uv run pytest libs/cantus/tests/test_hooks.py -v` 全綠。
+
+## 4. cantus.workflows building blocks 五件套
+
+- [x] 4.1 [P] 在 `libs/cantus/cantus/workflows/prompt_chain.py` 實作 `PromptChain(steps: list[Skill]).run(input)` — 把 step 輸出當下一個 step 輸入串接，無 registry 註冊。落實 ADDED Requirement「cantus.workflows building blocks compose Skills explicitly」之 PromptChain scenario（決策「`cantus.workflows` building block 是純 Python 類別，不碰 registry」）。驗證：`uv run pytest libs/cantus/tests/test_workflows/test_prompt_chain.py -v` 綠，且斷言 `get_registry().names_for("skill")` 不含 `"PromptChain"`。
+- [x] 4.2 [P] 在 `libs/cantus/cantus/workflows/router.py` 實作 `Router(routes: dict[str, Skill], classifier: Callable).run(input)` — 透過 classifier 路由到一條 route，其他 route 不被呼叫。落實「cantus.workflows building blocks compose Skills explicitly」之 Router scenario。驗證：`uv run pytest libs/cantus/tests/test_workflows/test_router.py -v` 綠，包含「被路由的 skill 被呼叫一次、未被路由的 skill 從未被呼叫」斷言。
+- [x] 4.3 [P] 在 `libs/cantus/cantus/workflows/parallel.py` 實作 `Parallel(branches: list[Skill]).run(input)` — 對同一個輸入呼叫所有 branch、收集輸出 list，純 Python 不碰 registry。落實「cantus.workflows building blocks compose Skills explicitly」中 building block surface 表的 `Parallel` 行。驗證：`uv run pytest libs/cantus/tests/test_workflows/test_parallel.py -v` 綠。
+- [x] 4.4 [P] 在 `libs/cantus/cantus/workflows/orchestrator_worker.py` 實作 `OrchestratorWorker(orchestrator: Skill, workers: list[Skill]).run(input)` — orchestrator 分派 sub-task、workers 並執行、orchestrator 聚合。落實「cantus.workflows building blocks compose Skills explicitly」中 `OrchestratorWorker` 行。驗證：`uv run pytest libs/cantus/tests/test_workflows/test_orchestrator_worker.py -v` 綠。
+- [x] 4.5 [P] 在 `libs/cantus/cantus/workflows/evaluator_optimizer.py` 實作 `EvaluatorOptimizer(generator: Skill, evaluator: Skill, max_iters: int).run(input)` — generator→evaluator 迴圈，直到 evaluator 通過或達 max_iters。落實「cantus.workflows building blocks compose Skills explicitly」中 `EvaluatorOptimizer` 行。驗證：`uv run pytest libs/cantus/tests/test_workflows/test_evaluator_optimizer.py -v` 綠，包含「max_iters 到了仍未通過」與「第二次迭代通過」兩個 case。
+- [x] 4.6 在 `libs/cantus/cantus/workflows/__init__.py` re-export 五個 building block，並新增 `tests/test_workflows/test_no_registry_mutation.py` 斷言實例化任一 building block 後 `get_registry().spec_for_llm()` 的 top-level keys 仍只剩 `"skill"`。落實「cantus.workflows building blocks compose Skills explicitly」之 registry isolation 條款（決策「`cantus.workflows` building block 是純 Python 類別，不碰 registry」）。驗證：`uv run pytest libs/cantus/tests/test_workflows/ -v` 全綠。
+
+## 5. 移除 Workflow protocol 與 deprecated shim
+
+- [x] 5.1 硬刪 `libs/cantus/cantus/protocols/workflow.py` 與 `libs/cantus/tests/test_workflow.py`，不留 deprecated shim。落實 REMOVED Requirement「Workflow composes other protocols」（決策「硬刪 Workflow，不留 deprecated shim」）。驗證：`git ls-files libs/cantus/cantus/protocols/workflow.py` 與 `git ls-files libs/cantus/tests/test_workflow.py` 皆無輸出；`python -c "from cantus.protocols import workflow"` 引發 `ImportError`。
+- [x] 5.2 在 `tests/test_public_api.py` 加入「`from cantus import Workflow` / `workflow` / `register_workflow` 皆 `ImportError`」斷言，覆蓋 ADDED Requirement「Two protocol kinds with distinct semantic roles」中對 `Workflow` 符號完全移除的契約。驗證：`uv run pytest libs/cantus/tests/test_public_api.py -k workflow_removed -v` 綠。
+
+## 6. 公開 API 收斂與版本 bump
+
+- [x] 6.1 更新 `libs/cantus/cantus/__init__.py` 的 `__all__`：移除 `analyzer`、`validator`、`Analyzer`、`Validator`、`register_analyzer`、`register_validator`、`workflow`、`Workflow`、`register_workflow`；新增 `hooks` 與 `workflows` 模組路徑可用。落實 ADDED Requirement「Two protocol kinds with distinct semantic roles」中 import path scenario（決策「Analyzer / Validator 從 cantus top-level 搬到 cantus.hooks」）。驗證：`uv run pytest libs/cantus/tests/test_public_api.py -v` 全綠，覆蓋所有預期 ImportError 與成功 import 兩條清單。
+- [x] 6.2 `libs/cantus/pyproject.toml` 版本字串改為 `0.3.0`；`libs/cantus/cantus/__init__.py` 的 `__version__` 同步更新。驗證：`python -c "import cantus; assert cantus.__version__ == '0.3.0', cantus.__version__"` 成功，且 `grep '^version = "0.3.0"' libs/cantus/pyproject.toml` 命中。
+- [x] 6.3 `libs/cantus/CHANGELOG.md` 加入 `## [0.3.0] - 2026-05-XX` 段，內容引用本 change 的 breaking-change 清單與 `MIGRATION_v0.2_to_v0.3.md`。驗證：`grep -F "## [0.3.0]" libs/cantus/CHANGELOG.md` 命中且該段有「BREAKING」字樣與「pre_hook / post_hook」字樣。
+
+## 7. @debug 重新對齊 hook 與 Skill
+
+- [x] 7.1 更新 `libs/cantus/cantus/inspect/debug.py`（或現有 @debug 實作位置）使其只接受 `@skill`、`@analyzer`、`@validator` 三種裝飾目標；對舊有 `@workflow` 堆疊路徑做純語法層的失敗（`@workflow` 已不存在）。落實 ADDED Requirement「@debug decorator stacking on @skill」。驗證：`uv run pytest libs/cantus/tests/test_inspector.py -k debug_stacking -v` 綠，覆蓋「`@debug @skill` 印 trace」與「`@debug` on hook helper 在 dispatch 內印 `pre_hook` 標籤 trace」兩個 scenario。
+- [x] 7.2 在 `tests/test_inspector.py` 加入「import `@workflow` 直接失敗，使得 `@debug @workflow` 不可能成立」smoke case，覆蓋 REMOVED Requirement「@debug decorator stacking」之 migration 條款。驗證：`uv run pytest libs/cantus/tests/test_inspector.py -k workflow_removed -v` 綠。
+
+## 8. Migration 文件、wiki 與 notebook
+
+- [x] 8.1 [P] 新增 `libs/cantus/MIGRATION_v0.2_to_v0.3.md`，內容五段：概念重述、sed-friendly 轉換 recipe、`@workflow` → `PromptChain` 對照表、breaking-change 清單、before/after notebook diff。內容引用 REMOVED Requirement「Five protocol kinds with distinct semantic roles」、「Three entry points for Skill, Analyzer, Validator, Workflow」、「Workflow composes other protocols」、「@debug decorator stacking」之 migration 條款。驗證：`grep -E '^## ' libs/cantus/MIGRATION_v0.2_to_v0.3.md | wc -l` 至少為 5；內文搜到 `pre_hook` / `post_hook` / `cantus.workflows` / `cantus.hooks` 全部命中。
+- [x] 8.2 [P] 改寫 `libs/cantus/docs/protocols/analyzer.md` 與 `libs/cantus/docs/protocols/validator.md` 為 hook helper 角色說明，更新範例為 `@skill(pre_hook=...)` / `@skill(post_hook=...)`、import 改為 `from cantus.hooks import analyzer, validator`，移除 `register_analyzer` / `register_validator` function-pass entry 段落。驗證：`wiki-validator libs/cantus/docs/llm_wiki/` 回報零違規（llm_wiki 未動，本來就 clean）；目視確認 protocol 文件不再宣稱 Analyzer / Validator 是 protocol kind。
+- [x] 8.3 [P] 新增 `libs/cantus/docs/protocols/workflows.md` 涵蓋五個 building block 各一段 100 行內的範例與用途說明。落實「cantus.workflows building blocks compose Skills explicitly」之教學配套。驗證：`grep -E '^## (PromptChain|Router|Parallel|OrchestratorWorker|EvaluatorOptimizer)' libs/cantus/docs/protocols/workflows.md | wc -l` 為 5。
+- [x] 8.4 [P] 刪除 `libs/cantus/docs/protocols/workflow.md`（單數）並從 `libs/cantus/docs/llms-txt.md` 與 `libs/cantus/docs/llm_wiki/index.md`（若有）移除其引用。落實 REMOVED Requirement「Workflow composes other protocols」之文件對齊。驗證：`git ls-files libs/cantus/docs/protocols/workflow.md` 無輸出。
+- [x] 8.5 Migrate `libs/cantus/notebooks/task_template.ipynb`：`@analyzer` / `@validator` cell 改用 `cantus.hooks` import + `@skill(pre_hook=, post_hook=)`；`@workflow` cell 換成 `PromptChain` 範例。Cell 數量保持以利學生 fork 的 diff 最小化。落實 ADDED Requirement「Two protocol kinds with distinct semantic roles」與「cantus.workflows building blocks compose Skills explicitly」在 cantus 自身 canonical notebook 的展示契約。驗證：`jupyter nbconvert --to notebook --execute --inplace libs/cantus/notebooks/task_template.ipynb` 跑完無 cell 拋例外；`python -c "import json; nb = json.load(open('libs/cantus/notebooks/task_template.ipynb')); print(len(nb['cells']))"` 印出與 v0.2.1 相同的 cell 數。
+
+## 9. ARCH-2 migration smoke 延伸
+
+- [x] 9.1 在 `libs/cantus/tests/test_integration_smoke.py` 同檔新增 `test_v0_1_example_runs_after_migration`：以 subprocess 跑一個遷移後的小型 example（直接內嵌字串或 fixture 檔），斷言 exit code 0、stdout 含 `FinalAnswerAction` 字樣、stderr 不含 `ImportError`。延伸 ARCH-2 integration smoke audit table 同一列（決策「Migration smoke 併入既有 integration smoke 檔，audit table 單行」）。驗證：`uv run pytest libs/cantus/tests/test_integration_smoke.py::test_v0_1_example_runs_after_migration -v` 綠；既有 `test_core_import_does_not_transitively_load_provider_sdks` 仍綠。
+- [x] 9.2 跑 multi-provider regression：`uv run pytest libs/cantus/tests/providers/ libs/cantus/tests/test_bridge.py libs/cantus/tests/test_factory.py libs/cantus/tests/test_chat_protocol.py -v` 全綠，確認 v0.2.x adapter 工作不被 protocol-reorg 波及。
+
+## 10. Spectra 與品質 gate
+
+- [x] 10.1 跑 lint / type-check / test 全套：`uv run ruff check libs/cantus/`、`uv run mypy libs/cantus/cantus/`、`uv run pytest libs/cantus/tests/ -v` 三者全綠。驗證：三條指令各自 exit 0。
+- [x] 10.2 跑 `spectra verify cantus-protocol-reorg` 與 `spectra audit cantus-protocol-reorg` 兩者皆乾淨（無 Critical/Warning）。驗證：`spectra verify cantus-protocol-reorg --json` 與 `spectra audit cantus-protocol-reorg --json` 各自 exit 0 且輸出 `"findings": []`（或等價乾淨狀態）。

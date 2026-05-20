@@ -99,3 +99,7 @@ logs/
 
 # uv
 uv.lock
+
+# Spectra runtime state
+.spectra/
+openspec/.vector-search.db*

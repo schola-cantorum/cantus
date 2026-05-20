@@ -29,3 +29,10 @@ The agent reads `docs/llm_wiki/index.md` first, then drills into relevant pages 
 ## Lint
 
 Periodic lint passes detect contradictions across pages, stale claims, orphan pages, missing cross-references, and synthesis gaps.
+
+## Spectra Workflow
+
+This repository also uses **Spectra** for Spec-Driven Development(SDD). Capability specs live in `openspec/specs/`, change proposals in `openspec/changes/`, archived changes in `openspec/changes/archive/`. Workflow ordering: `discuss? → propose → apply ⇄ ingest → archive`. See `CLAUDE.md` for the full `/spectra-*` skill block and parked-change semantics.
+
+The Spectra workflow is orthogonal to the wiki workflow described above: Spectra governs cantus capability evolution; the `research` wiki profile (declared in the YAML frontmatter at the top of this file) governs research-source curation under `docs/llm_wiki/`.
+
