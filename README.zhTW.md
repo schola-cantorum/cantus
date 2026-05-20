@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/cantus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus.svg"></a>
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.1"><img alt="release v0.4.1" src="https://img.shields.io/badge/release-v0.4.1-blue"></a>
+  <a href="https://pypi.org/project/cantus-agent/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus-agent.svg"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.2"><img alt="release v0.4.2" src="https://img.shields.io/badge/release-v0.4.2-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
@@ -23,25 +23,27 @@ Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent
 
 中文 LLM 社群把 prompt engineering 稱作「*詠唱*」。Cantus 把 agent 的組合視為一段複音聖詠 —— 每個協定是一條聲部，合起來就形成一個會回唱的 agent。
 
+在 Cantus 裡，你寫的 code 就是詠唱本身——每一個 `Skill`、`Memory`、`Agent` 都是一段詠唱詞，駕馭著 LLM。套件名 `cantus-agent` 把這層意思點出來：你詠唱，agent 回應。
+
 ## 一鍵在 Colab 開啟 —— 5 分鐘入門路徑
 
 體驗 Cantus 最快的方式，是直接啟動 repo 內附的 notebook：
 
 | Notebook | 對象 | 一鍵啟動 |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/admin_setup.ipynb) |
 
 建議的執行順序與 tag pinning 慣例詳見 [`notebooks/README.md`](./notebooks/README.md)。
 
 ## Install
 
 ```bash
-# PyPI（推薦 —— reproducible，不必 clone Git）
-pip install cantus==0.4.1
+# PyPI（推薦 —— reproducible，不必 clone Git）。Distribution 名稱是 `cantus-agent`；Python import 名稱仍然是 `cantus`。
+pip install cantus-agent==0.4.2
 
 # Git 安裝路徑 —— 用於追蹤 main / feature branch / 特定 commit 的 escape hatch
-pip install git+https://github.com/schola-cantorum/cantus@v0.4.1
+pip install git+https://github.com/schola-cantorum/cantus@v0.4.2
 pip install git+https://github.com/schola-cantorum/cantus@main
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
@@ -49,13 +51,13 @@ pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 Runtime extras（Gemma 4 + transformers + bitsandbytes）需要：
 
 ```bash
-pip install 'cantus[runtime]==0.4.1'
+pip install 'cantus-agent[runtime]==0.4.2'
 ```
 
 Serve extras（v0.4.0 —— FastAPI app factory；會一併安裝 `fastapi`、`uvicorn`、`pydantic-settings`）：
 
 ```bash
-pip install cantus[serve]
+pip install 'cantus-agent[serve]==0.4.2'
 ```
 
 ## Serve Quickstart（v0.4.0）
@@ -98,7 +100,7 @@ print(result.final_answer)
 
 Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI、Anthropic、Google Gemini、Groq 或 NVIDIA NIM，不再侷限於本地 Gemma。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
 
-OpenAI（`pip install 'cantus[openai]'`，並設定 `OPENAI_API_KEY`）：
+OpenAI（`pip install 'cantus-agent[openai]'`，並設定 `OPENAI_API_KEY`）：
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -109,7 +111,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Anthropic（`pip install 'cantus[anthropic]'`，並設定 `ANTHROPIC_API_KEY`）：
+Anthropic（`pip install 'cantus-agent[anthropic]'`，並設定 `ANTHROPIC_API_KEY`）：
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -120,7 +122,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Google Gemini（`pip install 'cantus[google]'`，並設定 `GOOGLE_API_KEY`；使用 `google-genai`，**非**舊版 `google-generativeai`）：
+Google Gemini（`pip install 'cantus-agent[google]'`，並設定 `GOOGLE_API_KEY`；使用 `google-genai`，**非**舊版 `google-generativeai`）：
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -131,7 +133,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Groq（`pip install 'cantus[groq]'`，並設定 `GROQ_API_KEY`）：
+Groq（`pip install 'cantus-agent[groq]'`，並設定 `GROQ_API_KEY`）：
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -142,7 +144,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-NVIDIA NIM（`pip install 'cantus[openai]'` — NIM 走 OpenAI SDK，因此**不**另開 `cantus[nvidia]` extras；設定 `NVIDIA_API_KEY`）：
+NVIDIA NIM（`pip install 'cantus-agent[openai]'` — NIM 走 OpenAI SDK，因此**不**另開 `cantus-agent[nvidia]` extras；設定 `NVIDIA_API_KEY`）：
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -153,7 +155,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-`cantus[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
+`cantus-agent[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus-agent[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus 雙 protocol kind（Skill、Memory）加上 Analyzer ／ Validator hook helper 與 cantus.workflows building block">
@@ -199,6 +201,7 @@ Workflows building block：
 - [v0.3.5 → v0.3.6](./MIGRATION_v0.3.5_to_v0.3.6.md)
 - [v0.3.6 → v0.4.0](./MIGRATION_v0.3.6_to_v0.4.0.md)
 - [v0.4.0 → v0.4.1](./MIGRATION_v0.4.0_to_v0.4.1.md)
+- [v0.4.1 → v0.4.2](./MIGRATION_v0.4.1_to_v0.4.2.md)
 
 非 breaking 的所有變動（新增功能、內部變動、安全性 note）都記錄於 [`CHANGELOG.md`](./CHANGELOG.md)。
 

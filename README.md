@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/cantus/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus.svg"></a>
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.1"><img alt="release v0.4.1" src="https://img.shields.io/badge/release-v0.4.1-blue"></a>
+  <a href="https://pypi.org/project/cantus-agent/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus-agent.svg"></a>
+  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.2"><img alt="release v0.4.2" src="https://img.shields.io/badge/release-v0.4.2-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
@@ -23,25 +23,27 @@ Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Two 
 
 The Chinese-speaking LLM community refers to prompt engineering as *yǒng chàng* — literally "to chant" or "to incant". Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
 
+In Cantus, your code IS the chant — every `Skill`, `Memory`, and `Agent` is a verse that wields the LLM. The PyPI name `cantus-agent` makes the relationship explicit: you chant, the agent answers.
+
 ## Open in Colab — 5-minute path
 
 The fastest way to experience Cantus is to launch the bundled notebooks directly:
 
 | Notebook | Audience | One-click launch |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.1/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/admin_setup.ipynb) |
 
 See [`notebooks/README.md`](./notebooks/README.md) for the recommended order and tag-pinning conventions.
 
 ## Install
 
 ```bash
-# PyPI (recommended — reproducible, no Git clone)
-pip install cantus==0.4.1
+# PyPI (recommended — reproducible, no Git clone). Distribution name is `cantus-agent`; import name remains `cantus`.
+pip install cantus-agent==0.4.2
 
 # Git source — escape hatch for tracking main, a feature branch, or a specific commit
-pip install git+https://github.com/schola-cantorum/cantus@v0.4.1
+pip install git+https://github.com/schola-cantorum/cantus@v0.4.2
 pip install git+https://github.com/schola-cantorum/cantus@main
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
@@ -49,13 +51,13 @@ pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 
 ```bash
-pip install 'cantus[runtime]==0.4.1'
+pip install 'cantus-agent[runtime]==0.4.2'
 ```
 
 The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`):
 
 ```bash
-pip install cantus[serve]
+pip install 'cantus-agent[serve]==0.4.2'
 ```
 
 ## Serve Quickstart (v0.4.0)
@@ -98,7 +100,7 @@ print(result.final_answer)
 
 Tier 2 ChatModel adapters let you point the same Agent at OpenAI, Anthropic, Google Gemini, Groq, or NVIDIA NIM instead of local Gemma. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
 
-OpenAI (install `pip install 'cantus[openai]'`, set `OPENAI_API_KEY`):
+OpenAI (install `pip install 'cantus-agent[openai]'`, set `OPENAI_API_KEY`):
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -109,7 +111,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Anthropic (install `pip install 'cantus[anthropic]'`, set `ANTHROPIC_API_KEY`):
+Anthropic (install `pip install 'cantus-agent[anthropic]'`, set `ANTHROPIC_API_KEY`):
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -120,7 +122,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Google Gemini (install `pip install 'cantus[google]'`, set `GOOGLE_API_KEY`; uses `google-genai`, **not** the legacy `google-generativeai`):
+Google Gemini (install `pip install 'cantus-agent[google]'`, set `GOOGLE_API_KEY`; uses `google-genai`, **not** the legacy `google-generativeai`):
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -131,7 +133,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-Groq (install `pip install 'cantus[groq]'`, set `GROQ_API_KEY`):
+Groq (install `pip install 'cantus-agent[groq]'`, set `GROQ_API_KEY`):
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -142,7 +144,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-NVIDIA NIM (install `pip install 'cantus[openai]'` — NIM runs on the OpenAI SDK, so there is **no** `cantus[nvidia]` extras; set `NVIDIA_API_KEY`):
+NVIDIA NIM (install `pip install 'cantus-agent[openai]'` — NIM runs on the OpenAI SDK, so there is **no** `cantus-agent[nvidia]` extras; set `NVIDIA_API_KEY`):
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model
@@ -153,7 +155,7 @@ result = agent.run("What is 17 plus 25?")
 print(result.final_answer)
 ```
 
-`cantus[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
+`cantus-agent[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus-agent[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
 
 <p align="center">
   <img src="assets/banner_protocols.jpeg" alt="Cantus protocol kinds (Skill, Memory) plus Analyzer / Validator hook helpers and cantus.workflows building blocks">
@@ -199,6 +201,7 @@ Per-version migration guides for breaking changes between adjacent releases:
 - [v0.3.5 → v0.3.6](./MIGRATION_v0.3.5_to_v0.3.6.md)
 - [v0.3.6 → v0.4.0](./MIGRATION_v0.3.6_to_v0.4.0.md)
 - [v0.4.0 → v0.4.1](./MIGRATION_v0.4.0_to_v0.4.1.md)
+- [v0.4.1 → v0.4.2](./MIGRATION_v0.4.1_to_v0.4.2.md)
 
 The [`CHANGELOG.md`](./CHANGELOG.md) lists everything else (additive features, internal changes, security notes).
 

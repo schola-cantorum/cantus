@@ -4,6 +4,33 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-05-21 — cantus-pypi-publish
+
+**Distribution-lifecycle release.** Zero code-level change — every public symbol, endpoint, default value, extras group, and `[tool.uv] conflicts` entry shipped by v0.4.1 is byte-identical in v0.4.2. The whole release lives at the distribution surface: first publish to PyPI as `cantus-agent`, complete PyPI project-page metadata, OIDC release pipeline, CI test matrix.
+
+### Distribution
+
+- **First PyPI publish as `cantus-agent`.** The unqualified `cantus` name on PyPI is held by an unrelated musicology placeholder release (Tim Eipert / University of Würzburg, version `0.0.0` "Coming soon"); the framework ships under the hyphenated distribution name `cantus-agent`. The Python import name remains `cantus` — `import cantus` is byte-identical and student notebook cells do not change. Install via `pip install cantus-agent==0.4.2`; the git+ install path (`pip install git+https://github.com/schola-cantorum/cantus@<ref>`) is retained as the escape hatch for `main`, feature branches, and arbitrary commit SHAs.
+- **`pyproject.toml` PyPI metadata expansion.** `[project.urls]` declares five entries (Homepage / Documentation / Source / Issues / Changelog, all pointing under `github.com/schola-cantorum/cantus`); `[project].keywords` covers `llm` / `agent` / `framework` / `education` / `colab` / `polyphonic`; `classifiers` adds `Development Status :: 4 - Beta` and `Operating System :: OS Independent`; license declaration upgraded from the legacy PEP 621 table form `{ text = "ECL-2.0" }` to the PEP 639 SPDX expression `license = "ECL-2.0"` with explicit `license-files = ["LICENSE"]` so both sdist and wheel bundle the license file at the PEP 639 location. Per PEP 639 normative enforcement (setuptools ≥ 77), the legacy `License :: OSI Approved :: …` trove classifier is removed — declaring both the SPDX expression and a `License ::` classifier now raises `InvalidConfigError`; the SPDX expression is the sole source of truth and modern PyPI clients render it via the PEP 639 `License-Expression` core metadata field.
+- **OIDC release pipeline.** New `.github/workflows/release.yml` runs on `release.published` and on manual `workflow_dispatch` (with `inputs.target` of `testpypi` or `pypi`). The job runs in the GitHub `environment: pypi` (or `testpypi`), requests `id-token: write`, builds sdist + wheel, gates with `twine check --strict`, then publishes via `pypa/gh-action-pypi-publish` using PyPI's Trusted Publisher OIDC exchange. Repository secrets contain no `PYPI_API_TOKEN` — there is no long-lived upload credential to rotate or leak.
+- **CI test matrix.** New `.github/workflows/test.yml` runs `pytest` on Python 3.10 / 3.11 / 3.12 against every push to `main` and every pull request. The matrix caps at 3.12 because `cantus[openhands]` declares `python_version >= "3.12" and python_version < "3.13"` and `openhands` does not yet publish 3.13 wheels.
+
+### Changed
+
+- `cantus.__version__` reports `"0.4.2"`; `pyproject.toml [project].version` is the static source of truth, kept in lockstep with `cantus/__init__.py`.
+
+### Notes
+
+- **`cantus.__version__` is identical to `importlib.metadata.version("cantus-agent")`.** Note that `importlib.metadata.version(...)` takes the PyPI distribution name (`cantus-agent`), not the Python import name (`cantus`). This asymmetry matters for downstream diagnostic tooling.
+- **PyPI publishes are not reversible.** PyPI does not allow same-version re-upload; yanking only hides a release. The release workflow gates with `twine check --strict` before upload, and the maintainer runs a TestPyPI dry-run before tagging the production release. If a serious metadata defect ships, the recovery path is `pip yank` plus a follow-up patch release — not a re-upload.
+
+### Notes — out of scope (scheduled)
+
+- **`bump-cantus-pin-to-v0-4-2`** (main repo overlay) — bumps the `libs/cantus` submodule pin in `schola-cantorum/colab-llm-agent` and updates the student Colab notebook setup cells to prefer `pip install cantus-agent==0.4.2`.
+- **`cantus-spec-self-hosting`** (Phase 2) — moves the cantus framework spec from the umbrella repo into `cantus` itself.
+- **Physical relocation** (Phase 3) — moves the cantus dev tree from `libs/cantus/` to `edu-projects/cantus/`.
+- **PEP 541 reclaim of the `cantus` PyPI name** — slow, uncertain, and not a blocker; deferred to a future change if it ever becomes feasible.
+
 ## [0.4.1] - 2026-05-20 — cantus-serve-security
 
 補上 v0.4.0 故意延後的 auth gate 與 `pydantic.SecretStr` token 載入。**完全 ADDITIVE** — 沒有 BREAKING、`auth_mode` 預設 `AuthMode.NONE` 維持 v0.4.0 行為，既有 cookbook / examples 無需改動即可升級。

@@ -3,17 +3,20 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cantus"
-version = "0.4.1"
+name = "cantus-agent"
+version = "0.4.2"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "ECL-2.0" }
+license = "ECL-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "CXPh03n1x", email = "0826@fhsh.tp.edu.tw" }
 ]
+keywords = ["llm", "agent", "framework", "education", "colab", "polyphonic"]
 classifiers = [
-    "License :: OSI Approved :: Educational Community License, Version 2.0 (ECL-2.0)",
+    "Development Status :: 4 - Beta",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -25,6 +28,13 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/schola-cantorum/cantus"
+Documentation = "https://github.com/schola-cantorum/cantus#readme"
+Source = "https://github.com/schola-cantorum/cantus"
+Issues = "https://github.com/schola-cantorum/cantus/issues"
+Changelog = "https://github.com/schola-cantorum/cantus/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 runtime = [
@@ -114,10 +124,10 @@ serve = [
 # code lives in `cantus.serve.security` and uses only stdlib (`hmac`,
 # `enum`) plus pydantic's `SecretStr` (already required by serve).
 security = [
-    "cantus[serve]",
+    "cantus-agent[serve]",
 ]
 providers = [
-    "cantus[openai,anthropic,google,groq]",
+    "cantus-agent[openai,anthropic,google,groq]",
 ]
 dev = [
     "pytest>=7.0",
@@ -127,7 +137,7 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.5",
 ]
-all = ["cantus[runtime,memory,providers,dev]"]
+all = ["cantus-agent[runtime,memory,providers,dev]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
