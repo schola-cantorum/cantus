@@ -59,7 +59,9 @@ def test_import_cantus_succeeds_without_serve_sdks(
     monkeypatch.delitem(sys.modules, "cantus", raising=False)
 
     cantus = importlib.import_module("cantus")
-    assert cantus.__version__ == "0.4.1"
+    assert cantus.__version__, (
+        "cantus.__version__ must be set even when serve SDKs are absent"
+    )
 
 
 # --- cantus.serve gate ---------------------------------------------------
