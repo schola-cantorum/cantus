@@ -31,3 +31,11 @@ Pushes to `main` and pull requests SHALL trigger a GitHub Actions workflow at `.
 - **THEN** every test under `tests/providers/` SHALL be able to `import anthropic`, `import openai`, `import google.genai`, and `import groq` without raising `ModuleNotFoundError`
 - **AND** test fixtures that build fake SDK clients (e.g., `install_fake_anthropic`, `install_fake_openai` in `tests/providers/test_*_adapter.py`) SHALL succeed at fixture-setup time
 - **AND** failure to resolve any of these provider SDK imports SHALL be treated as a CI failure that blocks merge
+
+#### Scenario: version anchor tests stay dynamic, never hardcoded
+
+- **WHEN** a contributor adds or updates a test that asserts on `cantus.__version__` or `pyproject.toml [project].version`
+- **THEN** the assertion SHALL NOT hardcode a specific version literal (e.g., `assert cantus.__version__ == "0.4.1"`)
+- **AND** the assertion SHALL use a structural invariant (e.g., `re.fullmatch(r"\d+\.\d+\.\d+", ...)` for semver shape) or a dynamic equality against the canonical source (e.g., `assert cantus.__version__ == cfg["project"]["version"]`)
+- **AND** test function names SHALL NOT carry a hardcoded version suffix such as `test_version_is_0_4_1` — they SHALL use intent-revealing names such as `test_version_is_valid_semver` or `test_dunder_version_aligned_with_pyproject`
+- **AND** the rationale is that hardcoded version anchors regress on every release bump and re-introduce CI red — they are an anti-pattern even if well-intentioned as "release checklist reminders"

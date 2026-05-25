@@ -167,9 +167,14 @@ def test_mypy_strict_rejects_untyped_def_regression(tmp_path: Path) -> None:
     )
 
 
-def test_pyproject_version_bumped_to_0_4_1() -> None:
+def test_pyproject_version_is_valid_semver() -> None:
+    import re
+
     cfg = _load_pyproject()
-    assert cfg["project"]["version"] == "0.4.1"
+    version = cfg["project"]["version"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", version), (
+        f"pyproject.toml [project].version must match X.Y.Z semver; got {version!r}"
+    )
 
 
 def test_dunder_version_aligned_with_pyproject() -> None:
