@@ -22,10 +22,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install cantus with dev extras
+      - name: Install cantus with dev + serve extras
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,serve]"
 
       - name: Run pytest
         run: pytest
