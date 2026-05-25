@@ -36,6 +36,9 @@ Source = "https://github.com/schola-cantorum/cantus"
 Issues = "https://github.com/schola-cantorum/cantus/issues"
 Changelog = "https://github.com/schola-cantorum/cantus/blob/main/CHANGELOG.md"
 
+[project.scripts]
+cantus = "cantus.cli:main"
+
 [project.optional-dependencies]
 runtime = [
     "transformers>=4.53.0",
