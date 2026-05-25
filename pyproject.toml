@@ -129,6 +129,16 @@ serve = [
 security = [
     "cantus-agent[serve]",
 ]
+# v0.4.4 cantus-local-llm-and-desktop-walkthrough — documentary alias
+# for the Ollama local LLM path. The local Ollama daemon exposes an
+# OpenAI-compatible endpoint, so `OllamaChatModel` runs on the openai
+# SDK (same pattern as `NvidiaChatModel`). The `ollama` extras key
+# resolves to the same closure as `cantus[openai]` — no new third-party
+# packages, no new [tool.uv] conflicts entries; downstream code may
+# write `pip install cantus[ollama]` to communicate intent.
+ollama = [
+    "cantus-agent[openai]",
+]
 providers = [
     "cantus-agent[openai,anthropic,google,groq]",
 ]
@@ -227,6 +237,13 @@ conflicts = [
     [{ extra = "anthropic" }, { extra = "openhands" }],
     [{ extra = "google" }, { extra = "openhands" }],
     [{ extra = "groq" }, { extra = "openhands" }],
+    # `ollama` is a documentary alias for `openai` (the local Ollama daemon
+    # exposes an OpenAI-compatible endpoint), so it inherits the same
+    # transitive openai>=1.50,<2 pin and the same incompatibility with the
+    # `openhands` extras (whose transitive litellm pulls openai>=2.20.0).
+    # uv does not auto-propagate alias-target conflicts, so this entry is
+    # required for `uv sync` universal resolution to succeed.
+    [{ extra = "ollama" }, { extra = "openhands" }],
 ]
 
 [tool.ruff.lint.per-file-ignores]

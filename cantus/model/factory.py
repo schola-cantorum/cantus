@@ -5,9 +5,11 @@ adapter module so users who only need one provider don't pay the import
 cost of the others (and so missing optional extras surface as actionable
 `ImportError` messages instead of import-time crashes).
 
-v0.2.1 ships five providers — `openai`, `anthropic`, `google`, `groq`, and
-`nvidia`. NVIDIA NIM is OpenAI-compatible at the wire layer, so its missing-
-extras hint points at `cantus[openai]` rather than a phantom `cantus[nvidia]`.
+v0.4.4 ships six providers — `openai`, `anthropic`, `google`, `groq`,
+`nvidia`, and `ollama`. NVIDIA NIM and the local Ollama daemon are both
+OpenAI-compatible at the wire layer (subclasses of `OpenAIChatModel`), so
+their missing-extras hints point at `cantus[openai]` rather than phantom
+`cantus[nvidia]` / `cantus[ollama]` packages.
 """
 
 from __future__ import annotations
@@ -24,18 +26,21 @@ _REGISTRY: dict[str, tuple[str, str]] = {
     "google": ("cantus.model.providers.google", "GoogleChatModel"),
     "groq": ("cantus.model.providers.groq", "GroqChatModel"),
     "nvidia": ("cantus.model.providers.nvidia", "NvidiaChatModel"),
+    "ollama": ("cantus.model.providers.ollama", "OllamaChatModel"),
 }
 
 # NVIDIA's adapter runs on the openai SDK (NIM exposes an OpenAI-compatible
 # endpoint), so its missing-extras hint must point at the openai extras group
-# rather than a non-existent `cantus[nvidia]`. Keeping the map explicit makes
-# the special case auditable.
+# rather than a non-existent `cantus[nvidia]`. Ollama follows the same pattern
+# (the local daemon exposes an OpenAI-compatible endpoint). Keeping the map
+# explicit makes the special cases auditable.
 _EXTRAS_HINT: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
     "google": "google",
     "groq": "groq",
     "nvidia": "openai",
+    "ollama": "openai",
 }
 
 
