@@ -223,3 +223,46 @@ def test_missing_nvidia_extras_hint_points_to_cantus_openai_not_nvidia(monkeypat
     msg = str(exc.value)
     assert "pip install cantus[openai]" in msg
     assert "cantus[nvidia]" not in msg
+
+
+# ---------- ollama provider (v0.4.4 cantus-local-llm-and-desktop-walkthrough)
+
+
+def test_ollama_in_registry():
+    from cantus.model.factory import _REGISTRY
+
+    assert _REGISTRY["ollama"] == ("cantus.model.providers.ollama", "OllamaChatModel")
+
+
+def test_ollama_extras_hint_points_at_openai():
+    from cantus.model.factory import _EXTRAS_HINT
+
+    assert _EXTRAS_HINT["ollama"] == "openai"
+
+
+def test_unknown_provider_error_message_includes_ollama():
+    """The supported-prefix list in the ValueError message must mention ollama."""
+    with pytest.raises(ValueError) as exc:
+        load_chat_model("vertex/gemini-2.0-flash")
+    assert "ollama" in str(exc.value)
+
+
+def test_missing_ollama_extras_hint_points_to_cantus_openai_not_ollama(monkeypatch):
+    """Ollama adapter runs on the openai SDK — extras hint MUST point at cantus[openai]."""
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.ollama":
+            raise ImportError("No module named 'openai'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.ollama", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("ollama/gemma3:4b")
+    msg = str(exc.value)
+    assert "pip install cantus[openai]" in msg
+    assert "cantus[ollama]" not in msg

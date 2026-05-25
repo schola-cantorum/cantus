@@ -74,14 +74,43 @@ cantus serve --host 0.0.0.0 --port 8000 --registry-import myskills.app:registry
 
 The CLI accepts overrides for `--host`, `--port`, `--auth-mode {none,bearer,api-key}`, `--dashboard` / `--no-dashboard`, and one or more `--channels DOTTED_PATH`. Unset flags fall through to `CANTUS_SERVE_*` env vars and finally to `Settings` defaults; press `Ctrl-C` for a graceful uvicorn shutdown.
 
-## What about local LLMs on macOS / Windows?
+## Expose via Cloudflare Tunnel
 
-The 4-bit local Gemma loader (`mount_drive_and_load`, `LocalEnvironment.prepare_model`) is supported only on Linux with CUDA in v0.4.3. On macOS and Windows, calling `LocalEnvironment.prepare_model(...)` raises `RuntimeError` because `bitsandbytes` is intentionally absent from the `[runtime]` extras on those platforms.
+Once `cantus serve` is running on `127.0.0.1`, a single `cloudflared` invocation gives you a public HTTPS URL you can hand to a webhook (LINE, Discord, Telegram, Google Chat) without opening any inbound firewall port. Install `cloudflared` from the [official Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then in a second shell:
 
-Local LLM support for macOS and Windows ships with the upcoming `cantus-local-llm-ollama-bridge` capability (A1), which provides an Ollama-backed adapter so desktop users can run open-weight models without CUDA. Until A1 ships, use the API-key path above.
+```bash
+cloudflared tunnel --url http://127.0.0.1:8765
+```
+
+`cloudflared` prints a randomly-assigned `https://<slug>.trycloudflare.com` URL. Press `Ctrl-C` to tear the tunnel down — the URL stops resolving immediately.
+
+**Security note.** The quick-tunnel mode shown above is unauthenticated — anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The quick-tunnel mode persists no token to disk; if you upgrade to a named tunnel later, the resulting `cert.pem` MUST NOT be committed to version control (it is the long-lived credential for your tunnel namespace).
+
+## Local LLMs via Ollama
+
+`load_chat_model("ollama/...")` runs against a local [Ollama](https://ollama.com/download) daemon and works on macOS, Linux, and Windows without CUDA or `bitsandbytes`. The Linux-only 4-bit Gemma path (`LocalEnvironment.prepare_model`) is still available where supported, but Ollama is the recommended cross-platform local-LLM option.
+
+After installing the daemon from [https://ollama.com/download](https://ollama.com/download), pull a model:
+
+```bash
+ollama pull gemma3:4b
+```
+
+Then use it from Python exactly like any other provider:
+
+```python
+from cantus import Agent, Message, load_chat_model
+
+chat = load_chat_model("ollama/gemma3:4b")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@skill` before relying on it.
 
 ## Where to go next
 
 - [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
 - [`cookbook/`](./cookbook/) — runnable recipes covering workflows, multi-provider routing, retrieval, and the `cantus.serve` FastAPI app.
 - `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus import serve`).
+- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).
