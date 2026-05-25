@@ -1,5 +1,7 @@
 # Quickstart：30 秒跑出第一個 Agent
 
+> **Desktop（Win / macOS / Linux）使用者**：本文針對 Colab 環境（會 `mount_drive_and_load` 載 4-bit Gemma）。如果你在本機桌面執行，請改讀 [`quickstart-desktop.md`](./quickstart-desktop.md)，那裡提供 API key 路徑的跨平台 walkthrough。
+
 這份指南帶你從 `import` 到第一次 `agent.run()` 印出結果，全部都在一個 Colab cell 內完成。預設使用 Gemma 4，但任何符合 `ModelHandle` protocol（有 `generate(prompt) -> str` 方法）的 model 都可以替換進來。
 
 ## 完整範例

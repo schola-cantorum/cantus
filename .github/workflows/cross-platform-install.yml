@@ -1,0 +1,64 @@
+name: cross-platform-install
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "scripts/smoke_install.sh"
+      - ".github/workflows/cross-platform-install.yml"
+
+jobs:
+  install-smoke:
+    name: install smoke on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install cantus-agent (no extras)
+        run: uv pip install --system .
+
+      - name: Import smoke
+        run: python -c "from cantus import skill, Agent, load_chat_model"
+
+      - name: Install cantus-agent[serve,openai]
+        run: uv pip install --system ".[serve,openai]"
+
+      - name: Install cantus-agent[runtime]
+        run: uv pip install --system ".[runtime]"
+
+      - name: Assert bitsandbytes presence per OS
+        shell: bash
+        run: |
+          set -eo pipefail
+          echo "Installed packages matching 'bitsandbytes':"
+          uv pip list | grep -i '^bitsandbytes' || echo "(none)"
+          case "${RUNNER_OS}" in
+            Linux)
+              uv pip list | grep -i '^bitsandbytes' > /dev/null \
+                || (echo "FAIL: bitsandbytes missing on Linux runtime extras" >&2; exit 1)
+              echo "ok: bitsandbytes present on Linux"
+              ;;
+            macOS|Windows)
+              if uv pip list | grep -i '^bitsandbytes' > /dev/null; then
+                echo "FAIL: bitsandbytes unexpectedly present on ${RUNNER_OS}" >&2
+                exit 1
+              fi
+              echo "ok: bitsandbytes absent on ${RUNNER_OS}"
+              ;;
+          esac

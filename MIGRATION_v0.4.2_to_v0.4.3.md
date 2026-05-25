@@ -59,3 +59,19 @@ The three course-oriented capabilities — `task-template`, `model-loader`, `llm
 ## Why ship spec self-hosting as a PATCH release?
 
 v0.4.3 follows the same distribution-lifecycle PATCH classification as v0.4.2: the change is entirely on the repository governance surface (specs, configuration files, documentation), with no runtime API addition or modification. MINOR (`0.5.0`) is reserved for the next runtime capability arc.
+
+## Cross-platform runtime extras 行為變更（v0.4.3 新增）
+
+A0 跨平台桌面 runtime change（`cantus-uv-cross-platform-install`）在 `pyproject.toml` 的 `[project.optional-dependencies].runtime` 條目給 `bitsandbytes>=0.43.0` 加上 PEP 508 marker `sys_platform == 'linux'`。三 OS 上 `uv pip install cantus-agent[runtime]` 的觀察結果如下：
+
+- **macOS Intel（x86_64）**：v0.4.2 上 install abort（bnb 無 `macosx_*_x86_64` wheel）；v0.4.3 上 install 成功，resolved set 不含 `bitsandbytes`。**這是改善**。
+- **macOS arm64（Apple Silicon, macOS ≥14.0）/ Windows x86_64**：v0.4.2 上 install 成功且 resolved set 含 `bitsandbytes` 0.49.x（即便 4-bit 量化 kernel 只有 CUDA backend，這兩平台 runtime non-functional）；v0.4.3 上 resolved set 不再含 `bitsandbytes`。這移除了一個非可用的 native dependency；對曾把 bnb 當作「可 import 型別 stub」的下游程式碼是 silent breaking——若有此需求，請顯式 `pip install bitsandbytes`。
+- **Linux x86_64 / aarch64**：行為與 v0.4.2 byte-identical，resolved set 仍含 `bitsandbytes` 0.49.x，4-bit Gemma 量化路徑不變。
+
+### 給 macOS / Windows 學生的指引
+
+cantus 4-bit local Gemma 量化路徑在 v0.4.3 仍只支援 Linux + CUDA。macOS / Windows 桌面學生請改用 API key 路徑（`load_chat_model("openai/gpt-4o-mini")` 或其他 provider），詳見新增的 [`docs/quickstart-desktop.md`](docs/quickstart-desktop.md)。`LocalEnvironment.prepare_model(...)` 在 macOS / Windows 仍會在 `import bitsandbytes` 階段拋 `RuntimeError`（v0.4.2 既有訊息維持不變）；後續 A1 `cantus-local-llm-ollama-bridge` change ship 後，錯誤訊息會改為指引到 Ollama bridge。
+
+### CI tri-platform install smoke
+
+v0.4.3 新增 `.github/workflows/cross-platform-install.yml`，在 push 到 `main` 與 release tag `v*.*.*` 時跑 `ubuntu-latest` / `macos-latest` / `windows-latest` 三 OS 的 install smoke matrix（含 `cantus-agent`、`cantus-agent[serve,openai]`、`cantus-agent[runtime]` 安裝與 import smoke）。`scripts/smoke_install.sh` 提供本機可重現的同步腳本。三 OS smoke 任一 OS 失敗即阻擋 PyPI release tag。

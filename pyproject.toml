@@ -39,7 +39,7 @@ Changelog = "https://github.com/schola-cantorum/cantus/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 runtime = [
     "transformers>=4.53.0",
-    "bitsandbytes>=0.43.0",
+    "bitsandbytes>=0.43.0; sys_platform == 'linux'",
     "accelerate>=0.30.0",
     "torch>=2.1.0",
     "outlines>=0.0.40",
