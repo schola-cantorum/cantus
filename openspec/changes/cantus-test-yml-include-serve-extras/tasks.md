@@ -26,5 +26,5 @@ Behavior + verification convention:
 
 ## 3. 收尾驗證
 
-- [ ] 3.1 為 Scenario「PR triggers full matrix」、「Push to main triggers full matrix」、「serve test suite collects without ImportError」、「provider adapter SDK imports resolve at install time」、「version anchor tests stay dynamic, never hardcoded」確認 PR branch push 後 `test.yml` 三 Python 版本 job 從 fail 翻為 pass；驗證：PR #4 頁面 `test / pytest on Python 3.10` / `3.11` / `3.12` 三個 check 皆 green
+- [x] 3.1 為 Scenario「PR triggers full matrix」、「Push to main triggers full matrix」、「serve test suite collects without ImportError」、「provider adapter SDK imports resolve at install time」、「version anchor tests stay dynamic, never hardcoded」確認 PR branch push 後 `test.yml` 三 Python 版本 job 從 fail 翻為 pass；驗證：PR #4 頁面 `test / pytest on Python 3.10` / `3.11` / `3.12` 三個 check 皆 green
 - [x] 3.2 `spectra validate cantus-test-yml-include-serve-extras` 通過；驗證：CLI 輸出無 error
