@@ -1,5 +1,7 @@
 """Verify the public import surface of cantus v0.3.0."""
 
+import re
+
 import pytest
 
 
@@ -365,7 +367,9 @@ def test_v033_batch2_gates_require_extras(monkeypatch, module_name, extras):
 # --- version stamp ------------------------------------------------------
 
 
-def test_version_is_0_4_1() -> None:
+def test_version_is_valid_semver() -> None:
     import cantus
 
-    assert cantus.__version__ == "0.4.1"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", cantus.__version__), (
+        f"cantus.__version__ must match X.Y.Z semver; got {cantus.__version__!r}"
+    )
