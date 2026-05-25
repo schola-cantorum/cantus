@@ -39,6 +39,9 @@ jobs:
       - name: Install cantus-agent[serve,openai]
         run: uv pip install --system ".[serve,openai]"
 
+      - name: Smoke - cantus serve --help
+        run: cantus serve --help
+
       - name: Install cantus-agent[runtime]
         run: uv pip install --system ".[runtime]"
 

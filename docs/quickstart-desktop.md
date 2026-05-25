@@ -63,6 +63,17 @@ print(getattr(final, "answer", final))
 
 You should see the agent invoke the `add` skill and print `42`.
 
+## Serve via CLI
+
+Once your `Registry` is exposed as a top-level binding in a module, you can start the FastAPI server from the shell — no need to write `import uvicorn` yourself:
+
+```bash
+pip install cantus-agent[serve]
+cantus serve --host 0.0.0.0 --port 8000 --registry-import myskills.app:registry
+```
+
+The CLI accepts overrides for `--host`, `--port`, `--auth-mode {none,bearer,api-key}`, `--dashboard` / `--no-dashboard`, and one or more `--channels DOTTED_PATH`. Unset flags fall through to `CANTUS_SERVE_*` env vars and finally to `Settings` defaults; press `Ctrl-C` for a graceful uvicorn shutdown.
+
 ## What about local LLMs on macOS / Windows?
 
 The 4-bit local Gemma loader (`mount_drive_and_load`, `LocalEnvironment.prepare_model`) is supported only on Linux with CUDA in v0.4.3. On macOS and Windows, calling `LocalEnvironment.prepare_model(...)` raises `RuntimeError` because `bitsandbytes` is intentionally absent from the `[runtime]` extras on those platforms.
