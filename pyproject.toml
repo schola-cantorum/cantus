@@ -135,6 +135,15 @@ serve = [
     # conflict entry is needed; each split resolves to a websockets version
     # satisfying its own provider constraint.
     "websockets>=13",
+    # v0.4.7 cantus-channel-gateway-pubsub — Google Chat over Cloud Pub/Sub
+    # streaming pull (inbound) plus OAuth2 service-account access token
+    # minting via the transitively-pulled google-auth (NOT pinned explicitly).
+    # The package and its transitive grpcio dependency ship prebuilt wheels
+    # for Linux x86_64 (manylinux2014), macOS arm64 + x86_64, and Windows
+    # AMD64 across CPython 3.10-3.13 — same matrix as the v0.4.6 PyNaCl pin,
+    # so `pip install cantus-agent[serve]` keeps its "no source builds"
+    # property on every supported install target.
+    "google-cloud-pubsub>=2.20,<3",
 ]
 # v0.4.1 cantus-serve-security — documentary alias for the security
 # surface (auth gate + SecretStr token handling). Resolves to the same
@@ -225,6 +234,13 @@ module = [
     "anthropic.*",
     "openai.*",
     "google.genai.*",
+    # v0.4.7 cantus-channel-gateway-pubsub — google-cloud-pubsub and
+    # google-auth do not ship py.typed markers (as of 2.20 / 2.40 lines),
+    # so strict mypy treats their imports as untyped without these
+    # overrides. The same pattern was applied to google.genai in v0.4.0.
+    "google.cloud.*",
+    "google.oauth2.*",
+    "google.auth.*",
     "groq.*",
     "fastapi.*",
     "uvicorn.*",

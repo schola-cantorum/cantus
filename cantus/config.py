@@ -82,5 +82,14 @@ class Settings(BaseSettings):
     channel_discord_public_key: SecretStr | None = None
     channel_discord_application_id: str | None = None
 
+    # v0.4.7 cantus-channel-gateway-pubsub: Google Chat over Pub/Sub.
+    # All three are plain str (NOT SecretStr): the credentials_path is a
+    # filesystem location pointer (the JSON file's contents are sensitive,
+    # but the path itself is not), and the subscription path and space ID
+    # are publicly-assigned Google identifiers.
+    channel_google_chat_credentials_path: str | None = None
+    channel_google_chat_subscription: str | None = None
+    channel_google_chat_space: str | None = None
+
 
 __all__ = ["AuthMode", "Settings"]

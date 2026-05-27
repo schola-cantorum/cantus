@@ -31,6 +31,7 @@ from cantus.serve.channels.discord import (
     DiscordRealtimeChannel,
     DiscordSignatureError,
 )
+from cantus.serve.channels.googlechat import GoogleChatPubSubChannel
 from cantus.serve.channels.line import LineWebhookChannel
 from cantus.serve.channels.telegram import TelegramWebhookChannel
 from cantus.serve.security import require_auth
@@ -41,6 +42,7 @@ __all__ = [
     "ChannelSendError",
     "DiscordRealtimeChannel",
     "DiscordSignatureError",
+    "GoogleChatPubSubChannel",
     "LineWebhookChannel",
     "LocalMockReceiver",
     "RealtimeChannel",
