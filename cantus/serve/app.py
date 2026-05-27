@@ -21,24 +21,38 @@ is then injected through ``openapi_extra``.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.params import Depends as DependsType
 
 from cantus.config import AuthMode, Settings
 from cantus.core.registry import Registry
-from cantus.serve.channel import Channel
+from cantus.serve.channel import Channel, WebhookChannel
 from cantus.serve.dashboard import (
     RESERVED_DASHBOARD_NAMES,
     register_dashboard_routes,
 )
 from cantus.serve.security import require_auth, validate_auth_config
 
+# v0.4.5 cantus-channel-gateway-webhook: extend the reserved top-level path
+# set with "channels". The two collision messages stay distinct so operators
+# see which subsystem reserved the name.
+RESERVED_CHANNEL_NAMES: frozenset[str] = frozenset({"channels"})
+RESERVED_TOP_LEVEL_NAMES: frozenset[str] = (
+    RESERVED_DASHBOARD_NAMES | RESERVED_CHANNEL_NAMES
+)
+
 _TYPE_ERROR = "cantus.serve expects a Registry instance"
-_RESERVED_VALUE_ERROR = (
+_RESERVED_DASHBOARD_VALUE_ERROR = (
     "Skill name {name!r} collides with a reserved dashboard path "
     "(reserved dashboard path)"
+)
+_RESERVED_CHANNEL_VALUE_ERROR = (
+    "Skill name {name!r} collides with a reserved channel path "
+    "(reserved channel path)"
 )
 
 
@@ -76,12 +90,22 @@ def serve(
 
     import cantus
 
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI) -> Any:
+        # App-scoped HTTP client shared by webhook channels for outbound replies.
+        app.state.http_client = httpx.AsyncClient(timeout=10.0)
+        try:
+            yield
+        finally:
+            await app.state.http_client.aclose()
+
     app: FastAPI = FastAPI(
         title="cantus",
         version=cantus.__version__,
         docs_url=effective_settings.docs_url,
         openapi_url=effective_settings.openapi_url,
         redoc_url=effective_settings.redoc_url,
+        lifespan=_lifespan,
     )
     # require_auth reads Settings from app.state.settings.
     app.state.settings = effective_settings
@@ -94,8 +118,10 @@ def serve(
 
     skill_names: list[str] = registry.names_for("skill")
     for name in skill_names:
+        if name in RESERVED_CHANNEL_NAMES:
+            raise ValueError(_RESERVED_CHANNEL_VALUE_ERROR.format(name=name))
         if name in RESERVED_DASHBOARD_NAMES:
-            raise ValueError(_RESERVED_VALUE_ERROR.format(name=name))
+            raise ValueError(_RESERVED_DASHBOARD_VALUE_ERROR.format(name=name))
 
     for name in skill_names:
         skill_instance = registry.lookup("skill", name)
@@ -116,6 +142,13 @@ def serve(
             effective_settings,
             dependencies=dashboard_dependencies,
         )
+
+    # v0.4.5: dispatch mount(app) to every channel that conforms to the
+    # WebhookChannel sub-Protocol. Plain Channels (LocalMockReceiver) skip
+    # the loop because they do not need an HTTP entry point.
+    for channel in app.state.channels:
+        if isinstance(channel, WebhookChannel):
+            channel.mount(app)
 
     return app
 

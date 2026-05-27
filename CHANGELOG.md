@@ -4,6 +4,36 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-05-2x — cantus-channel-gateway-webhook
+
+**B-series first MINOR release.** ✨ Ships the new `cantus-channel-gateway-webhook` capability: LINE + Telegram production-grade HTTP webhook receivers plus the matching outbound reply path, all without touching the v0.4.0–v0.4.4 default surface. Google Chat (Pub/Sub, B3) and Discord (WebSocket + Ed25519, B2) remain out of scope and ship in later B-series changes. See [`MIGRATION_v0.4.4_to_v0.4.5.md`](MIGRATION_v0.4.4_to_v0.4.5.md) for the full upgrade note.
+
+### Added
+
+- ✨ `cantus.serve.channel.WebhookChannel` — `@runtime_checkable` Protocol that extends `Channel` with `mount(app: FastAPI) -> None`. `cantus.serve.serve(...)` iterates the `channels=` list and dispatches `mount(app)` to every WebhookChannel member; plain `Channel` implementations (`LocalMockReceiver`) skip the loop and stay unchanged.
+- ✨ `cantus.serve.channels.line.LineWebhookChannel` — receives at `POST /channels/line` (HMAC-SHA256 over raw body, header `X-Line-Signature`, base64 digest); outbound `send(message)` POSTs to `https://api.line.me/v2/bot/message/reply` with `Authorization: Bearer <channel_access_token>`. Constructor: `LineWebhookChannel(channel_secret=None, channel_access_token=None, queue_maxlen=None, settings=None)`.
+- ✨ `cantus.serve.channels.telegram.TelegramWebhookChannel` — receives at `POST /channels/telegram` (constant-time compare of `X-Telegram-Bot-Api-Secret-Token`); outbound `send(message)` POSTs to `https://api.telegram.org/bot<bot_token>/sendMessage`. Constructor: `TelegramWebhookChannel(secret_token=None, bot_token=None, queue_maxlen=None, settings=None)`.
+- ✨ `cantus.serve.channels.ChannelSendError` — Exception raised by `send()` on 4xx/5xx; carries `status_code: int`, `body_excerpt: str` (200-byte cap), `provider: str ("line" | "telegram")`. `str(err)` never contains the access token or bot token.
+- ✨ `cantus.config.Settings` gains four `SecretStr | None` fields with default `None`, loaded from `CANTUS_SERVE_CHANNEL_LINE_SECRET` / `CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN` / `CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN` / `CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN`. Masked in `repr`, `model_dump_json()`, and OpenAPI.
+- ✨ `cantus.serve` re-exports four new symbols at package level: `WebhookChannel`, `LineWebhookChannel`, `TelegramWebhookChannel`, `ChannelSendError`.
+- ✨ `[project.optional-dependencies] serve` group adds `httpx>=0.27,<1` — pure Python, no `cryptography` C-extension surface, no new `[tool.uv] conflicts` entry. The `httpx.AsyncClient` is app-scoped via FastAPI `lifespan` and mounted on `app.state.http_client`.
+- ✨ `/channels` joins `{"skills", "health", "events"}` as a reserved top-level path prefix. Skill name collisions raise `ValueError` containing the literal substring `reserved channel path` (distinct from the existing `reserved dashboard path`).
+- 📝 `docs/cookbook-line-channel.md` — student-facing echo-bot walkthrough (LINE Developers Console → env vars → `cantus serve --channels` → Cloudflare Tunnel → webhook URL register → worker loop → curl self-test).
+- 📝 `docs/cookbook-telegram-channel.md` — same shape for Telegram (`@BotFather` → `setWebhook` with `secret_token` → worker loop).
+
+### Changed
+
+- 🔁 `cantus.serve.app.serve(...)` adds a FastAPI `lifespan` async context manager that creates `app.state.http_client = httpx.AsyncClient(timeout=10.0)` at startup and closes it at shutdown. All v0.4.0–v0.4.4 endpoint behaviour stays byte-identical; the lifespan is additive for callers that do not use webhook channels.
+- 🔁 `RESERVED_DASHBOARD_NAMES` (in `cantus.serve.dashboard`) is unchanged. `cantus.serve.app` adds two siblings: `RESERVED_CHANNEL_NAMES = frozenset({"channels"})` and the union `RESERVED_TOP_LEVEL_NAMES`, both used by the per-Skill collision check at `serve()` build time.
+- 🔁 `cantus.__version__` `"0.4.4"` → `"0.4.5"`; `pyproject.toml [project].version` kept in lockstep.
+
+### Notes
+
+- 🚧 B-series ordering: v0.4.5 is B1; B2 (`cantus-channel-gateway-realtime`, Discord WebSocket + Ed25519) and B3 (`cantus-channel-gateway-pubsub`, Google Chat Cloud Pub/Sub) follow as separate MINOR releases before Gate B audit.
+- 📦 Single new dep in the supply chain: `httpx>=0.27,<1` plus its transitives `httpcore`, `h11`. A0 跨平台 install path is preserved.
+- ✅ All 128 `tests/serve/` tests pass (70 v0.4.4 baseline + 58 new); `mypy --strict` on `cantus/serve/channels/` clean; `respx` (already in `[dev]` extras) used to mock outbound httpx in tests.
+- 🚧 Out of scope (named explicitly): Google Chat HTTP webhook (uses RS256 JWT — replaced by B3 Pub/Sub path), Discord (B2), multi-tenant, `send()` retry / queue / persistence, event payload schema / dataclass, Agent auto-dispatch, webhook URL registration automation.
+
 ## [0.4.4] - 2026-05-27 — gate-a-audit-hardening
 
 **Gate A hardening PATCH release.** Zero new public API surface; zero breaking change. Five hardening fixes (2 High + 2 Medium + 1 Low) from the post-Gate-A audit ship together; the remaining audit items (M2 base-URL reachability, M3 `uv` smoke precheck) are deferred to follow-up changes. See [`MIGRATION_v0.4.3_to_v0.4.4.md`](MIGRATION_v0.4.3_to_v0.4.4.md) for the per-item migration notes.

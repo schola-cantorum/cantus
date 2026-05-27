@@ -69,5 +69,11 @@ class Settings(BaseSettings):
     bearer_token: SecretStr | None = None
     dashboard_requires_auth: bool = True
 
+    # v0.4.5 cantus-channel-gateway-webhook: per-platform channel secrets.
+    channel_line_secret: SecretStr | None = None
+    channel_line_access_token: SecretStr | None = None
+    channel_telegram_secret_token: SecretStr | None = None
+    channel_telegram_bot_token: SecretStr | None = None
+
 
 __all__ = ["AuthMode", "Settings"]
