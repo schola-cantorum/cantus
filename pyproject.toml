@@ -121,6 +121,20 @@ serve = [
     # v0.4.5 cantus-channel-gateway-webhook — outbound reply HTTP client
     # shared by webhook channels (LINE Messaging API / Telegram Bot API).
     "httpx>=0.27,<1",
+    # v0.4.6 cantus-channel-gateway-realtime — Ed25519 interaction
+    # signature verification (PyNaCl is the first C-extension dependency
+    # in cantus[serve]; prebuilt wheels cover Linux x86_64, macOS arm64
+    # + x86_64, and Windows AMD64 for CPython 3.10–3.13) plus the pure
+    # Python WebSocket client for the Discord Gateway connection.
+    "pynacl>=1.5,<2",
+    # Unbounded upper to let uv pick a websockets version compatible with
+    # whichever provider extras are in the resolution split: `cantus[all]`
+    # pulls google-genai<=0.8.0 which pins websockets<15; `cantus[openhands]`
+    # pulls openhands-sdk→fastmcp which pins websockets>=15. Both splits are
+    # already separated by [tool.uv].conflicts (all ↔ openhands), so no new
+    # conflict entry is needed; each split resolves to a websockets version
+    # satisfying its own provider constraint.
+    "websockets>=13",
 ]
 # v0.4.1 cantus-serve-security — documentary alias for the security
 # surface (auth gate + SecretStr token handling). Resolves to the same

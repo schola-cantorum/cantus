@@ -75,5 +75,12 @@ class Settings(BaseSettings):
     channel_telegram_secret_token: SecretStr | None = None
     channel_telegram_bot_token: SecretStr | None = None
 
+    # v0.4.6 cantus-channel-gateway-realtime: Discord bot + Ed25519 public
+    # key are SecretStr; application_id is a publicly-visible identifier
+    # (shows up in OAuth invite URLs) and stays plain str.
+    channel_discord_bot_token: SecretStr | None = None
+    channel_discord_public_key: SecretStr | None = None
+    channel_discord_application_id: str | None = None
+
 
 __all__ = ["AuthMode", "Settings"]

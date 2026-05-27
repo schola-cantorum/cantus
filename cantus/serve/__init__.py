@@ -20,8 +20,17 @@ except ImportError as exc:
 
 from cantus.config import AuthMode
 from cantus.serve.app import serve
-from cantus.serve.channel import Channel, LocalMockReceiver, WebhookChannel
+from cantus.serve.channel import (
+    Channel,
+    LocalMockReceiver,
+    RealtimeChannel,
+    WebhookChannel,
+)
 from cantus.serve.channels._errors import ChannelSendError
+from cantus.serve.channels.discord import (
+    DiscordRealtimeChannel,
+    DiscordSignatureError,
+)
 from cantus.serve.channels.line import LineWebhookChannel
 from cantus.serve.channels.telegram import TelegramWebhookChannel
 from cantus.serve.security import require_auth
@@ -30,8 +39,11 @@ __all__ = [
     "AuthMode",
     "Channel",
     "ChannelSendError",
+    "DiscordRealtimeChannel",
+    "DiscordSignatureError",
     "LineWebhookChannel",
     "LocalMockReceiver",
+    "RealtimeChannel",
     "TelegramWebhookChannel",
     "WebhookChannel",
     "require_auth",
