@@ -219,6 +219,43 @@ def test_skill_named_channels_rejected_as_reserved_channel_path() -> None:
         serve(registry)
 
 
+def test_dashboard_routes_coexist_with_discord_interactions_route() -> None:
+    """Task 7.4 — Requirement: /channels/discord/* reserved path namespace.
+
+    Mounting a DiscordRealtimeChannel registers POST /channels/discord/interactions
+    beneath the v0.4.5 reserved /channels top-level prefix. The dashboard
+    routes (/skills, /health, /events) MUST continue to respond as documented
+    — the new sub-path is a sibling, not a shadower.
+    """
+    from fastapi.testclient import TestClient
+
+    from cantus.core.registry import Registry
+    from cantus.serve import DiscordRealtimeChannel, serve
+
+    channel = DiscordRealtimeChannel(
+        bot_token="fake-bot-token",
+        public_key="aa" * 32,  # 32-byte hex
+        application_id="100",
+    )
+    app = serve(Registry(), channels=[channel])
+    client = TestClient(app)
+
+    # Dashboard endpoints respond exactly as v0.4.5 documented.
+    assert client.get("/skills").status_code == 200
+    assert client.get("/health").status_code == 200
+    assert client.get("/events").status_code == 200
+
+    # /channels/discord/interactions is registered (POST-only); GET returns
+    # 405 Method Not Allowed, not 404 — proving the route exists but does
+    # not shadow dashboard paths.
+    discord_get = client.get("/channels/discord/interactions")
+    assert discord_get.status_code == 405
+
+    # A request to a non-existent /channels/* sub-path is 404 (sub-path
+    # reservation does not implicitly handle siblings).
+    assert client.get("/channels/discord/voice").status_code == 404
+
+
 # --- v0.4.1 cantus-serve-security: dashboard_requires_auth toggle --------
 
 

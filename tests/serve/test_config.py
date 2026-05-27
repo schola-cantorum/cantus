@@ -290,6 +290,85 @@ def test_channel_secrets_do_not_leak_in_model_dump_json(
     assert "leak-tg-2" not in dumped
 
 
+def test_discord_fields_load_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 1.2 — Requirement: Settings adds three Discord channel fields with masked secrets.
+
+    The three new fields populate from the same `CANTUS_SERVE_` env prefix
+    used by line/telegram secrets. SecretStr-wrapped secrets keep their
+    plaintext recoverable via `.get_secret_value()`; application_id stays
+    plain str because it is a publicly-visible identifier.
+    """
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_DISCORD_BOT_TOKEN", "MTAxxx.discord.bot")
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY",
+        "deadbeef" * 8,
+    )
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID", "1234567890"
+    )
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.channel_discord_bot_token, SecretStr)
+    assert s.channel_discord_bot_token.get_secret_value() == "MTAxxx.discord.bot"
+    assert isinstance(s.channel_discord_public_key, SecretStr)
+    assert s.channel_discord_public_key.get_secret_value() == "deadbeef" * 8
+    # application_id is a plain str — publicly visible identifier, not secret.
+    assert s.channel_discord_application_id == "1234567890"
+    assert isinstance(s.channel_discord_application_id, str)
+
+
+def test_discord_fields_default_none() -> None:
+    """Task 1.2 — Requirement: Settings adds three Discord channel fields with masked secrets.
+
+    All three Discord channel fields default to None so existing v0.4.5
+    deployments that never set CANTUS_SERVE_CHANNEL_DISCORD_* keep behaviour
+    byte-identical.
+    """
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_discord_bot_token is None
+    assert s.channel_discord_public_key is None
+    assert s.channel_discord_application_id is None
+
+
+def test_discord_secrets_masked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 1.3 — Requirement: Settings adds three Discord channel fields with masked secrets.
+
+    Verifies SecretStr discipline: the two secret fields never leak in
+    `repr(settings)`, `model_dump_json()`, or the generated OpenAPI schema.
+    `channel_discord_application_id` is NOT masked (public identifier).
+    """
+    import json
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_DISCORD_BOT_TOKEN", "leak-discord-bot")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY", "leak-discord-pk")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID", "public-app-id-001")
+    Settings = _load_settings_class()
+    s = Settings()
+    # repr never shows the secret plaintext.
+    assert "leak-discord-bot" not in repr(s)
+    assert "leak-discord-pk" not in repr(s)
+    # application_id is public — DOES appear in repr.
+    assert "public-app-id-001" in repr(s)
+    # model_dump_json masks SecretStr, preserves application_id plaintext.
+    dumped = s.model_dump_json()
+    assert "leak-discord-bot" not in dumped
+    assert "leak-discord-pk" not in dumped
+    assert "public-app-id-001" in dumped
+    # OpenAPI schema does not expose either secret value or the field names.
+    from cantus.core.registry import Registry
+    from cantus.serve import serve
+
+    app = serve(Registry(), settings=Settings())
+    schema_json = json.dumps(app.openapi())
+    assert "leak-discord-bot" not in schema_json
+    assert "leak-discord-pk" not in schema_json
+    assert "channel_discord_bot_token" not in schema_json
+    assert "channel_discord_public_key" not in schema_json
+
+
 def test_channel_secrets_absent_from_openapi(monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 1.2: SecretStr channel fields must NOT appear in the FastAPI
     OpenAPI schema. cantus.serve.app does not bind Settings into a request

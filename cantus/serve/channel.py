@@ -81,4 +81,35 @@ class WebhookChannel(Channel, Protocol):
         ...
 
 
-__all__ = ["Channel", "LocalMockReceiver", "WebhookChannel"]
+@runtime_checkable
+class RealtimeChannel(Channel, Protocol):
+    """Channel that owns a long-lived outbound connection to its platform.
+
+    Sibling of :class:`WebhookChannel` — both extend :class:`Channel`, neither
+    inherits from the other. :func:`cantus.serve.serve` dispatches
+    ``connect()`` / ``disconnect()`` to RealtimeChannels via the FastAPI
+    ``lifespan`` async context manager (startup spawns
+    ``asyncio.create_task(channel.connect())``; shutdown awaits
+    ``channel.disconnect()`` before cancelling the task).
+
+    Discord ships as a RealtimeChannel because the Gateway is a WebSocket
+    that cantus must open and heartbeat itself; HMAC-style platforms like
+    LINE and Telegram remain :class:`WebhookChannel`-only.
+
+    A class MAY conform to both sub-Protocols simultaneously — Discord's
+    interactions HTTP endpoint requires :class:`WebhookChannel.mount` and
+    the Gateway requires :class:`RealtimeChannel.connect` /
+    :class:`RealtimeChannel.disconnect`, so the Discord adapter implements
+    both.
+    """
+
+    async def connect(self) -> None:
+        """Open and maintain the long-lived platform connection."""
+        ...
+
+    async def disconnect(self) -> None:
+        """Close the long-lived platform connection cleanly."""
+        ...
+
+
+__all__ = ["Channel", "LocalMockReceiver", "RealtimeChannel", "WebhookChannel"]

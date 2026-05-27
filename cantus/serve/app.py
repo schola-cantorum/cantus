@@ -21,6 +21,7 @@ is then injected through ``openapi_extra``.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -30,7 +31,7 @@ from fastapi.params import Depends as DependsType
 
 from cantus.config import AuthMode, Settings
 from cantus.core.registry import Registry
-from cantus.serve.channel import Channel, WebhookChannel
+from cantus.serve.channel import Channel, RealtimeChannel, WebhookChannel
 from cantus.serve.dashboard import (
     RESERVED_DASHBOARD_NAMES,
     register_dashboard_routes,
@@ -92,11 +93,28 @@ def serve(
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> Any:
-        # App-scoped HTTP client shared by webhook channels for outbound replies.
+        # App-scoped HTTP client shared by webhook + realtime channels for
+        # outbound replies (v0.4.5) and Discord REST API calls (v0.4.6).
         app.state.http_client = httpx.AsyncClient(timeout=10.0)
+        # v0.4.6 cantus-channel-gateway-realtime: spawn each RealtimeChannel's
+        # connect() as a background asyncio.Task. The Task lives for the
+        # lifetime of the app; channel.disconnect() at shutdown signals it to
+        # close cleanly, then we cancel any task that did not finish on its own.
+        realtime_tasks: list[asyncio.Task[None]] = []
+        for ch in app.state.channels:
+            if isinstance(ch, RealtimeChannel):
+                realtime_tasks.append(asyncio.create_task(ch.connect()))
         try:
             yield
         finally:
+            # Disconnect signals the connect() loop to stop; await it first so
+            # the channel can close its WebSocket with a normal close code
+            # before the task is cancelled.
+            for ch in app.state.channels:
+                if isinstance(ch, RealtimeChannel):
+                    await ch.disconnect()
+            for task in realtime_tasks:
+                task.cancel()
             await app.state.http_client.aclose()
 
     app: FastAPI = FastAPI(

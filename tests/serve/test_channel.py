@@ -138,3 +138,92 @@ def test_webhook_channel_rejects_missing_mount() -> None:
             return None
 
     assert isinstance(_Almost(), channel_mod.WebhookChannel) is False
+
+
+# --- v0.4.6 RealtimeChannel Protocol -------------------------------------
+
+
+def test_realtime_channel_membership() -> None:
+    """Task 2.2 — Requirement: RealtimeChannel Protocol extends Channel with
+    connect/disconnect lifecycle.
+
+    A stub implementing receive+send+connect+disconnect passes both Channel
+    and RealtimeChannel; LocalMockReceiver passes Channel only;
+    LineWebhookChannel passes Channel + WebhookChannel only (sibling
+    independence — neither Protocol inherits from the other).
+    """
+    channel_mod = _load_module()
+
+    class _StubRealtimeChannel:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+        async def connect(self) -> None:
+            return None
+
+        async def disconnect(self) -> None:
+            return None
+
+    stub = _StubRealtimeChannel()
+    assert isinstance(stub, channel_mod.Channel) is True
+    assert isinstance(stub, channel_mod.RealtimeChannel) is True
+    # WebhookChannel needs mount(); the stub does not implement it.
+    assert isinstance(stub, channel_mod.WebhookChannel) is False
+
+    # Pure Channel — neither sub-Protocol.
+    receiver = channel_mod.LocalMockReceiver()
+    assert isinstance(receiver, channel_mod.Channel) is True
+    assert isinstance(receiver, channel_mod.RealtimeChannel) is False
+    assert isinstance(receiver, channel_mod.WebhookChannel) is False
+
+
+def test_realtime_channel_sibling_independence_with_line_webhook() -> None:
+    """Task 2.2 — sibling Protocols stay orthogonal.
+
+    LineWebhookChannel implements receive+send+mount but NOT connect/disconnect.
+    It must be Channel + WebhookChannel but NOT RealtimeChannel.
+    """
+    channel_mod = _load_module()
+    from cantus.serve.channels.line import LineWebhookChannel
+
+    line = LineWebhookChannel(
+        channel_secret="dummy-secret",
+        channel_access_token="dummy-token",
+    )
+    assert isinstance(line, channel_mod.Channel) is True
+    assert isinstance(line, channel_mod.WebhookChannel) is True
+    assert isinstance(line, channel_mod.RealtimeChannel) is False
+
+
+def test_realtime_channel_rejects_missing_lifecycle_methods() -> None:
+    """Task 2.2 — RealtimeChannel needs BOTH connect and disconnect.
+
+    A class with connect but no disconnect (or vice versa) fails membership.
+    """
+    channel_mod = _load_module()
+
+    class _HasConnectOnly:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+        async def connect(self) -> None:
+            return None
+
+    class _HasDisconnectOnly:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+        async def disconnect(self) -> None:
+            return None
+
+    assert isinstance(_HasConnectOnly(), channel_mod.RealtimeChannel) is False
+    assert isinstance(_HasDisconnectOnly(), channel_mod.RealtimeChannel) is False
