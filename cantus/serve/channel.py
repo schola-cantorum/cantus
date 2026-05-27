@@ -11,7 +11,10 @@ suitable for any production transport.
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 
 @runtime_checkable
@@ -61,4 +64,21 @@ class LocalMockReceiver:
         return self._queue.popleft()
 
 
-__all__ = ["Channel", "LocalMockReceiver"]
+@runtime_checkable
+class WebhookChannel(Channel, Protocol):
+    """Channel that registers its own FastAPI route to receive inbound events.
+
+    Extends :class:`Channel` with a single ``mount(app)`` method invoked by
+    :func:`cantus.serve.serve` after Skill and dashboard routes are registered.
+    LINE and Telegram webhook adapters implement this Protocol; in-process
+    channels such as :class:`LocalMockReceiver` do not, and ``isinstance``
+    correctly distinguishes the two so :func:`cantus.serve.serve` only calls
+    ``mount`` on channels that require an HTTP entry point.
+    """
+
+    def mount(self, app: FastAPI) -> None:
+        """Attach inbound routes to the FastAPI app."""
+        ...
+
+
+__all__ = ["Channel", "LocalMockReceiver", "WebhookChannel"]

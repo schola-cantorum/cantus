@@ -207,3 +207,107 @@ def test_dashboard_requires_auth_env_coerces_to_bool(
     Settings = _load_settings_class()
     s = Settings()
     assert s.dashboard_requires_auth is False
+
+
+# --- v0.4.5 cantus-channel-gateway-webhook: SecretStr channel fields -----
+
+
+def test_channel_secrets_default_to_none() -> None:
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_line_secret is None
+    assert s.channel_line_access_token is None
+    assert s.channel_telegram_secret_token is None
+    assert s.channel_telegram_bot_token is None
+
+
+def test_channel_line_secret_env_wraps_in_secretstr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_SECRET", "s3cret-line")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.channel_line_secret, SecretStr)
+    assert s.channel_line_secret.get_secret_value() == "s3cret-line"
+    assert "s3cret-line" not in repr(s.channel_line_secret)
+    assert "s3cret-line" not in repr(s)
+
+
+def test_channel_line_access_token_env_wraps_in_secretstr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN", "tok-line")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.channel_line_access_token, SecretStr)
+    assert s.channel_line_access_token.get_secret_value() == "tok-line"
+    assert "tok-line" not in repr(s)
+
+
+def test_channel_telegram_secret_token_env_wraps_in_secretstr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN", "tg-secret")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.channel_telegram_secret_token, SecretStr)
+    assert s.channel_telegram_secret_token.get_secret_value() == "tg-secret"
+    assert "tg-secret" not in repr(s)
+
+
+def test_channel_telegram_bot_token_env_wraps_in_secretstr(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", "123:tg-bot")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert isinstance(s.channel_telegram_bot_token, SecretStr)
+    assert s.channel_telegram_bot_token.get_secret_value() == "123:tg-bot"
+    assert "123:tg-bot" not in repr(s)
+
+
+def test_channel_secrets_do_not_leak_in_model_dump_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_SECRET", "leak-line-1")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN", "leak-line-2")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN", "leak-tg-1")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", "leak-tg-2")
+    Settings = _load_settings_class()
+    s = Settings()
+    dumped = s.model_dump_json()
+    assert "leak-line-1" not in dumped
+    assert "leak-line-2" not in dumped
+    assert "leak-tg-1" not in dumped
+    assert "leak-tg-2" not in dumped
+
+
+def test_channel_secrets_absent_from_openapi(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 1.2: SecretStr channel fields must NOT appear in the FastAPI
+    OpenAPI schema. cantus.serve.app does not bind Settings into a request
+    body, so an empty/scan-clean OpenAPI components.schemas plus an absence
+    of the env var names anywhere in the JSON is the contract."""
+    import json
+
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_SECRET", "openapi-leak-test-A")
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", "openapi-leak-test-B")
+    Settings = _load_settings_class()
+
+    from cantus.core.registry import Registry
+    from cantus.serve import serve
+
+    app = serve(Registry(), settings=Settings())
+    schema_json = json.dumps(app.openapi())
+    assert "openapi-leak-test-A" not in schema_json
+    assert "openapi-leak-test-B" not in schema_json
+    # Field names also absent — Settings is not exposed.
+    assert "channel_line_secret" not in schema_json
+    assert "channel_telegram_bot_token" not in schema_json

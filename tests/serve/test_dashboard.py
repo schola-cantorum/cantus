@@ -197,6 +197,28 @@ def test_skill_named_after_reserved_dashboard_path_is_rejected(
         serve(registry)
 
 
+def test_skill_named_channels_rejected_as_reserved_channel_path() -> None:
+    """v0.4.5: 'channels' joins the reserved top-level names; collision uses
+    a distinct error string so dashboard vs channel collisions stay
+    distinguishable in diagnostics."""
+    from cantus.core.registry import Registry
+    from cantus.serve import serve
+
+    class _StubSkill:
+        name = "channels"
+
+        def spec_for_llm(self) -> dict[str, Any]:
+            return {"name": "channels", "description": "", "args_schema": {}}
+
+        def run(self, **kwargs: Any) -> Any:
+            return None
+
+    registry = Registry()
+    registry.register("skill", _StubSkill())
+    with pytest.raises(ValueError, match="reserved channel path"):
+        serve(registry)
+
+
 # --- v0.4.1 cantus-serve-security: dashboard_requires_auth toggle --------
 
 

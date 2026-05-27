@@ -99,3 +99,42 @@ def test_local_mock_receiver_conforms_to_channel_protocol() -> None:
     channel_mod = _load_module()
     ch = channel_mod.LocalMockReceiver()
     assert isinstance(ch, channel_mod.Channel) is True
+
+
+# --- v0.4.5 WebhookChannel Protocol --------------------------------------
+
+
+def test_webhook_channel_membership() -> None:
+    """LocalMockReceiver is a Channel but NOT a WebhookChannel; a class with
+    receive+send+mount is both."""
+    channel_mod = _load_module()
+    ch = channel_mod.LocalMockReceiver()
+    assert isinstance(ch, channel_mod.Channel) is True
+    assert isinstance(ch, channel_mod.WebhookChannel) is False
+
+    class _StubWebhookChannel:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+        def mount(self, app: Any) -> None:
+            return None
+
+    stub = _StubWebhookChannel()
+    assert isinstance(stub, channel_mod.Channel) is True
+    assert isinstance(stub, channel_mod.WebhookChannel) is True
+
+
+def test_webhook_channel_rejects_missing_mount() -> None:
+    channel_mod = _load_module()
+
+    class _Almost:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+    assert isinstance(_Almost(), channel_mod.WebhookChannel) is False

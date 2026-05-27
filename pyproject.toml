@@ -118,6 +118,9 @@ serve = [
     "fastapi>=0.115,<1",
     "uvicorn>=0.30,<1",
     "pydantic-settings>=2.4,<3",
+    # v0.4.5 cantus-channel-gateway-webhook — outbound reply HTTP client
+    # shared by webhook channels (LINE Messaging API / Telegram Bot API).
+    "httpx>=0.27,<1",
 ]
 # v0.4.1 cantus-serve-security — documentary alias for the security
 # surface (auth gate + SecretStr token handling). Resolves to the same
