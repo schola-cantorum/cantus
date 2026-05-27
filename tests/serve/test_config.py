@@ -390,3 +390,95 @@ def test_channel_secrets_absent_from_openapi(monkeypatch: pytest.MonkeyPatch) ->
     # Field names also absent — Settings is not exposed.
     assert "channel_line_secret" not in schema_json
     assert "channel_telegram_bot_token" not in schema_json
+
+
+# --- B3 cantus-channel-gateway-pubsub: Google Chat Pub/Sub Settings -------
+
+
+def test_channel_google_chat_credentials_path_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Task 1.1 — Requirement: Settings adds three Google Chat channel fields
+    with environment variable bindings.
+
+    `channel_google_chat_credentials_path` is a plain `str | None` (NOT
+    SecretStr) because a filesystem path is non-sensitive location config.
+    """
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH",
+        "/etc/cantus/sa.json",
+    )
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_google_chat_credentials_path == "/etc/cantus/sa.json"
+    assert isinstance(s.channel_google_chat_credentials_path, str)
+
+
+def test_channel_google_chat_subscription_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Task 1.2 — Requirement: Settings adds three Google Chat channel fields
+    with environment variable bindings."""
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SUBSCRIPTION",
+        "projects/p/subscriptions/s",
+    )
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_google_chat_subscription == "projects/p/subscriptions/s"
+    assert isinstance(s.channel_google_chat_subscription, str)
+
+
+def test_channel_google_chat_space_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Task 1.3 — Requirement: Settings adds three Google Chat channel fields
+    with environment variable bindings."""
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SPACE", "spaces/AAA")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_google_chat_space == "spaces/AAA"
+    assert isinstance(s.channel_google_chat_space, str)
+
+
+def test_google_chat_fields_default_none() -> None:
+    """Task 1.1-1.3 — all three Google Chat fields default to None so existing
+    deployments that never set CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_* keep
+    behaviour byte-identical."""
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.channel_google_chat_credentials_path is None
+    assert s.channel_google_chat_subscription is None
+    assert s.channel_google_chat_space is None
+
+
+def test_google_chat_fields_unmasked_in_dump(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Task 1.4 — All three Google Chat fields are plain str (NOT SecretStr),
+    so they appear unmasked in `repr(settings)` and `model_dump_json()`. The
+    filesystem path is a location pointer (the file's *contents* are
+    sensitive, but the path is not). Subscription path and space identifier
+    are publicly-assigned Google identifiers."""
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH",
+        "/etc/cantus/sa.json",
+    )
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SUBSCRIPTION",
+        "projects/p/subscriptions/s",
+    )
+    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SPACE", "spaces/AAA")
+    Settings = _load_settings_class()
+    s = Settings()
+    dumped = s.model_dump_json()
+    assert '"channel_google_chat_credentials_path":"/etc/cantus/sa.json"' in dumped
+    assert (
+        '"channel_google_chat_subscription":"projects/p/subscriptions/s"' in dumped
+    )
+    assert '"channel_google_chat_space":"spaces/AAA"' in dumped
+    # No masking marker on any of the three new fields.
+    rep = repr(s)
+    assert "/etc/cantus/sa.json" in rep
+    assert "projects/p/subscriptions/s" in rep
+    assert "spaces/AAA" in rep

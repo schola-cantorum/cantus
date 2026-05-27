@@ -66,6 +66,26 @@ def test_serve_extras_pins_fastapi_uvicorn_pydantic_settings() -> None:
     )
 
 
+def test_serve_extras_pins_google_cloud_pubsub() -> None:
+    """Task 2.1 — Requirement: serve extras adds google-cloud-pubsub dependency
+    with cross-platform wheel coverage.
+
+    The B3 (v0.4.7) channel gateway pulls google-cloud-pubsub for the Pub/Sub
+    streaming-pull inbound transport. google-auth is NOT pinned explicitly —
+    it arrives transitively through google-cloud-pubsub.
+    """
+    cfg = _load_pyproject()
+    serve = cfg["project"]["optional-dependencies"]["serve"]
+    flat = " ".join(serve)
+    assert re.search(r"google-cloud-pubsub>=2\.20,<3\b", flat), (
+        f"serve extras must pin google-cloud-pubsub>=2.20,<3; got: {serve}"
+    )
+    # google-auth must NOT be pinned explicitly — it comes via google-cloud-pubsub.
+    assert not re.search(r"^google-auth[<>=~]", flat), (
+        f"google-auth must not be pinned explicitly; got: {serve}"
+    )
+
+
 def test_legacy_extras_keys_preserved_byte_identical() -> None:
     cfg = _load_pyproject()
     extras = cfg["project"]["optional-dependencies"]
