@@ -266,3 +266,55 @@ def test_missing_ollama_extras_hint_points_to_cantus_openai_not_ollama(monkeypat
     msg = str(exc.value)
     assert "pip install cantus[openai]" in msg
     assert "cantus[ollama]" not in msg
+
+
+# ---------- L1 (gate-a-audit-hardening): version-agnostic factory messages -
+
+
+def test_load_chat_model_docstring_excludes_version_string():
+    """`load_chat_model` docstring SHALL NOT pin a release version.
+
+    Task 2.1 / Scenario: factory docstring describes providers without
+    referencing a specific release version. The supported-provider set is
+    bound to `_REGISTRY` membership, not a release number.
+    """
+    import inspect
+    import re
+
+    doc = inspect.getdoc(load_chat_model)
+    assert doc is not None
+    assert "v0.2.1" not in doc
+    assert not re.search(r"v\d+\.\d+\.\d+", doc), (
+        f"docstring must not contain a vN.N.N version string: {doc!r}"
+    )
+
+
+def test_unsupported_provider_error_excludes_version_string():
+    """ValueError message for unknown prefix is version-agnostic.
+
+    Task 2.2 / Scenario: unsupported-provider error message is version-agnostic.
+    """
+    import re
+
+    with pytest.raises(ValueError) as exc:
+        load_chat_model("vertex/gemini-2.0-flash")
+    msg = str(exc.value)
+    assert "supported providers:" in msg
+    assert "v0.2.1" not in msg
+    assert "ships only" not in msg
+    assert not re.search(r"v\d+\.\d+\.\d+", msg), (
+        f"error message must not contain a vN.N.N version string: {msg!r}"
+    )
+
+
+def test_unsupported_provider_error_lists_all_six_providers():
+    """ValueError message for unknown prefix lists all six current providers.
+
+    Task 2.2 contract: message must name every key in `_REGISTRY` so the
+    user sees `openai`, `anthropic`, `google`, `groq`, `nvidia`, `ollama`.
+    """
+    with pytest.raises(ValueError) as exc:
+        load_chat_model("vertex/gemini-2.0-flash")
+    msg = str(exc.value)
+    for provider in ("openai", "anthropic", "google", "groq", "nvidia", "ollama"):
+        assert provider in msg, f"supported provider {provider!r} missing from {msg!r}"

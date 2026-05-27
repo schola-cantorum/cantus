@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import sys
+from types import ModuleType
 
 from cantus.config import AuthMode, Settings
 from cantus.core.registry import Registry
@@ -112,11 +113,37 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _format_attribute_error(module: ModuleType, attr_name: str, spec: str) -> str:
+    """Build a candidate-listing message for a getattr failure on `module`.
+
+    Lists public (non-underscore-prefixed) attribute names sorted alphabetically
+    and capped at 10 entries; longer lists are truncated with the literal
+    suffix `(truncated)`. Modules with zero public attributes report
+    `; available: (none)`. Pure function — input fully determines output.
+    """
+    public_names = sorted(name for name in dir(module) if not name.startswith("_"))
+    if not public_names:
+        candidates = "(none)"
+    elif len(public_names) > 10:
+        candidates = ", ".join(public_names[:10]) + " (truncated)"
+    else:
+        candidates = ", ".join(public_names)
+    return (
+        f"module {module.__name__!r} has no attribute {attr_name!r} "
+        f"(spec {spec!r}); available: {candidates}"
+    )
+
+
 def _resolve_registry_import(spec: str) -> Registry:
     module_name, _, attr_name = spec.partition(":")
     if not module_name or not attr_name:
         raise RegistryImportError(
             f"expected `module.dotted.path:variable_name`, got {spec!r}"
+        )
+    if not attr_name.isidentifier():
+        raise RegistryImportError(
+            f"attr_name {attr_name!r} is not a valid Python identifier "
+            f"(spec {spec!r})"
         )
     try:
         module = importlib.import_module(module_name)
@@ -125,7 +152,9 @@ def _resolve_registry_import(spec: str) -> Registry:
     try:
         obj = getattr(module, attr_name)
     except AttributeError as exc:
-        raise RegistryImportError(str(exc)) from exc
+        raise RegistryImportError(
+            _format_attribute_error(module, attr_name, spec)
+        ) from exc
     if not isinstance(obj, Registry):
         raise RegistryImportError(
             f"{spec!r} resolved to {type(obj).__name__}, expected Registry"
@@ -136,16 +165,25 @@ def _resolve_registry_import(spec: str) -> Registry:
 def _resolve_channels_import(specs: list[str]) -> list:
     """Resolve one or more dotted-import channel specs into channel objects.
 
-    Reuses `_resolve_registry_import`'s partition-then-import pattern but
-    without the Registry isinstance check (channel kinds vary; the
-    cantus.serve.channel.Channel base class would tighten this later).
+    Each resolved attribute SHALL satisfy the `cantus.serve.channel.Channel`
+    Protocol (`@runtime_checkable`); non-conforming values raise
+    `RegistryImportError` at startup rather than crashing later. `Channel`
+    is imported lazily so that `import cantus.cli` does not transitively
+    pull `cantus.serve.channel` into sys.modules.
     """
+    from cantus.serve.channel import Channel
+
     channels = []
     for spec in specs:
         module_name, _, attr_name = spec.partition(":")
         if not module_name or not attr_name:
             raise RegistryImportError(
                 f"expected `module.dotted.path:variable_name`, got {spec!r}"
+            )
+        if not attr_name.isidentifier():
+            raise RegistryImportError(
+                f"attr_name {attr_name!r} is not a valid Python identifier "
+                f"(spec {spec!r})"
             )
         try:
             module = importlib.import_module(module_name)
@@ -154,11 +192,17 @@ def _resolve_channels_import(specs: list[str]) -> list:
                 f"cannot import channel from {spec!r}: {exc}"
             ) from exc
         try:
-            channels.append(getattr(module, attr_name))
+            obj = getattr(module, attr_name)
         except AttributeError as exc:
             raise RegistryImportError(
-                f"cannot import channel from {spec!r}: {exc}"
+                _format_attribute_error(module, attr_name, spec)
             ) from exc
+        if not isinstance(obj, Channel):
+            raise RegistryImportError(
+                f"channel {spec!r} resolved to {type(obj).__name__}, "
+                f"expected cantus.serve.channel.Channel-compatible object"
+            )
+        channels.append(obj)
     return channels
 
 
@@ -224,6 +268,14 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"cantus serve: error: {exc}", file=sys.stderr)
         return 1
+
+    if settings.auth_mode == AuthMode.NONE and settings.dashboard is True:
+        sys.stderr.write(
+            "cantus serve: WARNING: auth-mode=none AND dashboard=on — "
+            "server is unauthenticated and exposes dashboard endpoints. "
+            "Set --auth-mode (bearer|api-key) or "
+            "CANTUS_SERVE_DASHBOARD=false for production deployment.\n"
+        )
 
     uvicorn.run(app, host=settings.host, port=settings.port)
     return 0

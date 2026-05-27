@@ -10,6 +10,14 @@ TBD - created by archiving change 'cantus-local-llm-and-desktop-walkthrough'. Up
 
 The framework SHALL provide a class `OllamaChatModel` importable from `cantus.model.providers.ollama` that inherits from `cantus.model.providers.openai.OpenAIChatModel`. The constructor SHALL accept `model_id: str`, optional `api_key: str | None`, optional `base_url: str | None`, and `**client_kwargs`. When `api_key` is `None`, the constructor SHALL use the sentinel literal string `"ollama"` and SHALL NOT consult any environment variable. When `base_url` is `None`, the constructor SHALL use `"http://localhost:11434/v1"`. The constructor SHALL then delegate to `super().__init__(model_id=model_id, api_key=resolved_api_key, base_url=resolved_base_url, **client_kwargs)`. The class SHALL NOT call `cantus.model.providers._common.resolve_api_key`. The class SHALL inherit `supports_tool_use = True` from `OpenAIChatModel` without overriding it.
 
+The `OllamaChatModel` class docstring SHALL disclose the silent-override behavior of the `api_key` parameter. The docstring SHALL contain all three of the following literal substrings, so that a caller reading the docstring understands that explicit `api_key` values are accepted by the constructor signature but discarded by the Ollama daemon:
+
+- `api_key parameter is accepted but ignored`
+- `Ollama daemon does not authenticate requests`
+- `pass base_url=`
+
+The first substring documents that explicit `api_key=...` arguments are syntactically accepted but not authoritative. The second substring documents the reason. The third substring points callers to the correct knob for the most common follow-up configuration question (running Ollama on a different host).
+
 #### Scenario: default constructor uses sentinel api_key and local base_url
 
 - **WHEN** a caller instantiates `OllamaChatModel(model_id="gemma3:4b")` without passing `api_key` or `base_url`
@@ -29,6 +37,13 @@ The framework SHALL provide a class `OllamaChatModel` importable from `cantus.mo
 - **THEN** the call SHALL NOT raise any exception
 - **AND** the call SHALL NOT raise `cantus.model.providers._common.MissingAPIKeyError`
 
+#### Scenario: class docstring discloses api_key silent-override behavior
+
+- **WHEN** a caller inspects `OllamaChatModel.__doc__`
+- **THEN** the docstring SHALL contain the literal substring `api_key parameter is accepted but ignored`
+- **AND** the docstring SHALL contain the literal substring `Ollama daemon does not authenticate requests`
+- **AND** the docstring SHALL contain the literal substring `pass base_url=`
+
 ##### Example: constructor default resolution table
 
 | Caller invocation | Resolved api_key | Resolved base_url |
@@ -40,19 +55,20 @@ The framework SHALL provide a class `OllamaChatModel` importable from `cantus.mo
 
 
 <!-- @trace
-source: cantus-local-llm-and-desktop-walkthrough
-updated: 2026-05-25
+source: gate-a-audit-hardening
+updated: 2026-05-27
 code:
-  - cantus/model/providers/ollama.py
-  - pyproject.toml
+  - cantus/__init__.py
   - cantus/model/factory.py
-  - tests/integration/__init__.py
-  - docs/quickstart-desktop.md
+  - cantus/model/providers/ollama.py
+  - tests/cli/fixture_registry.py
+  - cantus/cli.py
+  - pyproject.toml
 tests:
-  - tests/test_factory.py
+  - tests/cli/test_registry_import.py
   - tests/providers/test_ollama_adapter.py
-  - tests/providers/test_ollama_connection_error.py
-  - tests/integration/test_tunnel_smoke.py
+  - tests/cli/test_serve_args.py
+  - tests/test_factory.py
 -->
 
 ---

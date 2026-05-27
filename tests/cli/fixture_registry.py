@@ -6,6 +6,10 @@ Provides a no-skill `Registry()` instance importable as
 """
 
 from cantus.core.registry import Registry
+from cantus.serve.channel import LocalMockReceiver
 
 registry = Registry()
+dashboard_registry = Registry()
 not_a_registry = "I am a str, not a Registry"
+not_a_channel = "hello"
+mock_channel = LocalMockReceiver()

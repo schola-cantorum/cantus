@@ -4,6 +4,29 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-05-27 — gate-a-audit-hardening
+
+**Gate A hardening PATCH release.** Zero new public API surface; zero breaking change. Five hardening fixes (2 High + 2 Medium + 1 Low) from the post-Gate-A audit ship together; the remaining audit items (M2 base-URL reachability, M3 `uv` smoke precheck) are deferred to follow-up changes. See [`MIGRATION_v0.4.3_to_v0.4.4.md`](MIGRATION_v0.4.3_to_v0.4.4.md) for the per-item migration notes.
+
+### Added
+
+- `cantus serve` startup-time stderr WARNING line when `auth-mode=none AND dashboard=on` (the v0.4.0 default combination, preserved for backwards compatibility but unsafe for any externally reachable deployment). Fires after `_build_app` succeeds; does not affect exit code; does not block startup. (**M1**)
+- `cantus.cli._resolve_channels_import` runtime check that each resolved `--channels` target satisfies the `@runtime_checkable cantus.serve.channel.Channel` Protocol; non-conforming values raise `RegistryImportError` at startup with the actual type name instead of crashing deep inside `cantus.serve`. `Channel` is imported lazily so `import cantus.cli` still does not pull `cantus.serve.channel` into `sys.modules`. (**M4**)
+- `cantus.cli._format_attribute_error` helper — pure function that builds a candidate-listing error message for `getattr` failures during `--registry-import` / `--channels` resolution; lists up to 10 sorted public attribute names (filtering double-underscore names) and appends the literal suffix `(truncated)` when more than 10 exist; reports `(none)` for modules with zero public attributes. (**H2**)
+
+### Changed
+
+- `cantus.model.factory.load_chat_model` docstring and unsupported-provider `ValueError` message are now version-agnostic. The literal `v0.2.1 ships only:` substring is replaced with `supported providers:` followed by the dynamic list joined from `_REGISTRY` at module-import time; the docstring is rewritten via `load_chat_model.__doc__.format(supported_providers=...)`. (**L1**)
+- `cantus.model.providers.ollama.OllamaChatModel` class docstring expanded from a single sentence to four-part disclosure: (1) `api_key` accepted-but-ignored, (2) Ollama daemon does not authenticate requests, (3) sentinel `"ollama"` is unconditionally substituted for the OpenAI SDK's `api_key` field, (4) `base_url=` is the way to target non-local Ollama instances (Docker / remote VM / etc.). The constructor behaviour is byte-identical to v0.4.3. (**H1**)
+- `cantus.cli._resolve_registry_import` and `cantus.cli._resolve_channels_import` add an `isidentifier()` precheck on the `attr` portion of `module.dotted.path:attr` specs; invalid Python identifiers (`123`, `foo-bar`, etc.) raise `RegistryImportError` immediately with the message `attr_name '...' is not a valid Python identifier (spec '...')`. The `AttributeError` branch also switches to `_format_attribute_error` to emit a candidate-listing message instead of the raw `module 'x' has no attribute 'y'` string. (**H2**)
+- `cantus.__version__` `"0.4.3"` → `"0.4.4"`; `pyproject.toml [project].version` kept in lockstep.
+
+### Notes
+
+- All five hardening items trace to the `gate-a-audit-hardening` change archive (`openspec/changes/archive/2026-05-27-gate-a-audit-hardening/`); see `proposal.md` / `tasks.md` for the full task-level mapping.
+- Spec sync (not a runtime release artifact): `openspec/specs/model-providers/spec.md`, `openspec/specs/cantus-local-llm-and-desktop-walkthrough/spec.md`, and `openspec/specs/cantus-serve-cli/spec.md` are updated to absorb the MODIFIED / ADDED Requirements from the archive. The cantus spec self-hosting model (v0.4.3) is preserved.
+- All 597 tests pass; no new `ruff check` or `mypy cantus` errors introduced (the 3 pre-existing ruff errors in `tests/serve/` and the 6 pre-existing mypy errors in `loader.py` / `huggingface.py` / `cli.py` remain unchanged).
+
 ## [0.4.3] - 2026-05-20 — cantus-spec-self-hosting
 
 **Distribution-lifecycle release.** Zero code-level change — every public symbol, endpoint, default value, extras group, and `[tool.uv] conflicts` entry shipped by v0.4.2 is byte-identical in v0.4.3. The whole release lives at the repository governance surface: the cantus repository now self-hosts its Spectra spec tree so OSS contributors and `pip install cantus-agent` users can discover the canonical framework capability specs in this repository instead of being redirected to `schola-cantorum/colab-llm-agent`.

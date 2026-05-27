@@ -147,3 +147,22 @@ def test_chat_passes_sentinel_and_default_base_url_to_sdk_client(install_fake_op
     model.chat([Message(role="user", content="hi")])
     assert captured["client"].init_kwargs["api_key"] == "ollama"
     assert captured["client"].init_kwargs["base_url"] == "http://localhost:11434/v1"
+
+
+# ---------- H1 (gate-a-audit-hardening): docstring discloses silent override
+
+
+def test_class_docstring_documents_silent_api_key_override():
+    """`OllamaChatModel.__doc__` SHALL disclose the silent `api_key` override.
+
+    Task 3.1 / Scenario: class docstring discloses api_key silent-override
+    behavior. The three required substrings come straight from the
+    `OllamaChatModel subclasses OpenAIChatModel` spec and let the reader
+    understand that explicit `api_key` values are accepted by the signature
+    but discarded by the Ollama daemon.
+    """
+    doc = OllamaChatModel.__doc__
+    assert doc is not None, "OllamaChatModel must have a class docstring"
+    assert "api_key parameter is accepted but ignored" in doc
+    assert "Ollama daemon does not authenticate requests" in doc
+    assert "pass base_url=" in doc
