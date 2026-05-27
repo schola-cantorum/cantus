@@ -49,8 +49,7 @@ def load_chat_model(spec: str, **kwargs: Any) -> ChatModel:
 
     Args:
         spec: ``"<provider>/<model_id>"``, e.g. ``"anthropic/claude-sonnet-4-6"``.
-            Supported providers in v0.2.1: ``openai``, ``anthropic``, ``google``,
-            ``groq``, ``nvidia``.
+            Supported providers: {supported_providers}.
         **kwargs: forwarded to the adapter constructor (``api_key``,
             ``base_url``, etc.).
 
@@ -66,7 +65,7 @@ def load_chat_model(spec: str, **kwargs: Any) -> ChatModel:
     if provider not in _REGISTRY:
         supported = ", ".join(sorted(_REGISTRY))
         raise ValueError(
-            f"unsupported provider {provider!r}; v0.2.1 ships only: {supported}"
+            f"unsupported provider {provider!r}; supported providers: {supported}"
         )
 
     module_path, class_name = _REGISTRY[provider]
@@ -82,6 +81,12 @@ def load_chat_model(spec: str, **kwargs: Any) -> ChatModel:
     adapter_cls = getattr(module, class_name)
     instance: ChatModel = adapter_cls(model_id=model_id, **kwargs)
     return instance
+
+
+assert load_chat_model.__doc__ is not None
+load_chat_model.__doc__ = load_chat_model.__doc__.format(
+    supported_providers=", ".join(sorted(_REGISTRY))
+)
 
 
 def _parse_spec(spec: str) -> tuple[str, str]:

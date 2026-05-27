@@ -39,7 +39,18 @@ OLLAMA_API_KEY_SENTINEL = "ollama"
 
 
 class OllamaChatModel(OpenAIChatModel):
-    """Tier 2 adapter for the local Ollama daemon (OpenAI-compatible)."""
+    """Tier 2 adapter for the local Ollama daemon (OpenAI-compatible).
+
+    The api_key parameter is accepted but ignored.
+    The Ollama daemon does not authenticate requests, so this adapter
+    unconditionally substitutes the sentinel string ``"ollama"`` for the
+    api_key field that the underlying openai SDK requires; an explicit
+    ``api_key=...`` value is preserved in the constructor signature for
+    API compatibility with sibling adapters but is not authoritative on
+    the Ollama daemon side.
+    To run against a non-local Ollama instance (Docker, a remote VM, etc.),
+    pass base_url= pointing at that host's ``/v1`` endpoint.
+    """
 
     def __init__(
         self,
