@@ -36,14 +36,20 @@ from cantus.serve.dashboard import (
     RESERVED_DASHBOARD_NAMES,
     register_dashboard_routes,
 )
+from cantus.serve.introspection import (
+    SessionTracker,
+    register_introspection_routes,
+)
 from cantus.serve.security import require_auth, validate_auth_config
 
 # v0.4.5 cantus-channel-gateway-webhook: extend the reserved top-level path
-# set with "channels". The two collision messages stay distinct so operators
+# set with "channels". The collision messages stay distinct so operators
 # see which subsystem reserved the name.
 RESERVED_CHANNEL_NAMES: frozenset[str] = frozenset({"channels"})
+# v0.4.8 cantus-runtime-introspection-api: reserve the introspection prefix.
+RESERVED_INTROSPECTION_NAMES: frozenset[str] = frozenset({"introspection"})
 RESERVED_TOP_LEVEL_NAMES: frozenset[str] = (
-    RESERVED_DASHBOARD_NAMES | RESERVED_CHANNEL_NAMES
+    RESERVED_DASHBOARD_NAMES | RESERVED_CHANNEL_NAMES | RESERVED_INTROSPECTION_NAMES
 )
 
 _TYPE_ERROR = "cantus.serve expects a Registry instance"
@@ -54,6 +60,10 @@ _RESERVED_DASHBOARD_VALUE_ERROR = (
 _RESERVED_CHANNEL_VALUE_ERROR = (
     "Skill name {name!r} collides with a reserved channel path "
     "(reserved channel path)"
+)
+_RESERVED_INTROSPECTION_VALUE_ERROR = (
+    "Skill name {name!r} collides with a reserved introspection path "
+    "(reserved introspection path)"
 )
 
 
@@ -128,6 +138,10 @@ def serve(
     # require_auth reads Settings from app.state.settings.
     app.state.settings = effective_settings
     app.state.channels = list(channels) if channels else []
+    # v0.4.8 cantus-runtime-introspection-api: read-only run tracker, sibling
+    # of app.state.channels. Populated by the skill-invoke wrapper; surfaced by
+    # GET /introspection/sessions.
+    app.state.session_tracker = SessionTracker()
 
     apply_auth = effective_settings.auth_mode != AuthMode.NONE
     skill_dependencies: list[DependsType] = (
@@ -138,6 +152,8 @@ def serve(
     for name in skill_names:
         if name in RESERVED_CHANNEL_NAMES:
             raise ValueError(_RESERVED_CHANNEL_VALUE_ERROR.format(name=name))
+        if name in RESERVED_INTROSPECTION_NAMES:
+            raise ValueError(_RESERVED_INTROSPECTION_VALUE_ERROR.format(name=name))
         if name in RESERVED_DASHBOARD_NAMES:
             raise ValueError(_RESERVED_DASHBOARD_VALUE_ERROR.format(name=name))
 
@@ -159,6 +175,23 @@ def serve(
             registry,
             effective_settings,
             dependencies=dashboard_dependencies,
+        )
+
+    # v0.4.8 cantus-runtime-introspection-api: read-only /introspection group,
+    # registered after the dashboard and before channels are mounted. Gating
+    # and auth mirror the dashboard but key off the introspection-specific
+    # Settings flags so the two surfaces toggle independently.
+    if effective_settings.introspection:
+        introspection_dependencies: list[DependsType] = (
+            [Depends(require_auth)]
+            if apply_auth and effective_settings.introspection_requires_auth
+            else []
+        )
+        register_introspection_routes(
+            app,
+            registry,
+            effective_settings,
+            dependencies=introspection_dependencies,
         )
 
     # v0.4.5: dispatch mount(app) to every channel that conforms to the
@@ -183,10 +216,21 @@ def _register_skill_endpoint(
     description: str = spec.get("description") or f"Invoke cantus Skill {name!r}"
 
     async def endpoint(request: Request) -> dict[str, Any]:
+        tracker: SessionTracker | None = getattr(
+            request.app.state, "session_tracker", None
+        )
+        run_id = tracker.start(f"skill:{name}") if tracker is not None else None
         body = await request.json()
         if not isinstance(body, dict):
             body = {}
-        result: Any = skill_instance.run(**body)
+        try:
+            result: Any = skill_instance.run(**body)
+        except Exception:
+            if tracker is not None and run_id is not None:
+                tracker.finish(run_id, status="error")
+            raise
+        if tracker is not None and run_id is not None:
+            tracker.finish(run_id, status="completed")
         return {"result": result}
 
     app.add_api_route(

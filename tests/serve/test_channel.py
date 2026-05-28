@@ -227,3 +227,41 @@ def test_realtime_channel_rejects_missing_lifecycle_methods() -> None:
 
     assert isinstance(_HasConnectOnly(), channel_mod.RealtimeChannel) is False
     assert isinstance(_HasDisconnectOnly(), channel_mod.RealtimeChannel) is False
+
+
+# --- C2.0 cantus-runtime-introspection-api: QueueIntrospectable -----------
+
+
+def test_queue_introspectable_detects_capability_presence() -> None:
+    """A class exposing queue_depth() conforms; one without it does not."""
+    channel_mod = _load_module()
+
+    class _HasDepth:
+        def queue_depth(self) -> int:
+            return 0
+
+    class _NoDepth:
+        def receive(self) -> dict[str, Any]:
+            return {}
+
+        def send(self, message: dict[str, Any]) -> None:
+            return None
+
+    assert isinstance(_HasDepth(), channel_mod.QueueIntrospectable) is True
+    assert isinstance(_NoDepth(), channel_mod.QueueIntrospectable) is False
+
+
+def test_local_mock_receiver_reports_queue_depth() -> None:
+    """LocalMockReceiver exposes a read-only queue_depth reflecting buffered
+    messages, without altering receive/send semantics."""
+    channel_mod = _load_module()
+
+    receiver = channel_mod.LocalMockReceiver()
+    assert isinstance(receiver, channel_mod.QueueIntrospectable) is True
+    assert receiver.queue_depth() == 0
+    receiver.send({"a": 1})
+    receiver.send({"b": 2})
+    assert receiver.queue_depth() == 2
+    # receive() still pops in FIFO order — behaviour unchanged.
+    assert receiver.receive() == {"a": 1}
+    assert receiver.queue_depth() == 1

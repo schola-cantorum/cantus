@@ -59,3 +59,37 @@ def test_existing_v040_symbols_still_exported() -> None:
     assert LocalMockReceiver is not None
     assert callable(require_auth)
     assert callable(serve)
+
+
+def test_introspection_symbols_exported() -> None:
+    """C2.0 — register_introspection_routes, SessionTracker, the read-models,
+    and the QueueIntrospectable capability are importable from cantus.serve."""
+    from cantus.serve import (  # noqa: F401
+        IntrospectionSnapshot,
+        PermissionsSnapshot,
+        QueueIntrospectable,
+        SessionTracker,
+        SkillEntry,
+        register_introspection_routes,
+    )
+
+    assert callable(register_introspection_routes)
+    assert SessionTracker is not None
+
+
+def test_introspection_symbols_in_all() -> None:
+    import cantus.serve as serve_pkg
+
+    for name in (
+        "register_introspection_routes",
+        "SessionTracker",
+        "IntrospectionSnapshot",
+        "SkillEntry",
+        "SessionEntry",
+        "PermissionsSnapshot",
+        "QueueEntry",
+        "WorkflowTrace",
+        "DataflowGraph",
+        "QueueIntrospectable",
+    ):
+        assert name in serve_pkg.__all__
