@@ -313,3 +313,147 @@ async def test_ack_after_enqueue_not_before() -> None:
     finally:
         await ch.disconnect()
         await asyncio.wait_for(task, timeout=1.0)
+
+
+# --- Gate B M4 — success-since-last-failure flag + counter reset ----------
+
+
+@pytest.mark.anyio("asyncio")
+async def test_success_since_last_failure_set_after_ack() -> None:
+    """Gate B M4: connect() opens a Pub/Sub streaming pull — the success-flag
+    is False at construction, True after _on_message acks a delivered message."""
+    ch, fake = _build_channel()
+    assert ch._success_since_last_failure is False
+    task = asyncio.create_task(ch.connect())
+    try:
+        await _wait_until(lambda: fake._callback is not None)
+        fake.push_message(b'{"k":"v"}')
+        assert ch._success_since_last_failure is True
+    finally:
+        await ch.disconnect()
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_malformed_message_does_not_set_success_flag() -> None:
+    """Gate B M4: a nacked (malformed) message must NOT set the success flag."""
+    ch, fake = _build_channel()
+    task = asyncio.create_task(ch.connect())
+    try:
+        await _wait_until(lambda: fake._callback is not None)
+        fake.push_message(b"not-json")
+        assert ch._success_since_last_failure is False
+    finally:
+        await ch.disconnect()
+        await asyncio.wait_for(task, timeout=1.0)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_successful_delivery_resets_failure_counter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gate B M4 + spec scenario 117-122: 5 failures + 1 ack + 1 more failure
+    → 6th sleep is 1s, not 32s. Validates Decision: instance flag wiring."""
+    sleep_log: list[float] = []
+
+    async def _capture_sleep(seconds: float) -> None:
+        sleep_log.append(seconds)
+
+    import cantus.serve.channels.googlechat as gc_mod
+
+    monkeypatch.setattr(gc_mod.asyncio, "sleep", _capture_sleep, raising=True)  # type: ignore[attr-defined]
+
+    settings = Settings(
+        channel_google_chat_credentials_path=CREDENTIALS_PATH,
+        channel_google_chat_subscription=SUBSCRIPTION,
+        channel_google_chat_space=SPACE,
+    )
+    ch = GoogleChatPubSubChannel(settings=settings)
+
+    build_count = 0
+
+    def _build_interleaved() -> _FakeSubscriber:
+        nonlocal build_count
+        build_count += 1
+        fake = _FakeSubscriber()
+        original_subscribe = fake.subscribe
+
+        def _subscribe(sub: str, callback: Any) -> Any:
+            fut = original_subscribe(sub, callback=callback)
+            if build_count == 6:
+                # 6th attempt: deliver one message successfully, then fail.
+                # The successful ack flips _success_since_last_failure True;
+                # the subsequent failure must observe the flag and reset
+                # attempts to 0 before incrementing.
+                fake.push_message(b'{"event": "MESSAGE"}')
+            fake.fail_future(RuntimeError(f"failure-{build_count}"))
+            return fut
+
+        fake.subscribe = _subscribe  # type: ignore[method-assign,assignment]
+        return fake
+
+    ch._build_subscriber = _build_interleaved  # type: ignore[method-assign]
+
+    await asyncio.wait_for(ch.connect(), timeout=3.0)
+
+    # First five failures: standard geometric backoff.
+    assert sleep_log[:5] == [1, 2, 4, 8, 16], f"pre-reset sleeps: {sleep_log[:5]}"
+    # 6th sleep is the post-success failure — must reset to 1s, NOT 32s.
+    assert sleep_log[5] == 1, (
+        f"expected sleep[5] == 1 after success-driven reset, got {sleep_log[5]}; "
+        f"full log: {sleep_log}"
+    )
+    # And the 7th sleep follows the freshly-restarted backoff: 2s.
+    assert sleep_log[6] == 2, f"post-reset 7th sleep should be 2s, got {sleep_log[6]}"
+    # Flag was consumed back to False during the except branch.
+    assert ch._success_since_last_failure is False
+
+
+# --- Gate B L1 — _build_subscriber passes explicit pubsub scope -----------
+
+
+def test_build_subscriber_passes_explicit_pubsub_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Gate B L1: _build_subscriber explicitly passes
+    scopes=["https://www.googleapis.com/auth/pubsub"] to from_service_account_file."""
+    settings = Settings(
+        channel_google_chat_credentials_path=CREDENTIALS_PATH,
+        channel_google_chat_subscription=SUBSCRIPTION,
+        channel_google_chat_space=SPACE,
+    )
+    ch = GoogleChatPubSubChannel(settings=settings)
+
+    captured: dict[str, Any] = {}
+
+    class _FakeCreds:
+        def __init__(self, scopes: list[str]) -> None:
+            self.scopes = scopes
+
+    def _fake_from_file(path: str, **kwargs: Any) -> _FakeCreds:
+        captured["path"] = path
+        captured["kwargs"] = kwargs
+        return _FakeCreds(scopes=kwargs.get("scopes", []))
+
+    class _FakeSC:
+        def __init__(self, *, credentials: Any) -> None:
+            self.credentials = credentials
+
+    import google.cloud.pubsub_v1 as pubsub_mod
+    import google.oauth2.service_account as sa_mod
+
+    monkeypatch.setattr(
+        sa_mod.Credentials,
+        "from_service_account_file",
+        staticmethod(_fake_from_file),
+    )
+    monkeypatch.setattr(pubsub_mod, "SubscriberClient", _FakeSC)
+
+    sc = ch._build_subscriber()
+
+    assert captured["path"] == CREDENTIALS_PATH
+    assert captured["kwargs"].get("scopes") == [
+        "https://www.googleapis.com/auth/pubsub"
+    ]
+    assert isinstance(sc, _FakeSC)
+    assert sc.credentials.scopes == ["https://www.googleapis.com/auth/pubsub"]

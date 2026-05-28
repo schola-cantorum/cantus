@@ -14,6 +14,7 @@ contain the bot token; only the response body excerpt (4xx/5xx) is carried.
 from __future__ import annotations
 
 import logging
+import re
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,16 @@ if TYPE_CHECKING:
 
 _AUTH_REQUIRED_DETAIL = "Authentication required"
 _BODY_EXCERPT_LIMIT = 200
+
+# Telegram bot_token = `<bot_id>:<token>` per the Bot API docs; the suffix is
+# at least 35 chars in practice but 20 is the smallest plausible random
+# component we accept. Total length capped at 255 to keep error paths bounded.
+_BOT_TOKEN_RE = re.compile(r"^\d+:[A-Za-z0-9_-]{20,}$")
+_BOT_TOKEN_MAX_LEN = 255
+# Telegram secret_token (X-Telegram-Bot-Api-Secret-Token) allows 1..256 chars
+# from A-Z, a-z, 0-9, underscore, hyphen.
+_SECRET_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_SECRET_TOKEN_MAX_LEN = 256
 
 logger = logging.getLogger("cantus.serve.channels")
 
@@ -55,6 +66,20 @@ class TelegramWebhookChannel:
             "channel_telegram_bot_token",
             "telegram",
         )
+        # Format validation runs AFTER resolve_secret's blank/missing check so
+        # an unset env still surfaces "channel secret not configured", not
+        # "invalid format". Error messages never echo the rejected value to
+        # avoid leaking partial secrets via logs / TestClient capture.
+        if (
+            len(self._bot_token) > _BOT_TOKEN_MAX_LEN
+            or _BOT_TOKEN_RE.fullmatch(self._bot_token) is None
+        ):
+            raise ValueError("telegram bot_token has invalid format")
+        if (
+            len(self._secret_token) > _SECRET_TOKEN_MAX_LEN
+            or _SECRET_TOKEN_RE.fullmatch(self._secret_token) is None
+        ):
+            raise ValueError("telegram secret_token has invalid format")
         self._queue: deque[dict[str, Any]] = deque(maxlen=queue_maxlen)
         self._queue_maxlen = queue_maxlen
         self._app: FastAPI | None = None
