@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 
 SECRET_TOKEN = "tg-secret"
-BOT_TOKEN = "123:tg-bot-XYZ"
+BOT_TOKEN = "123:abcdefghijklmnopqrstuvwxyz"
 
 
 def _make_app_with_channel(
@@ -31,6 +31,91 @@ def _make_app_with_channel(
     app = FastAPI()
     ch.mount(app)
     return app, ch
+
+
+# --- 5.0 constructor format validation (Gate B M1) ---------------------
+
+VALID_BOT_TOKEN = "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_-"
+VALID_SECRET_TOKEN = "Sample_Secret-Token"
+
+
+def test_constructor_accepts_valid_bot_token_and_secret_token() -> None:
+    from cantus.serve.channels.telegram import TelegramWebhookChannel
+
+    ch = TelegramWebhookChannel(
+        secret_token=VALID_SECRET_TOKEN,
+        bot_token=VALID_BOT_TOKEN,
+    )
+    assert ch._secret_token == VALID_SECRET_TOKEN
+    assert ch._bot_token == VALID_BOT_TOKEN
+
+
+@pytest.mark.parametrize(
+    "bad_bot_token",
+    [
+        "not-a-valid-token",
+        "abc:abcdefghijklmnopqrst",
+        "123:short",
+        "123456789:" + "A" * 250,
+    ],
+    ids=[
+        "no_digit_prefix_no_colon",
+        "non_digit_prefix",
+        "suffix_shorter_than_twenty",
+        "length_over_255",
+    ],
+)
+def test_constructor_rejects_bot_token_format_violation(bad_bot_token: str) -> None:
+    from cantus.serve.channels.telegram import TelegramWebhookChannel
+
+    with pytest.raises(ValueError) as exc_info:
+        TelegramWebhookChannel(
+            secret_token=VALID_SECRET_TOKEN,
+            bot_token=bad_bot_token,
+        )
+    msg = str(exc_info.value)
+    assert "telegram bot_token has invalid format" in msg
+    assert bad_bot_token not in msg
+
+
+@pytest.mark.parametrize(
+    "bad_secret_token",
+    [
+        "has spaces",
+        "with!special",
+        "with#hash",
+        "A" * 257,
+    ],
+    ids=["whitespace", "exclamation", "hash", "length_over_256"],
+)
+def test_constructor_rejects_secret_token_format_violation(
+    bad_secret_token: str,
+) -> None:
+    from cantus.serve.channels.telegram import TelegramWebhookChannel
+
+    with pytest.raises(ValueError) as exc_info:
+        TelegramWebhookChannel(
+            secret_token=bad_secret_token,
+            bot_token=VALID_BOT_TOKEN,
+        )
+    msg = str(exc_info.value)
+    assert "telegram secret_token has invalid format" in msg
+    assert bad_secret_token not in msg
+
+
+def test_constructor_blank_check_runs_before_format_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Blank/missing must still produce the original message, not 'invalid format'."""
+    from cantus.serve.channels.telegram import TelegramWebhookChannel
+
+    monkeypatch.delenv("CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN", raising=False)
+    monkeypatch.delenv("CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", raising=False)
+    with pytest.raises(ValueError) as exc_info:
+        TelegramWebhookChannel()
+    msg = str(exc_info.value)
+    assert "channel secret not configured" in msg
+    assert "invalid format" not in msg
 
 
 # --- 5.1 constructor fail-fast ------------------------------------------
@@ -63,10 +148,12 @@ def test_constructor_succeeds_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     from cantus.serve.channels.telegram import TelegramWebhookChannel
 
     monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN", "env-secret-tg")
-    monkeypatch.setenv("CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", "999:env-tg-bot")
+    monkeypatch.setenv(
+        "CANTUS_SERVE_CHANNEL_TELEGRAM_BOT_TOKEN", "999:env-tg-bot-XXXXXXXXXXXXX"
+    )
     ch = TelegramWebhookChannel(settings=Settings())
     assert ch._secret_token == "env-secret-tg"
-    assert ch._bot_token == "999:env-tg-bot"
+    assert ch._bot_token == "999:env-tg-bot-XXXXXXXXXXXXX"
 
 
 # --- 5.2 mount registers route -----------------------------------------

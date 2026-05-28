@@ -33,7 +33,9 @@ def _line_app() -> tuple[FastAPI, str]:
 
 def _telegram_app() -> tuple[FastAPI, str]:
     token = "indist-tg-token"
-    ch = TelegramWebhookChannel(secret_token=token, bot_token="9:bot")
+    ch = TelegramWebhookChannel(
+        secret_token=token, bot_token="9:abcdefghijklmnopqrstuv"
+    )
     app = FastAPI()
     ch.mount(app)
     return app, token

@@ -212,7 +212,7 @@ async def test_heartbeat_ack_miss() -> None:
         nonlocal connections
         connections += 1
         # Very short interval so the miss happens fast.
-        await _send_hello(ws, heartbeat_interval=80)
+        await _send_hello(ws, heartbeat_interval=200)
         if connections == 1:
             try:
                 async for raw in ws:
@@ -368,3 +368,240 @@ async def test_ten_failures_stop_without_raise() -> None:
 
     assert identify_attempts == 10, f"expected 10 attempts, saw {identify_attempts}"
     assert isinstance(client.last_error, _IdentifyRejectedError)
+
+
+# --- Gate B M2: HELLO heartbeat_interval bounds check -----------------------
+
+
+@pytest.mark.parametrize(
+    "bad_interval",
+    [0, 99, 120001, 200000],
+    ids=["zero", "below_lower_bound", "above_upper_bound", "far_above_upper_bound"],
+)
+@pytest.mark.anyio("asyncio")
+async def test_hello_heartbeat_interval_out_of_bounds_triggers_resumable(
+    bad_interval: int,
+) -> None:
+    """HELLO with heartbeat_interval outside [100, 120000] → no HEARTBEAT, reconnect."""
+    from cantus.serve.channels import _realtime as realtime_mod
+    from cantus.serve.channels._realtime import GatewayClient, _ResumableError
+
+    heartbeat_seen: list[int] = []
+    backoff_count = 0
+
+    async def handler(ws: ServerConnection) -> None:
+        await _send_hello(ws, heartbeat_interval=bad_interval)
+        try:
+            async for raw in ws:
+                frame = json.loads(raw)
+                if frame.get("op") == 1:
+                    heartbeat_seen.append(frame.get("op"))
+        except websockets.exceptions.ConnectionClosed:
+            return
+
+    original_backoff = realtime_mod.GatewayClient._backoff_sleep
+
+    async def short_backoff(self: Any, delay: float) -> None:
+        nonlocal backoff_count
+        backoff_count += 1
+        await asyncio.sleep(0)
+
+    realtime_mod.GatewayClient._backoff_sleep = short_backoff  # type: ignore[assignment]
+    client: Any = None
+    backoff_observed_before_stop = False
+    try:
+        async with fake_gateway(handler) as uri:
+            client = GatewayClient(gateway_url=uri)
+            task = asyncio.create_task(
+                client.start(bot_token="t", intents=0, on_event=lambda e: None)
+            )
+            try:
+                # Validation must trigger backoff well before any heartbeat
+                # could fire, even for bad_interval=200000 (200s).
+                for _ in range(60):
+                    if backoff_count >= 1:
+                        backoff_observed_before_stop = True
+                        break
+                    await asyncio.sleep(0.05)
+            finally:
+                await client.stop()
+                try:
+                    await asyncio.wait_for(task, timeout=3.0)
+                except asyncio.TimeoutError:
+                    task.cancel()
+    finally:
+        realtime_mod.GatewayClient._backoff_sleep = original_backoff  # type: ignore[assignment]
+
+    assert backoff_observed_before_stop, (
+        f"validation did not trigger backoff for bad interval {bad_interval} "
+        "within the polling window"
+    )
+    assert not heartbeat_seen, (
+        f"unexpected HEARTBEAT sent for bad interval {bad_interval}"
+    )
+    assert isinstance(client.last_error, _ResumableError)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_hello_heartbeat_interval_at_lower_bound_is_accepted() -> None:
+    """heartbeat_interval=100 is accepted (boundary case)."""
+    from cantus.serve.channels._realtime import GatewayClient
+
+    identify_seen = asyncio.Event()
+
+    async def handler(ws: ServerConnection) -> None:
+        await _send_hello(ws, heartbeat_interval=100)
+        try:
+            async for raw in ws:
+                frame = json.loads(raw)
+                if frame.get("op") == 2:
+                    identify_seen.set()
+                    await ws.close(code=1000)
+                    return
+        except websockets.exceptions.ConnectionClosed:
+            return
+
+    async with fake_gateway(handler) as uri:
+        client = GatewayClient(gateway_url=uri)
+        task = asyncio.create_task(
+            client.start(bot_token="t", intents=0, on_event=lambda e: None)
+        )
+        try:
+            await asyncio.wait_for(identify_seen.wait(), timeout=3.0)
+        finally:
+            await client.stop()
+            try:
+                await asyncio.wait_for(task, timeout=3.0)
+            except asyncio.TimeoutError:
+                task.cancel()
+
+
+# --- Gate B M3: seq only advances on DISPATCH frames via helper -------------
+
+
+@pytest.mark.anyio("asyncio")
+async def test_accept_dispatch_frame_advances_seq_when_s_is_int() -> None:
+    """DISPATCH frame with integer s advances self._seq via the helper."""
+    from cantus.serve.channels._realtime import GatewayClient
+
+    client = GatewayClient()
+    client._seq = 42
+    events: list[dict[str, Any]] = []
+    frame = {"op": 0, "s": 43, "t": "MESSAGE_CREATE", "d": {"x": 1}}
+
+    client._accept_dispatch_frame(frame, events.append)
+
+    assert client._seq == 43
+    assert events == [frame]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_accept_dispatch_frame_does_not_advance_seq_when_s_is_missing() -> None:
+    """DISPATCH frame missing s leaves self._seq untouched."""
+    from cantus.serve.channels._realtime import GatewayClient
+
+    client = GatewayClient()
+    client._seq = 42
+    client._accept_dispatch_frame(
+        {"op": 0, "t": "MESSAGE_CREATE", "d": {}}, lambda f: None
+    )
+    assert client._seq == 42
+
+
+@pytest.mark.anyio("asyncio")
+async def test_accept_dispatch_frame_captures_ready_session_id() -> None:
+    """DISPATCH READY frame stores session_id for future RESUME."""
+    from cantus.serve.channels._realtime import GatewayClient
+
+    client = GatewayClient()
+    client._accept_dispatch_frame(
+        {
+            "op": 0,
+            "s": 1,
+            "t": "READY",
+            "d": {"session_id": "sess_capture_test"},
+        },
+        lambda f: None,
+    )
+    assert client._session_id == "sess_capture_test"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_seq_only_advances_on_dispatch_in_frame_loop() -> None:
+    """Non-DISPATCH frame carrying integer s does NOT advance self._seq."""
+    from cantus.serve.channels._realtime import GatewayClient
+
+    seq_observed_via_heartbeat: list[Any] = []
+    accept_dispatch_calls: list[dict[str, Any]] = []
+
+    async def handler(ws: ServerConnection) -> None:
+        await _send_hello(ws, heartbeat_interval=200)
+        try:
+            async for raw in ws:
+                frame = json.loads(raw)
+                if frame.get("op") == 2:
+                    # Send a non-DISPATCH frame with integer s — must NOT
+                    # advance seq.
+                    await ws.send(
+                        json.dumps({"op": 11, "s": 999, "d": None})
+                    )
+                    # Send a real DISPATCH frame that should advance seq.
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "op": 0,
+                                "s": 43,
+                                "t": "MESSAGE_CREATE",
+                                "d": {"channel_id": "c1"},
+                            }
+                        )
+                    )
+                    # Request a heartbeat so client sends one back with current
+                    # seq — that lets us observe the seq value over the wire.
+                    await ws.send(json.dumps({"op": 1, "d": None}))
+                if frame.get("op") == 1:
+                    seq_observed_via_heartbeat.append(frame.get("d"))
+                    await ws.close(code=1000)
+                    return
+        except websockets.exceptions.ConnectionClosed:
+            return
+
+    async with fake_gateway(handler) as uri:
+        from cantus.serve.channels._realtime import GatewayClient as _GC
+
+        original_accept = _GC._accept_dispatch_frame
+
+        def spy(
+            self: Any, frame: dict[str, Any], on_event: Any
+        ) -> None:
+            accept_dispatch_calls.append(frame)
+            return original_accept(self, frame, on_event)
+
+        _GC._accept_dispatch_frame = spy  # type: ignore[assignment]
+        try:
+            client = GatewayClient(gateway_url=uri)
+            task = asyncio.create_task(
+                client.start(bot_token="t", intents=0, on_event=lambda e: None)
+            )
+            try:
+                for _ in range(60):
+                    if seq_observed_via_heartbeat:
+                        break
+                    await asyncio.sleep(0.05)
+            finally:
+                await client.stop()
+                try:
+                    await asyncio.wait_for(task, timeout=3.0)
+                except asyncio.TimeoutError:
+                    task.cancel()
+        finally:
+            _GC._accept_dispatch_frame = original_accept  # type: ignore[assignment]
+
+    # Helper invoked exactly once — for the DISPATCH frame only.
+    assert len(accept_dispatch_calls) == 1
+    assert accept_dispatch_calls[0]["op"] == 0
+    assert accept_dispatch_calls[0]["s"] == 43
+    # seq advanced to DISPATCH's s, NOT to the HEARTBEAT_ACK's s=999.
+    assert client._seq == 43
+    # heartbeat payload carried the advanced seq.
+    assert seq_observed_via_heartbeat[0] == 43

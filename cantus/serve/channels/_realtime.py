@@ -54,6 +54,12 @@ class Opcode(IntEnum):
 _DEFAULT_GATEWAY_URL: Final[str] = "wss://gateway.discord.gg/?v=10&encoding=json"
 _MAX_BACKOFF_SECONDS: Final[float] = 60.0
 _DEFAULT_MAX_IDENTIFY_FAILURES: Final[int] = 10
+# Discord publishes ~41250ms in practice. The 100..120000 ms window guards
+# against (a) malicious / corrupted HELLO frames driving CPU thrashing at
+# heartbeat=0 and (b) silently-broken connections sitting on multi-minute
+# intervals that defeat the ACK-miss safety net.
+_HEARTBEAT_INTERVAL_MIN_MS: Final[int] = 100
+_HEARTBEAT_INTERVAL_MAX_MS: Final[int] = 120000
 
 
 class _IdentifyRejectedError(Exception):
@@ -219,7 +225,18 @@ class GatewayClient:
                     raise _ResumableError(
                         f"expected op 10 HELLO, got op {hello.get('op')}"
                     )
-                self._heartbeat_interval_ms = float(hello["d"]["heartbeat_interval"])
+                interval_ms = float(hello["d"]["heartbeat_interval"])
+                if not (
+                    _HEARTBEAT_INTERVAL_MIN_MS
+                    <= interval_ms
+                    <= _HEARTBEAT_INTERVAL_MAX_MS
+                ):
+                    raise _ResumableError(
+                        f"HELLO heartbeat_interval out of bounds "
+                        f"[{_HEARTBEAT_INTERVAL_MIN_MS}, "
+                        f"{_HEARTBEAT_INTERVAL_MAX_MS}] ms"
+                    )
+                self._heartbeat_interval_ms = interval_ms
                 self._heartbeat_acked = True
                 heartbeat_task = asyncio.create_task(self._heartbeat_loop(ws))
 
@@ -259,22 +276,7 @@ class GatewayClient:
                     frame = _decode_frame(raw)
                     op = frame.get("op")
                     if op == Opcode.DISPATCH:
-                        # Update sequence cursor for future RESUME.
-                        s = frame.get("s")
-                        if isinstance(s, int):
-                            self._seq = s
-                        # Capture session_id from READY for future RESUMEs.
-                        if frame.get("t") == "READY":
-                            data = frame.get("d", {})
-                            sid = data.get("session_id")
-                            if isinstance(sid, str):
-                                self._session_id = sid
-                        try:
-                            on_event(frame)
-                        except Exception:  # noqa: BLE001 — caller bug; never crash loop
-                            logger.exception(
-                                "Discord Gateway on_event callback raised"
-                            )
+                        self._accept_dispatch_frame(frame, on_event)
                     elif op == Opcode.HEARTBEAT_ACK:
                         self._heartbeat_acked = True
                     elif op == Opcode.HEARTBEAT:
@@ -317,6 +319,32 @@ class GatewayClient:
                     except (asyncio.CancelledError, Exception):  # noqa: BLE001
                         pass
                 self._ws = None
+
+    def _accept_dispatch_frame(
+        self,
+        frame: dict[str, Any],
+        on_event: Callable[[dict[str, Any]], None],
+    ) -> None:
+        """Process a Discord op 0 (DISPATCH) frame.
+
+        Reifies the invariant that ``self._seq`` advances only from DISPATCH
+        frames — the only call site that mutates ``self._seq``. Non-DISPATCH
+        frames carrying an integer ``s`` field SHALL NOT reach this helper.
+        """
+
+        s = frame.get("s")
+        if isinstance(s, int):
+            self._seq = s
+        # READY carries the session_id we need for future RESUME attempts.
+        if frame.get("t") == "READY":
+            data = frame.get("d", {})
+            sid = data.get("session_id") if isinstance(data, dict) else None
+            if isinstance(sid, str):
+                self._session_id = sid
+        try:
+            on_event(frame)
+        except Exception:  # noqa: BLE001 — caller bug; never crash loop
+            logger.exception("Discord Gateway on_event callback raised")
 
     async def _heartbeat_loop(self, ws: ClientConnection) -> None:
         """Send op 1 every heartbeat_interval ms; close with 1011 on ACK miss."""

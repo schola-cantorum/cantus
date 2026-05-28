@@ -144,6 +144,14 @@ class GoogleChatPubSubChannel:
         self._pull_future: StreamingPullFuture | None = None
         self._app: Any = None  # FastAPI is bound lazily on first send()
         self._disconnected = False
+        # Gate B M4: tracks whether at least one successful message ack has
+        # occurred since the most recent streaming-pull failure. The flag is
+        # set in the Pub/Sub callback thread (after message.ack()) and read +
+        # cleared in connect()'s except branch on the event loop. A single
+        # bool write under the GIL needs no synchronisation primitive — in
+        # the worst case a set-after-read race delays the reset by one
+        # failure cycle, never reverses it.
+        self._success_since_last_failure: bool = False
         self.last_error: BaseException | None = None
 
     # ----- Channel surface ------------------------------------------------
@@ -236,6 +244,13 @@ class GoogleChatPubSubChannel:
                     return
             except BaseException as exc:
                 self.last_error = exc
+                # Gate B M4 — reset the consecutive-failure counter if any
+                # successful delivery acked since the last failure. Consumes
+                # the flag so a subsequent failure without an intervening
+                # success resumes the geometric backoff from 1s.
+                if self._success_since_last_failure:
+                    attempts = 0
+                    self._success_since_last_failure = False
                 attempts += 1
                 if attempts >= _MAX_CONSECUTIVE_FAILURES:
                     return
@@ -296,7 +311,14 @@ class GoogleChatPubSubChannel:
 
         # google-auth lacks py.typed; strict mypy flags the call as
         # untyped despite the ignore_missing_imports override.
-        creds = _Creds.from_service_account_file(self._credentials_path)  # type: ignore[no-untyped-call]
+        # Gate B L1 — pass scopes explicitly so a misconfigured SA file
+        # fails fast at connect() time. Mirrors send()'s with_scopes() on
+        # the chat.bot scope; google-cloud-pubsub would otherwise add the
+        # pubsub scope implicitly without surfacing missing IAM grants.
+        creds = _Creds.from_service_account_file(  # type: ignore[no-untyped-call]
+            self._credentials_path,
+            scopes=["https://www.googleapis.com/auth/pubsub"],
+        )
         return _SC(credentials=creds)
 
     def _on_message(self, message: Message) -> None:
@@ -322,6 +344,9 @@ class GoogleChatPubSubChannel:
             message.nack()
             return
         message.ack()
+        # Gate B M4 — record a successful delivery so the next streaming-pull
+        # failure resets the consecutive-failure counter.
+        self._success_since_last_failure = True
 
 
 __all__ = ["GoogleChatPubSubChannel"]

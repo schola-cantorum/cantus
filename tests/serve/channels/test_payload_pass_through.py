@@ -83,7 +83,10 @@ def test_line_payload_pass_through_deep_equal() -> None:
 
 
 def test_telegram_payload_pass_through_deep_equal() -> None:
-    ch = TelegramWebhookChannel(secret_token="passthrough-tg", bot_token="9:bot")
+    ch = TelegramWebhookChannel(
+        secret_token="passthrough-tg",
+        bot_token="9:abcdefghijklmnopqrstuv",
+    )
     app = FastAPI()
     ch.mount(app)
 
