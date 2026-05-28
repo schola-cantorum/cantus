@@ -482,3 +482,30 @@ def test_google_chat_fields_unmasked_in_dump(
     assert "/etc/cantus/sa.json" in rep
     assert "projects/p/subscriptions/s" in rep
     assert "spaces/AAA" in rep
+
+
+# --- C2.0 cantus-runtime-introspection-api: introspection flags ----------
+
+
+def test_introspection_flags_default_true() -> None:
+    """Both flags mirror dashboard / dashboard_requires_auth and default True."""
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.introspection is True
+    assert s.introspection_requires_auth is True
+
+
+def test_introspection_env_coerces_to_bool(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CANTUS_SERVE_INTROSPECTION", "false")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.introspection is False
+
+
+def test_introspection_requires_auth_env_coerces_to_bool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CANTUS_SERVE_INTROSPECTION_REQUIRES_AUTH", "false")
+    Settings = _load_settings_class()
+    s = Settings()
+    assert s.introspection_requires_auth is False

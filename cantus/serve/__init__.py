@@ -23,6 +23,7 @@ from cantus.serve.app import serve
 from cantus.serve.channel import (
     Channel,
     LocalMockReceiver,
+    QueueIntrospectable,
     RealtimeChannel,
     WebhookChannel,
 )
@@ -34,20 +35,47 @@ from cantus.serve.channels.discord import (
 from cantus.serve.channels.googlechat import GoogleChatPubSubChannel
 from cantus.serve.channels.line import LineWebhookChannel
 from cantus.serve.channels.telegram import TelegramWebhookChannel
+from cantus.serve.introspection import (
+    DataflowEdge,
+    DataflowGraph,
+    DataflowNode,
+    IntrospectionSnapshot,
+    PermissionsSnapshot,
+    QueueEntry,
+    SessionEntry,
+    SessionTracker,
+    SkillEntry,
+    WorkflowStep,
+    WorkflowTrace,
+    register_introspection_routes,
+)
 from cantus.serve.security import require_auth
 
 __all__ = [
     "AuthMode",
     "Channel",
     "ChannelSendError",
+    "DataflowEdge",
+    "DataflowGraph",
+    "DataflowNode",
     "DiscordRealtimeChannel",
     "DiscordSignatureError",
     "GoogleChatPubSubChannel",
+    "IntrospectionSnapshot",
     "LineWebhookChannel",
     "LocalMockReceiver",
+    "PermissionsSnapshot",
+    "QueueEntry",
+    "QueueIntrospectable",
     "RealtimeChannel",
+    "SessionEntry",
+    "SessionTracker",
+    "SkillEntry",
     "TelegramWebhookChannel",
     "WebhookChannel",
+    "WorkflowStep",
+    "WorkflowTrace",
+    "register_introspection_routes",
     "require_auth",
     "serve",
 ]

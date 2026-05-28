@@ -18,6 +18,22 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
+class QueueIntrospectable(Protocol):
+    """Optional read-only capability: report the current inbound queue depth.
+
+    v0.4.8 cantus-runtime-introspection-api. A channel MAY expose
+    ``queue_depth()`` so the introspection collector can report how many
+    messages are buffered without reaching into private state. The method is
+    purely observational — it MUST NOT mutate the queue. Channels that do not
+    implement it are still listed in the queues projection with ``depth=None``.
+    """
+
+    def queue_depth(self) -> int:
+        """Return the number of messages currently buffered."""
+        ...
+
+
+@runtime_checkable
 class Channel(Protocol):
     """Bidirectional channel contract — `receive()` + `send()`.
 
@@ -62,6 +78,10 @@ class LocalMockReceiver:
         if not self._queue:
             raise IndexError("LocalMockReceiver queue is empty")
         return self._queue.popleft()
+
+    def queue_depth(self) -> int:
+        """Number of buffered messages (read-only; conforms to QueueIntrospectable)."""
+        return len(self._queue)
 
 
 @runtime_checkable
@@ -112,4 +132,10 @@ class RealtimeChannel(Channel, Protocol):
         ...
 
 
-__all__ = ["Channel", "LocalMockReceiver", "RealtimeChannel", "WebhookChannel"]
+__all__ = [
+    "Channel",
+    "LocalMockReceiver",
+    "QueueIntrospectable",
+    "RealtimeChannel",
+    "WebhookChannel",
+]

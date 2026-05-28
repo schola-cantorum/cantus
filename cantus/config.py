@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8765
     dashboard: bool = True
+    # v0.4.8 cantus-runtime-introspection-api: read-only /introspection endpoint
+    # group, gated and auth-gated independently of the dashboard.
+    introspection: bool = True
+    introspection_requires_auth: bool = True
     docs_url: str | None = "/docs"
     openapi_url: str | None = "/openapi.json"
     redoc_url: str | None = "/redoc"
