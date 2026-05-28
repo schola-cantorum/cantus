@@ -217,6 +217,74 @@ def test_skill_invoke_records_one_session_entry() -> None:
     }
 
 
+# --- skill-invoke EventStream wiring (cantus-serve-tui-mvp task 2.x) ------
+
+
+def _registry_with_boom() -> Any:
+    from cantus.core.registry import Registry
+    from cantus.protocols.skill import register_skill
+
+    def boom(value: str) -> str:
+        """Always raises."""
+        raise ValueError("kaboom")
+
+    registry = Registry()
+    registry.register("skill", register_skill(boom))
+    return registry
+
+
+def test_skill_invoke_records_two_step_event_stream() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    app = serve(_registry_with_echo())
+    client = TestClient(app)
+    resp = client.post("/skills/echo", json={"value": "hi"})
+    assert resp.status_code == 200
+
+    sessions = client.get("/introspection/sessions").json()
+    assert len(sessions) == 1
+    run = sessions[0]
+    assert run["source"] == "skill:echo"
+    assert run["status"] == "completed"
+    # The skill invocation records a CallSkillAction + SkillObservation.
+    assert run["event_count"] == 2
+
+    trace = client.get(f"/introspection/workflows/{run['id']}")
+    assert trace.status_code == 200
+    steps = trace.json()["steps"]
+    assert [s["index"] for s in steps] == [0, 1]
+    assert steps[0]["kind"] == "action"
+    assert steps[0]["type"] == "CallSkillAction"
+    assert steps[1]["kind"] == "observation"
+    assert steps[1]["type"] == "SkillObservation"
+
+
+def test_skill_invoke_error_records_tool_error_observation() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    app = serve(_registry_with_boom())
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/skills/boom", json={"value": "x"})
+    assert resp.status_code == 500
+
+    sessions = client.get("/introspection/sessions").json()
+    assert len(sessions) == 1
+    run = sessions[0]
+    assert run["status"] == "error"
+    assert run["event_count"] == 2
+
+    trace = client.get(f"/introspection/workflows/{run['id']}")
+    assert trace.status_code == 200
+    steps = trace.json()["steps"]
+    assert steps[0]["type"] == "CallSkillAction"
+    assert steps[1]["kind"] == "observation"
+    assert steps[1]["type"] == "ToolErrorObservation"
+
+
 # --- collect_skills (task 5.1) -------------------------------------------
 
 
