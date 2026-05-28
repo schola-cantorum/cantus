@@ -28,7 +28,8 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
+        # setup-uv 未發佈浮動 v8 major tag（僅有 v8.1.0 / v8.0.0），故 pin 完整版本
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Install cantus-agent (no extras)
         run: uv pip install --system .
