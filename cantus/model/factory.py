@@ -5,7 +5,7 @@ adapter module so users who only need one provider don't pay the import
 cost of the others (and so missing optional extras surface as actionable
 `ImportError` messages instead of import-time crashes).
 
-v0.4.4 ships six providers — `openai`, `anthropic`, `google`, `groq`,
+v0.4.7 ships six providers — `openai`, `anthropic`, `google`, `groq`,
 `nvidia`, and `ollama`. NVIDIA NIM and the local Ollama daemon are both
 OpenAI-compatible at the wire layer (subclasses of `OpenAIChatModel`), so
 their missing-extras hints point at `cantus[openai]` rather than phantom

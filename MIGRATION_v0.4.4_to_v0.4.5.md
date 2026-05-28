@@ -1,6 +1,6 @@
 # Migrating cantus v0.4.4 → v0.4.5
 
-**Release date: 2026-05-2x（TBD via release runbook）.** v0.4.5 is a **MINOR release** shipping the new `cantus-channel-gateway-webhook` capability — the first of three B-series channel gateway changes. v0.4.5 brings cantus's first production-grade HTTP webhook receivers (LINE + Telegram) plus the matching outbound reply path; Google Chat HTTP is intentionally NOT in scope and never will be — Google Chat ships via B3 over Cloud Pub/Sub. Discord ships via B2 over WebSocket + Ed25519.
+**Release date: 2026-05-28（shipped inside the v0.4.7 PyPI bundle — see [`MIGRATION_v0.4.6_to_v0.4.7.md`](./MIGRATION_v0.4.6_to_v0.4.7.md)）.** v0.4.5 is a **MINOR release** shipping the new `cantus-channel-gateway-webhook` capability — the first of three B-series channel gateway changes. v0.4.5 brings cantus's first production-grade HTTP webhook receivers (LINE + Telegram) plus the matching outbound reply path; Google Chat HTTP is intentionally NOT in scope and never will be — Google Chat ships via B3 over Cloud Pub/Sub. Discord ships via B2 over WebSocket + Ed25519.
 
 ## Breaking
 

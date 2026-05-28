@@ -4,7 +4,7 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.7] - 2026-05-2x — cantus-channel-gateway-pubsub
+## [0.4.7] - 2026-05-28 — cantus-channel-gateway-pubsub + Gate B audit hardening
 
 **B-series third (and final) MINOR release.** ✨ Ships the new `cantus-channel-gateway-pubsub` capability: Google Chat over Cloud Pub/Sub streaming pull (inbound) plus the Chat REST API outbound path, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.6 default surface byte-identical. HTTPS-webhook + RS256 JWT for Google Chat is **permanently out of scope** — the Pub/Sub pull path lets a school laptop behind NAT receive Chat events without any tunnel.
 
@@ -19,13 +19,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - ✨ `[project.optional-dependencies] serve` group adds `google-cloud-pubsub>=2.20,<3` (transitively pulls `google-auth`, `grpcio`, `protobuf`). **Second C-extension family in `cantus[serve]`** after v0.4.6 PyNaCl; prebuilt wheels cover the same matrix — Linux x86_64 / macOS arm64+x86_64 / Windows AMD64 × CPython 3.10–3.13. No new `[tool.uv].conflicts` entry needed (verified by `uv lock` against `[openhands]`).
 - 📝 `docs/cookbook-google-chat-channel.md` — student-facing walkthrough covering GCP project setup, Pub/Sub API + Chat API + Workspace Events API enablement, service-account JSON download, Pub/Sub topic + subscription creation, Workspace Events subscription via REST, env-var configuration, and a manual smoke step.
 
+### Changed
+
+- 🔒 **Gate B audit hardening (M1–M4 + L1)** — production-readiness fixes from the post-B-series Gate B audit, all tightening existing channel contracts with **zero breaking change** to the documented surface:
+  - 🔒 (**M1**) `TelegramWebhookChannel.__init__` now validates `bot_token` (`^\d+:[A-Za-z0-9_-]{20,}$`, ≤ 255 chars) and `secret_token` (`^[A-Za-z0-9_-]+$`, ≤ 256 chars) after the existing blank/missing check; malformed values raise `ValueError("telegram bot_token has invalid format")` / `("telegram secret_token has invalid format")` and the rejected value is never echoed into the message or logs.
+  - 🐛 (**M2**) Discord Gateway HELLO `heartbeat_interval` is bounds-checked (`100–120000 ms`); out-of-range values raise `_ResumableError` and route through the existing reconnect + exponential backoff, preventing `heartbeat=0` CPU thrashing and multi-minute intervals that defeat the ACK-miss safety net.
+  - ♻️ (**M3**) Discord DISPATCH handling is extracted into `_accept_dispatch_frame`, reifying the invariant that `self._seq` advances only from op-0 DISPATCH frames into a single call site.
+  - 🐛 (**M4**) Google Chat Pub/Sub `connect()` resets the consecutive-failure counter via a new `_success_since_last_failure` flag (set after `message.ack()`, consumed in the except branch), so a single successful delivery after a failure streak makes the next failure sleep `1` second instead of continuing the geometric backoff.
+  - 🔒 (**L1**) Google Chat Pub/Sub `_build_subscriber` passes `scopes=["https://www.googleapis.com/auth/pubsub"]` explicitly to `from_service_account_file`, so a misconfigured service account fails fast at `connect()`.
+- 🔁 `cantus.__version__` `"0.4.6"` → `"0.4.7"`; `pyproject.toml [project].version` kept in lockstep.
+
 ### Notes
 
+- 📦 **Single PyPI bundle.** v0.4.5 (B1) and v0.4.6 (B2) were developed and merged to `main` but never published to PyPI as standalone releases; all three B-series capabilities plus the Gate B hardening ship together in the **v0.4.7** PyPI bundle. The [0.4.5] / [0.4.6] sections below document the per-capability milestones for reference.
+- 📌 All five hardening items trace to the `gate-b-audit-hardening` change archive (`openspec/changes/archive/2026-05-28-gate-b-audit-hardening/`); see `proposal.md` / `design.md` / `tasks.md` for the task-level mapping.
 - 🚧 B-series ordering: v0.4.7 is B3 and closes the B series. Gate B audit (HMAC + Ed25519 + Pub/Sub IAM cross-platform secret-handling discipline) follows.
 - 📦 New transitive C-extension family in the supply chain: `grpcio` (+ `protobuf`). The matrix matches PyNaCl from v0.4.6; Alpine (musllinux without wheel) remains unsupported for `cantus[serve]`.
 - 🚧 Out of scope (named explicitly): Google Chat HTTPS-webhook + RS256 JWT path (permanently — Pub/Sub pull is the supported transport for cantus), multi-space outbound routing beyond `message["space"]` + Settings fallback, advanced Chat features (thread replies, cardsV2 templating), Pub/Sub publish (outbound stays on Chat REST), live-GCP CI integration tests (fake SubscriberClient + respx is the supported test path).
 
-## [0.4.6] - 2026-05-2x — cantus-channel-gateway-realtime
+## [0.4.6] - 2026-05-28 — cantus-channel-gateway-realtime
 
 **B-series second MINOR release.** ✨ Ships the new `cantus-channel-gateway-realtime` capability: Discord Gateway WebSocket bot + Ed25519-signed interactions HTTP endpoint, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.5 default surface byte-identical. Slack RTM / Mattermost / Matrix / IRC are explicitly out of scope. Google Chat ships in a later B3 release via Cloud Pub/Sub. See [`MIGRATION_v0.4.5_to_v0.4.6.md`](MIGRATION_v0.4.5_to_v0.4.6.md) for the full upgrade note.
 
@@ -52,7 +64,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - ✅ Discord Gateway opcode coverage: op 0 (Dispatch) / op 1 (Heartbeat) / op 2 (Identify) / op 6 (Resume) / op 7 (Reconnect) / op 9 (InvalidSession) / op 10 (Hello) / op 11 (HeartbeatACK). Discord Interactions API coverage: type 1 (Ping → Pong) / type 2 (ApplicationCommand → enqueue + DEFERRED response).
 - 🚧 Out of scope (named explicitly): Slack RTM / Mattermost / Matrix / IRC, Discord sharding (≥2500 guild bots), Discord voice (RTP / Opus), slash command auto-registration (`PUT /applications/{id}/commands`), component `custom_id` state persistence, multi-bot / multi-application routing, `send()` retry / queue / dead-letter, WebSocket compression (`zlib-stream`), cross-platform event fan-out (Discord events do NOT auto-flow to LINE / Telegram, and vice versa).
 
-## [0.4.5] - 2026-05-2x — cantus-channel-gateway-webhook
+## [0.4.5] - 2026-05-28 — cantus-channel-gateway-webhook
 
 **B-series first MINOR release.** ✨ Ships the new `cantus-channel-gateway-webhook` capability: LINE + Telegram production-grade HTTP webhook receivers plus the matching outbound reply path, all without touching the v0.4.0–v0.4.4 default surface. Google Chat (Pub/Sub, B3) and Discord (WebSocket + Ed25519, B2) remain out of scope and ship in later B-series changes. See [`MIGRATION_v0.4.4_to_v0.4.5.md`](MIGRATION_v0.4.4_to_v0.4.5.md) for the full upgrade note.
 

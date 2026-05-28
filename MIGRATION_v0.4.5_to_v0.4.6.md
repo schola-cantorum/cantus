@@ -1,6 +1,6 @@
 # Migrating cantus v0.4.5 → v0.4.6
 
-**Release date: 2026-05-2x（TBD via release runbook）.** v0.4.6 is a **MINOR release** shipping the new `cantus-channel-gateway-realtime` capability — the second of three B-series channel gateway changes. v0.4.6 brings cantus's first persistent-connection channel adapter (Discord Gateway WebSocket) plus the matching Ed25519-signed interactions HTTP endpoint and outbound reply path. Google Chat is intentionally NOT in scope (B3, via Cloud Pub/Sub); Slack RTM / Mattermost / Matrix / IRC are not on the B-series roadmap at all.
+**Release date: 2026-05-28（shipped inside the v0.4.7 PyPI bundle — see [`MIGRATION_v0.4.6_to_v0.4.7.md`](./MIGRATION_v0.4.6_to_v0.4.7.md)）.** v0.4.6 is a **MINOR release** shipping the new `cantus-channel-gateway-realtime` capability — the second of three B-series channel gateway changes. v0.4.6 brings cantus's first persistent-connection channel adapter (Discord Gateway WebSocket) plus the matching Ed25519-signed interactions HTTP endpoint and outbound reply path. Google Chat is intentionally NOT in scope (B3, via Cloud Pub/Sub); Slack RTM / Mattermost / Matrix / IRC are not on the B-series roadmap at all.
 
 ## Breaking
 
