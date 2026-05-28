@@ -110,6 +110,40 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     serve_parser.set_defaults(func=_cmd_serve)
+
+    tui_parser = subparsers.add_parser(
+        "tui",
+        help="Launch the terminal dashboard client for a running cantus serve.",
+        description=(
+            "Launch a standalone terminal dashboard that connects over HTTP to "
+            "a running `cantus serve` instance and polls its read-only "
+            "/introspection + /health endpoints. Requires cantus[tui]."
+        ),
+    )
+    tui_parser.add_argument(
+        "--url",
+        type=str,
+        default="http://127.0.0.1:8765",
+        help="Base URL of the running cantus serve instance "
+        "(default: http://127.0.0.1:8765).",
+    )
+    tui_parser.add_argument(
+        "--auth-mode",
+        type=str,
+        choices=list(_AUTH_MODE_BY_CLI_VALUE.keys()),
+        default="none",
+        help=(
+            "Authentication mode (default: none). `bearer` reads "
+            "CANTUS_SERVE_BEARER_TOKEN; `api-key` reads CANTUS_SERVE_API_KEY."
+        ),
+    )
+    tui_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=2.0,
+        help="Seconds between automatic refresh ticks (default: 2.0).",
+    )
+    tui_parser.set_defaults(func=_cmd_tui)
     return parser
 
 
@@ -278,6 +312,29 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         )
 
     uvicorn.run(app, host=settings.host, port=settings.port)
+    return 0
+
+
+def _cmd_tui(args: argparse.Namespace) -> int:
+    try:
+        import textual  # noqa: F401  -- probe the cantus[tui] extra
+    except ImportError:
+        print(
+            "cantus tui: error: cantus[tui] not installed. "
+            "Run: pip install cantus-agent[tui]",
+            file=sys.stderr,
+        )
+        return 1
+
+    from cantus.tui import run_tui
+
+    # run_tui blocks in the Textual event loop until the user quits; it leaves
+    # KeyboardInterrupt uncaught so Textual can drive its own clean teardown.
+    run_tui(
+        args.url,
+        auth_mode=args.auth_mode,
+        poll_interval=args.poll_interval,
+    )
     return 0
 
 

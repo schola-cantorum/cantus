@@ -168,6 +168,19 @@ ollama = [
 providers = [
     "cantus-agent[openai,anthropic,google,groq]",
 ]
+# v0.4.8 cantus-serve-tui-mvp — the `cantus tui` terminal dashboard client.
+# Textual (built on Rich) renders the four-pane layout; httpx is the HTTP
+# client used to poll the read-only /introspection + /health endpoints.
+# httpx is already pinned by `cantus[serve]`, but the TUI is a standalone
+# client that may be installed without the server stack, so the `tui` extra
+# carries its own httpx pin. Textual ships pure-Python wheels (no C build),
+# so this extra keeps the "no source builds" install property on every
+# supported target. No new [tool.uv] conflicts entry is needed: neither
+# Textual nor httpx participates in the websockets resolution split.
+tui = [
+    "textual>=8,<9",
+    "httpx>=0.27,<1",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
