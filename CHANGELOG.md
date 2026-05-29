@@ -4,6 +4,32 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## ✨ [0.5.0] - 2026-05-30
+
+> C-series 教學就緒里程碑：唯讀 runtime introspection API + `cantus tui` 五分頁終端機儀表板 + Gate C 安全性硬化，全程向下相容（additive + 兩處行為收緊）。從上一個 PyPI release v0.4.7 單步升級。
+
+### ✨ 新增 (Added)
+
+- **唯讀 runtime introspection API**：新增 `/introspection` 端點群（`skills` / `sessions` / `permissions` / `queues` / `workflows/{run_id}` / `dataflow`，外加 roll-up `GET /introspection`），含 6 個 Pydantic 唯讀 read-model、從現有 runtime 物件投影 snapshot 的 collector，以及輕量唯讀 `SessionTracker`（每處理一次 skill 端點呼叫 / channel 訊息記一筆）。`cantus.config.Settings` 新增 `introspection` 與 `introspection_requires_auth` 兩個旗標，鏡像既有的 `dashboard` / `dashboard_requires_auth` 閘門。全部唯讀（無 POST/PUT/DELETE），不改 agent 執行流程。([#13])
+- **`cantus tui` 終端機儀表板**：新增 `cantus tui` CLI 子指令——獨立的 Textual client，連到另一個 process 執行中的 serve、依固定間隔輪詢唯讀 introspection 端點並繪製儀表板；auth header 由環境變數帶入且絕不外洩 token、server 不可達時優雅降級而非崩潰、且只發出 GET 請求（唯讀）。([#14])
+- **`cantus tui` 五分頁介面**：將 TUI 重構為 Textual `TabbedContent` 五分頁（Dashboard / Skills / Permissions / Dataflow / Inspector），數字鍵 1–5 切頁、保留 `r` / `p` / `q`。新增 Skills 面板（列出註冊技能 name / description / args 並標記目前有 running session 的技能）、Permissions 面板（顯示 `auth_mode`、`dashboard_requires_auth`、`introspection_requires_auth`、`gated_routes`，絕不顯示 token）、Dataflow 面板（元件拓樸鄰接清單），並把 run drill-down 升級為 Inspector 面板呈現完整時間軸 trace。([#15])
+- **新增 `tui` optional-dependency extra**（`textual`，含 Rich；`httpx` 自帶以支援僅安裝 client 的情境）：`pip install 'cantus-agent[tui]'`。([#14])
+- **文件**：新增 `docs/tui.md`（`cantus tui` 操作說明、五分頁鍵位、三種 auth 模式、token 為敏感值勿外洩的標註）；`docs/protocols/serve.md` 新增「Introspection endpoints」段；`docs/quickstart-desktop.md` 新增「Inspect with `cantus tui`」段。([#16])
+
+### 🐛 修復 (Fixed)
+
+- 修正 skill-invoke 端點未記錄 EventStream，導致 workflow drill-down 對 skill run 永遠回 404、無資料可看。現在每次 skill 呼叫會記錄一個含 `CallSkillAction` + `SkillObservation`（例外則 `ToolErrorObservation`）的有序執行軌跡，使 workflow 端點對 skill run 回傳有序步驟、`sessions` 的 `event_count` 反映實際已記錄事件數。不新增端點、不改 JSON 形狀。([#14])
+
+### 🔒 安全性 (Security)
+
+- **(Gate C S1，Critical) Introspection workflow-trace 去敏感化**：`GET /introspection/workflows/{run_id}` 與 TUI Inspector 的步驟摘要不再以 `repr(event)` 輸出，改為結構化、不攜帶值的摘要——`CallSkillAction` 僅投影 skill 名稱與**引數鍵名**（不含引數值）、`SkillObservation` 僅投影 skill 名稱與**結果型別名稱**（不含結果值）、`ToolErrorObservation` 僅投影例外型別名稱（不含原始訊息）。在「預設 serve + Cloudflare Tunnel」這個 quickstart 教學情境下，避免含 secret 的執行軌跡外洩到公網。步驟型別與順序維持不變；新增洩漏迴歸測試鎖住此契約。([#16])
+- **(Gate C S2，High) Auth config-cliff 防呆**：當 `auth_mode=none` 且 `introspection` 啟用時，`cantus.serve()` 於 app 建構期 emit 一則 startup 警告，明示 `/introspection` 目前無需認證即可存取；並文件化「`auth_mode=none` 時 `dashboard_requires_auth` 與 `introspection_requires_auth` 均被忽略」的互動。另補 (S4，Medium) auth-gating 迴歸測試，鎖住 workflow 端點在 `auth_mode=bearer` + `introspection_requires_auth=true` 時無 token 回 401、帶正確 token 回 200。([#16])
+
+### 🔄 變更 (Changed)
+
+- CI：GitHub Actions 升級至支援 Node 24 的最新 major（Node 20 汰換前）。([#12])
+- `cantus.__version__` `"0.4.7"` → `"0.5.0"`；`pyproject.toml [project].version` 同步保持一致。
+
 ## [0.4.7] - 2026-05-28 — cantus-channel-gateway-pubsub + Gate B audit hardening
 
 **B-series third (and final) MINOR release.** ✨ Ships the new `cantus-channel-gateway-pubsub` capability: Google Chat over Cloud Pub/Sub streaming pull (inbound) plus the Chat REST API outbound path, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.6 default surface byte-identical. HTTPS-webhook + RS256 JWT for Google Chat is **permanently out of scope** — the Pub/Sub pull path lets a school laptop behind NAT receive Chat events without any tunnel.
