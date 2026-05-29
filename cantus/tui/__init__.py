@@ -2,9 +2,9 @@
 
 The TUI is a *client*: it connects over HTTP to an already-running
 ``cantus serve`` instance and polls its read-only ``/introspection`` +
-``/health`` endpoints, rendering a four-pane Textual dashboard (sessions /
-events / queue / health). It never shares a process with the server and
-issues only GET requests.
+``/health`` endpoints, rendering a tabbed Textual dashboard (Dashboard /
+Skills / Permissions / Dataflow / Inspector). It never shares a process with
+the server and issues only GET requests.
 
 ``run_tui`` is the package entry point invoked by the ``cantus tui`` CLI
 subcommand. Textual is imported lazily inside the function body so that
