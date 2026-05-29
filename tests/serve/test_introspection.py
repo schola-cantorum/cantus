@@ -603,3 +603,178 @@ def test_skill_named_introspection_rejected() -> None:
     registry.register("skill", _StubSkill())
     with pytest.raises(ValueError, match="reserved introspection path"):
         serve(registry)
+
+
+# --- S1: workflow-trace summary de-sensitization (gate-c task 2.1) --------
+#
+# The workflow endpoint must project a STRUCTURAL summary per step that never
+# carries skill argument values, skill result values, or raw exception
+# messages. These regression tests pin that contract with the spec's example
+# secret strings.
+
+
+def _registry_with_secret_skill() -> Any:
+    from cantus.core.registry import Registry
+    from cantus.protocols.skill import register_skill
+
+    def issue(api_key: str) -> dict[str, Any]:
+        """Issue a token for the supplied credential."""
+        return {"token": "token-secret-value"}
+
+    registry = Registry()
+    registry.register("skill", register_skill(issue))
+    return registry
+
+
+def _registry_with_secret_boom() -> Any:
+    from cantus.core.registry import Registry
+    from cantus.protocols.skill import register_skill
+
+    def leaky(value: str) -> str:
+        """Always raises with a message that must not leak."""
+        raise ValueError("boom-secret-detail")
+
+    registry = Registry()
+    registry.register("skill", register_skill(leaky))
+    return registry
+
+
+def _run_secret_skill() -> tuple[Any, str]:
+    """Invoke the secret skill once with a sensitive arg; return (client, run_id)."""
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    app = serve(_registry_with_secret_skill())
+    client = TestClient(app)
+    resp = client.post("/skills/issue", json={"api_key": "sk-secret-value"})
+    assert resp.status_code == 200
+    run_id: str = client.get("/introspection/sessions").json()[0]["id"]
+    return client, run_id
+
+
+def test_workflow_summary_omits_arg_values() -> None:
+    client, run_id = _run_secret_skill()
+    body = client.get(f"/introspection/workflows/{run_id}").text
+    assert "sk-secret-value" not in body
+
+
+def test_workflow_summary_omits_result_values() -> None:
+    client, run_id = _run_secret_skill()
+    body = client.get(f"/introspection/workflows/{run_id}").text
+    assert "token-secret-value" not in body
+
+
+def test_workflow_action_summary_has_keys_not_values() -> None:
+    client, run_id = _run_secret_skill()
+    steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
+    first = steps[0]
+    assert first["type"] == "CallSkillAction"
+    # The structural summary projects the skill name and the argument key
+    # names — but never the argument values.
+    assert "issue" in first["summary"]
+    assert "api_key" in first["summary"]
+    assert "sk-secret-value" not in first["summary"]
+
+
+def test_workflow_error_summary_omits_message() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    app = serve(_registry_with_secret_boom())
+    client = TestClient(app, raise_server_exceptions=False)
+    resp = client.post("/skills/leaky", json={"value": "x"})
+    assert resp.status_code == 500
+
+    run_id = client.get("/introspection/sessions").json()[0]["id"]
+    trace = client.get(f"/introspection/workflows/{run_id}")
+    second = trace.json()["steps"][1]
+    assert second["type"] == "ToolErrorObservation"
+    # The summary carries the (error) type name but not the raw message.
+    assert "ToolErrorObservation" in second["summary"]
+    assert "boom-secret-detail" not in trace.text
+
+
+# --- S2: config-cliff startup warning (gate-c task 3.1) -------------------
+
+
+def _introspection_warnings(caught: Any) -> list[Any]:
+    """Warnings about introspection-without-auth captured during a serve build."""
+    return [
+        w
+        for w in caught
+        if issubclass(w.category, UserWarning) and "introspection" in str(w.message)
+    ]
+
+
+def test_open_introspection_emits_startup_warning(monkeypatch: Any) -> None:
+    import importlib
+    import warnings
+
+    import pytest
+
+    from cantus.serve import serve
+
+    config_mod = importlib.import_module("cantus.config")
+
+    # (a) auth_mode=none + introspection=true → a UserWarning naming the
+    #     introspection surface; the message must not leak any configured token.
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "none")
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "tok-should-not-leak")
+    monkeypatch.setenv("CANTUS_SERVE_INTROSPECTION", "true")
+    importlib.reload(config_mod)
+    with pytest.warns(UserWarning, match="introspection") as record:
+        serve(_registry_with_echo(), settings=config_mod.Settings())
+    text = " ".join(str(w.message) for w in record)
+    assert "without authentication" in text
+    assert "tok-should-not-leak" not in text
+
+    # (b) auth_mode=bearer + introspection=true → no introspection warning.
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "bearer")
+    importlib.reload(config_mod)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        serve(_registry_with_echo(), settings=config_mod.Settings())
+    assert _introspection_warnings(caught) == []
+
+    # (c) auth_mode=none + introspection=false → no introspection warning.
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "none")
+    monkeypatch.setenv("CANTUS_SERVE_INTROSPECTION", "false")
+    importlib.reload(config_mod)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        serve(_registry_with_echo(), settings=config_mod.Settings())
+    assert _introspection_warnings(caught) == []
+
+
+# --- S4: workflow endpoint honours the same auth gate (gate-c task 4.1) ---
+
+
+def test_introspection_workflows_endpoint_gated_by_auth(monkeypatch: Any) -> None:
+    import importlib
+
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    monkeypatch.setenv("CANTUS_SERVE_AUTH_MODE", "bearer")
+    monkeypatch.setenv("CANTUS_SERVE_BEARER_TOKEN", "correct-secret")
+    monkeypatch.delenv("CANTUS_SERVE_INTROSPECTION_REQUIRES_AUTH", raising=False)
+    config_mod = importlib.import_module("cantus.config")
+    importlib.reload(config_mod)
+
+    app = serve(_registry_with_echo(), settings=config_mod.Settings())
+    client = TestClient(app)
+
+    # No credentials → the workflow path is gated like every other endpoint.
+    assert client.get("/introspection/workflows/anything").status_code == 401
+
+    # With the configured token → 200 or 404 (the run does not exist), but the
+    # request must never be rejected with 401.
+    ok = client.get(
+        "/introspection/workflows/anything",
+        headers={"Authorization": "Bearer correct-secret"},
+    )
+    assert ok.status_code in (200, 404)
+    assert ok.status_code != 401
