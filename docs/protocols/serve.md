@@ -4,7 +4,7 @@ v0.4.0 為 cantus 教學弧的 serve 入口：把 v0.3.0 收成的 Skill registr
 
 本文件涵蓋四個對外 surface：Quick start、`cantus.config.Settings` 12-factor 設定、Dashboard 三個 read-only endpoint、Channel Protocol 抽象 + `LocalMockReceiver`。
 
-> v0.4.1 cantus-serve-security 補上 opt-in auth gate + SecretStr token 載入（見下方 [Authentication](#authentication) 段）。tunnel helper（cloudflared / ngrok）排 v0.4.2 `cantus-serve-tunnel`、supply-chain CLI（`cantus deps` / `cantus audit`）排 v0.4.3 `cantus-supply-chain-cli`。HTTPS / WebSocket、real channel implementations（LINE / Telegram / Discord / Google Chat）皆仍 **out of scope**，由 v0.4.2 / v0.4.3 channel-gateway 系列處理或交給上游 reverse proxy。
+> v0.4.1 cantus-serve-security 補上 opt-in auth gate + SecretStr token 載入（見下方 [Authentication](#authentication) 段）。real channel implementations（LINE / Telegram / Discord / Google Chat）已於 B-series channel-gateway 釋出，操作見各 cookbook（[`../cookbook-line-channel.md`](../cookbook-line-channel.md)、[`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md)、[`../cookbook-discord-channel.md`](../cookbook-discord-channel.md)、[`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)）。read-only runtime 觀測層見下方 [Introspection endpoints](#introspection-endpoints) 段。HTTPS 仍建議交給上游 reverse proxy / tunnel 處理。
 
 ## Quick start
 
@@ -250,6 +250,40 @@ cantus.serve(registry)
 
 此 guard 在 `dashboard=True` 與 `dashboard=False` 兩種情境下**皆會觸發** — 預留 path 是常數，不隨 setting 浮動。
 
+## Introspection endpoints
+
+當 `Settings.introspection is True`（預設值），`cantus.serve()` 會額外掛一組 read-only 的 `/introspection/*` endpoint，把 cantus 既有的執行期狀態（Skill registry、auth 設定、attached channels、EventStream）投影成穩定的 JSON read-model。它**只觀測、不變更**任何 registry / settings / session / channel / event-stream 狀態，與 dashboard 平行、且各自**獨立** toggle。
+
+| Endpoint | 內容 |
+| --- | --- |
+| `GET /introspection/skills` | 每個註冊 Skill 的 `spec_for_llm()` 投影 |
+| `GET /introspection/sessions` | 最近被 dispatch 的 run（bounded、read-only SessionTracker） |
+| `GET /introspection/permissions` | 生效的 auth 設定（`auth_mode` + 兩個 `*_requires_auth` flag + 被 gate 的路徑清單；**永不**含 token 值） |
+| `GET /introspection/queues` | 各 channel 的 queue 深度（無此能力的 channel 以 `depth=null` 列出） |
+| `GET /introspection/workflows/{run_id}` | 單一 run 的 Action/Observation 步驟軌跡（見下方去敏感契約） |
+| `GET /introspection/dataflow` | 由 registry + channels 推導的靜態元件拓樸（nodes + edges） |
+| `GET /introspection` | 上述各切片的 roll-up（不含 per-run workflows） |
+
+### 啟用與 auth gating
+
+`/introspection` 由兩個 flag 控制，與 dashboard 各自獨立：
+
+- `introspection`（預設 `True`）：是否掛載整組 endpoint。設 `Settings(introspection=False)` 後全部回 `404`，但 dashboard 與 Skill invoke endpoint 不受影響。
+- `introspection_requires_auth`（預設 `True`）：當 `auth_mode != NONE` 時，整組 `/introspection/*`（**包含** `/introspection/workflows/{run_id}`）是否套 `require_auth`。設 `False` 可開放匿名讀取，行為對齊 `dashboard_requires_auth`。
+
+> ⚠️ **`auth_mode=none` 的 config cliff**：當 `auth_mode` 為 `none`（預設）時沒有任何認證可套，`introspection_requires_auth`（與 `dashboard_requires_auth`）**會被忽略**，`/introspection` 對任何能連到 server 的人都可讀。`cantus.serve()` 在此情境（`auth_mode=none` 且 `introspection` 啟用）會在 app 建構期 emit 一則 `UserWarning`，明示 `/introspection` 目前無需認證即可存取（訊息**不含**任何 token）。一旦把 server 暴露到 loopback 之外（綁 `0.0.0.0`、接 tunnel），請把 `auth_mode` 改成 `bearer` 或 `api-key`，introspection 會一併被保護。
+
+### Workflow-trace summary 去敏感契約
+
+`GET /introspection/workflows/{run_id}` 把該 run 的 EventStream 投影成有序步驟，每個步驟有 `index` / `kind` / `type` / `summary` 四欄。`summary` 是**結構投影、不攜帶任何值**：
+
+- `CallSkillAction` → skill 名稱 + 引數**鍵名**排序清單（不含引數值）
+- `SkillObservation` → skill 名稱 + 結果**型別名稱**（不含結果值）
+- `ToolErrorObservation` → 例外型別名稱（不含原始例外訊息）
+- 其他型別 → event 型別名稱（不含欄位值）
+
+引數值、結果值、原始例外訊息可能帶 secret / PII，因此一律不投影；步驟的 `kind` / `type` / 順序維持不變。未知 run_id 回 `404`。TUI Inspector（`cantus tui`，見 [`docs/tui.md`](../tui.md)）是這份 server 資料的純 render 端，因此同樣只顯示去敏感後的 summary。
+
 ## Channel Protocol
 
 `cantus.serve.channel.Channel` 是 `typing.Protocol`、且加 `@typing.runtime_checkable`，所以下游可以用 `isinstance(obj, Channel)` 做 duck-typing 檢查。Protocol 只規定兩個 method：
@@ -298,11 +332,12 @@ app = cantus.serve(registry, channels=[ch])
 assert app.state.channels == [ch]
 ```
 
-### Real channel implementations 是 out of scope
+### Real channel implementations（已於 B-series 釋出）
 
-LINE / Telegram / Discord / Google Chat 等真實 channel 實作 **out of scope for v0.4.0**：
+LINE / Telegram / Discord / Google Chat 等真實 channel 實作已於 **B-series channel-gateway** 釋出（先前 v0.4.0 僅定義 Protocol + in-memory stub）。各平台的接線（webhook / WebSocket / Pub/Sub、簽章驗證、outbound reply）與操作步驟見對應 cookbook：
 
-- v0.4.2 channel-gateway：第一批 real channel adapter
-- v0.4.3 channel-gateway-batch2：擴充
+- [`../cookbook-line-channel.md`](../cookbook-line-channel.md)、[`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md)（webhook gateway）
+- [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md)（WebSocket Gateway + Ed25519 interactions）
+- [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)（Pub/Sub）
 
-v0.4.0 對 channel 的職責只到「定義 Protocol + 提供 in-memory stub」，這層抽象先穩定下來，等 v0.4.2 真實 adapter 進來時，這份 Protocol 形狀就不會再動。
+`Channel` Protocol 形狀自 v0.4.0 定義後維持穩定，這些 real adapter 都在這層抽象之上實作，新增 adapter 不會再動 Protocol。

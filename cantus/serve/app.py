@@ -22,6 +22,7 @@ is then injected through ``openapi_extra``.
 from __future__ import annotations
 
 import asyncio
+import warnings
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -185,6 +186,21 @@ def serve(
     # and auth mirror the dashboard but key off the introspection-specific
     # Settings flags so the two surfaces toggle independently.
     if effective_settings.introspection:
+        # Config-cliff guard: when auth_mode is NONE, introspection_requires_auth
+        # has no effect (there is no auth to apply), so the read-only
+        # /introspection surface is reachable by anyone who can reach the
+        # server. Surface that at build time — loudly but without blocking, so
+        # the legitimate local-teaching use of an open server still works. The
+        # message names the surface but never any token value.
+        if not apply_auth:
+            warnings.warn(
+                "cantus.serve: the /introspection endpoints are enabled and "
+                "reachable without authentication (auth_mode=none). Anyone who "
+                "can reach this server can read its introspection data. Set "
+                "auth_mode to bearer or api-key to require credentials.",
+                UserWarning,
+                stacklevel=2,
+            )
         introspection_dependencies: list[DependsType] = (
             [Depends(require_auth)]
             if apply_auth and effective_settings.introspection_requires_auth

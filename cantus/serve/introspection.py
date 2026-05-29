@@ -26,8 +26,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.params import Depends as DependsType
 from pydantic import BaseModel
 
-from cantus.core.action import Action
+from cantus.core.action import Action, CallSkillAction
 from cantus.core.event_stream import EventStream
+from cantus.core.observation import SkillObservation, ToolErrorObservation
 from cantus.core.registry import Registry
 from cantus.serve.channel import (
     Channel,
@@ -331,6 +332,37 @@ def collect_dataflow(
     return DataflowGraph(nodes=nodes, edges=edges)
 
 
+def _summarize_event(event: Any) -> str:
+    """Project an event into a structural, de-sensitized step summary.
+
+    The summary names *structure* — skill names, argument key names, result
+    and event type names — but never the argument values, result values, or
+    raw exception messages, any of which can carry secrets or PII. This is the
+    text surfaced by ``GET /introspection/workflows/{run_id}`` and the TUI
+    Inspector, so it must be safe to expose to any reader of the API. Using
+    ``repr(event)`` here would leak ``CallSkillAction.args`` values and
+    ``SkillObservation.result`` data, so it is deliberately avoided.
+
+    Projection is white-list by event type and never raises: any unrecognized
+    event type falls back to its bare type name (no field values).
+    """
+    if isinstance(event, CallSkillAction):
+        return (
+            f"CallSkillAction skill={event.skill_name!r} "
+            f"arg_keys={sorted(event.args)}"
+        )
+    if isinstance(event, SkillObservation):
+        return (
+            f"SkillObservation skill={event.skill_name!r} "
+            f"result_type={type(event.result).__name__}"
+        )
+    if isinstance(event, ToolErrorObservation):
+        # The exception (error) type name only — the raw message may embed
+        # internal paths or input values, so it is dropped.
+        return f"ToolErrorObservation skill={event.skill_name!r}"
+    return type(event).__name__
+
+
 def project_workflow_trace(run_id: str, stream: EventStream) -> WorkflowTrace:
     """Project an EventStream's Action/Observation sequence into ordered steps."""
     steps: list[WorkflowStep] = []
@@ -341,7 +373,7 @@ def project_workflow_trace(run_id: str, stream: EventStream) -> WorkflowTrace:
                 index=index,
                 kind=kind,
                 type=type(event).__name__,
-                summary=repr(event),
+                summary=_summarize_event(event),
             )
         )
     return WorkflowTrace(run_id=run_id, steps=steps)

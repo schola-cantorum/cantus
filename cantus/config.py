@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # v0.4.8 cantus-runtime-introspection-api: read-only /introspection endpoint
     # group, gated and auth-gated independently of the dashboard.
     introspection: bool = True
+    # When auth_mode is NONE this flag — like dashboard_requires_auth — has no
+    # effect: there is no authentication to apply, so the /introspection
+    # endpoints stay reachable without credentials and cantus.serve() emits a
+    # startup UserWarning at build time. The flag only gates the surface when
+    # auth_mode is bearer or api-key.
     introspection_requires_auth: bool = True
     docs_url: str | None = "/docs"
     openapi_url: str | None = "/openapi.json"
