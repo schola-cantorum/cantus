@@ -65,7 +65,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.4.6] - 2026-05-28 — cantus-channel-gateway-realtime
 
-**B-series second MINOR release.** ✨ Ships the new `cantus-channel-gateway-realtime` capability: Discord Gateway WebSocket bot + Ed25519-signed interactions HTTP endpoint, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.5 default surface byte-identical. Slack RTM / Mattermost / Matrix / IRC are explicitly out of scope. Google Chat ships in a later B3 release via Cloud Pub/Sub. See [`MIGRATION_v0.4.5_to_v0.4.6.md`](MIGRATION_v0.4.5_to_v0.4.6.md) for the full upgrade note.
+**B-series second MINOR release.** ✨ Ships the new `cantus-channel-gateway-realtime` capability: Discord Gateway WebSocket bot + Ed25519-signed interactions HTTP endpoint, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.5 default surface byte-identical. Slack RTM / Mattermost / Matrix / IRC are explicitly out of scope. Google Chat ships in a later B3 release via Cloud Pub/Sub. See [`MIGRATION_v0.4.5_to_v0.4.6.md`](docs/migrations/MIGRATION_v0.4.5_to_v0.4.6.md) for the full upgrade note.
 
 ### Added
 
@@ -92,7 +92,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.4.5] - 2026-05-28 — cantus-channel-gateway-webhook
 
-**B-series first MINOR release.** ✨ Ships the new `cantus-channel-gateway-webhook` capability: LINE + Telegram production-grade HTTP webhook receivers plus the matching outbound reply path, all without touching the v0.4.0–v0.4.4 default surface. Google Chat (Pub/Sub, B3) and Discord (WebSocket + Ed25519, B2) remain out of scope and ship in later B-series changes. See [`MIGRATION_v0.4.4_to_v0.4.5.md`](MIGRATION_v0.4.4_to_v0.4.5.md) for the full upgrade note.
+**B-series first MINOR release.** ✨ Ships the new `cantus-channel-gateway-webhook` capability: LINE + Telegram production-grade HTTP webhook receivers plus the matching outbound reply path, all without touching the v0.4.0–v0.4.4 default surface. Google Chat (Pub/Sub, B3) and Discord (WebSocket + Ed25519, B2) remain out of scope and ship in later B-series changes. See [`MIGRATION_v0.4.4_to_v0.4.5.md`](docs/migrations/MIGRATION_v0.4.4_to_v0.4.5.md) for the full upgrade note.
 
 ### Added
 
@@ -122,7 +122,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.4.4] - 2026-05-27 — gate-a-audit-hardening
 
-**Gate A hardening PATCH release.** Zero new public API surface; zero breaking change. Five hardening fixes (2 High + 2 Medium + 1 Low) from the post-Gate-A audit ship together; the remaining audit items (M2 base-URL reachability, M3 `uv` smoke precheck) are deferred to follow-up changes. See [`MIGRATION_v0.4.3_to_v0.4.4.md`](MIGRATION_v0.4.3_to_v0.4.4.md) for the per-item migration notes.
+**Gate A hardening PATCH release.** Zero new public API surface; zero breaking change. Five hardening fixes (2 High + 2 Medium + 1 Low) from the post-Gate-A audit ship together; the remaining audit items (M2 base-URL reachability, M3 `uv` smoke precheck) are deferred to follow-up changes. See [`MIGRATION_v0.4.3_to_v0.4.4.md`](docs/migrations/MIGRATION_v0.4.3_to_v0.4.4.md) for the per-item migration notes.
 
 ### Added
 
@@ -153,7 +153,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `openspec/changes/archive/` directory containing the twelve historical change archive entries whose spec deltas only touch the ten framework capabilities listed above (entries that touch the course-only capabilities `task-template` / `model-loader` / `llm-wiki` are intentionally left in `colab-llm-agent`).
 - `.spectra.yaml` at the cantus repo root — Spectra CLI configuration enabling `spectra status` / `spectra propose` / `spectra apply` / `spectra archive` to run with cantus as project root. Settings: `locale: tw`, `tdd: true`, `audit: true`, `parallel_tasks: true`, plus the eight `claude_effort` per-skill levels (`apply: xhigh` / `archive: medium` / `ask: low` / `audit: max` / `debug: xhigh` / `discuss: high` / `ingest: xhigh` / `propose: xhigh`). `spec_dir` is intentionally not set and relies on the default value `openspec/specs`.
 - `CLAUDE.md` at the cantus repo root — Spectra workflow instruction block delimited by `<!-- SPECTRA:START v1.0.2 -->` and `<!-- SPECTRA:END -->`. Describes the `/spectra-discuss` / `/spectra-propose` / `/spectra-apply` / `/spectra-ingest` / `/spectra-ask` / `/spectra-archive` / `/spectra-commit` skill set, the `discuss? → propose → apply ⇄ ingest → archive` workflow ordering, and the parked-change semantics (`spectra park` / `spectra unpark`).
-- `MIGRATION_v0.4.2_to_v0.4.3.md` — migration note covering the (non-existent) OSS user impact, the contributor-visible change of spec location, and the absence of any breaking change.
+- `docs/migrations/MIGRATION_v0.4.2_to_v0.4.3.md` — migration note covering the (non-existent) OSS user impact, the contributor-visible change of spec location, and the absence of any breaking change.
 
 ### Changed
 
@@ -210,7 +210,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `cantus.serve.security` 新模組，公開兩個 callable：`require_auth(request: Request) -> None`（FastAPI dependency，讀 `request.app.state.settings` 取 auth 設定）、`validate_auth_config(settings: Settings) -> None`（`cantus.serve()` 啟動前的 fail-fast 檢查，`auth_mode != NONE` 但對應 token 為 `None` 時 raise `ValueError` 含字面 `BEARER_TOKEN` / `API_KEY`）。
 - `cantus.serve.AuthMode` / `cantus.serve.require_auth` — top-level re-export，方便 `from cantus.serve import AuthMode, require_auth` 一行帶到。
 - `cantus[security]` extras — documentary alias，dependency closure 跟 `cantus[serve]` 完全相同（fastapi、uvicorn、pydantic-settings），不引入新第三方套件、不新增 `[tool.uv] conflicts` 條目。下游可寫 `pip install cantus[security]` 表達安裝意圖。
-- 文件：`docs/protocols/serve.md` 新增「Authentication」段（三模式說明 + env 變數表 + bearer / api-key 兩種模式各一份 quick start + dashboard_requires_auth 行為 + Design notes）、`MIGRATION_v0.4.0_to_v0.4.1.md`。
+- 文件：`docs/protocols/serve.md` 新增「Authentication」段（三模式說明 + env 變數表 + bearer / api-key 兩種模式各一份 quick start + dashboard_requires_auth 行為 + Design notes）、`docs/migrations/MIGRATION_v0.4.0_to_v0.4.1.md`。
 
 ### Changed
 
@@ -255,7 +255,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `cantus.serve.channel.Channel`（`typing.Protocol`，`receive() -> dict` + `send(message: dict) -> None`，`@runtime_checkable`）與內建 in-memory FIFO `LocalMockReceiver` 實作，作為 ARCH-2 跨 capability smoke test 載具。
 - 新 `cantus[serve]` optional extras 群組（`fastapi>=0.115,<1`、`uvicorn>=0.30,<1`、`pydantic-settings>=2.4,<3`）；lazy-import gate 對齊 `cantus[mcp]` pattern — 未安裝 extras 時噴 `ImportError` 含 `pip install cantus[serve]`。
 - `cantus/__init__.py` 採 PEP 562 `__getattr__` lazy-expose `cantus.serve` 與 `cantus.config`，base install `import cantus` 不需要 serve SDK。
-- 文件：`docs/protocols/serve.md`（Quick start / Configuration / Dashboard endpoints / Channel Protocol）、`MIGRATION_v0.3.6_to_v0.4.0.md`、`README.md` / `README.zhTW.md` 同步 byte-identical Install + Quickstart code block。
+- 文件：`docs/protocols/serve.md`（Quick start / Configuration / Dashboard endpoints / Channel Protocol）、`docs/migrations/MIGRATION_v0.3.6_to_v0.4.0.md`、`README.md` / `README.zhTW.md` 同步 byte-identical Install + Quickstart code block。
 
 ### Changed
 
@@ -373,7 +373,7 @@ starts on a verifiable baseline.
   (`--cov=cantus --cov-report=term-missing --cov-report=xml`). Running
   `pytest tests/` without any flag emits a terminal coverage section and a
   `coverage.xml` artifact in the working directory.
-- `MIGRATION_v0.3.4_to_v0.3.5.md` — user-facing migration note documenting
+- `docs/migrations/MIGRATION_v0.3.4_to_v0.3.5.md` — user-facing migration note documenting
   the ADDITIVE nature of this release and the new dev workflow signals.
 
 ### Changed
@@ -432,7 +432,7 @@ byte-identical.
 - `docs/protocols/adapters-batch3.md` — new design document covering the
   v0.3.4 close-out, including the four-framework bidirectional matrix and
   the OpenHands "not applicable" rationale.
-- `MIGRATION_v0.3.3_to_v0.3.4.md` — user-facing migration note with usage
+- `docs/migrations/MIGRATION_v0.3.3_to_v0.3.4.md` — user-facing migration note with usage
   examples for `import_hf_tool` and guidance on the OpenHands export-only
   path.
 
@@ -649,7 +649,7 @@ MAJOR release. **BREAKING** — protocol surface reorganized: `Analyzer` and
 helpers; the `@workflow` decorator is removed and replaced by explicit
 `cantus.workflows` building blocks (`PromptChain`, `Router`, `Parallel`,
 `OrchestratorWorker`, `EvaluatorOptimizer`). See
-[`MIGRATION_v0.2_to_v0.3.md`](./MIGRATION_v0.2_to_v0.3.md) for the mechanical
+[`MIGRATION_v0.2_to_v0.3.md`](./docs/migrations/MIGRATION_v0.2_to_v0.3.md) for the mechanical
 conversion recipe.
 
 ### BREAKING

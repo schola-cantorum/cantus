@@ -1165,7 +1165,7 @@ source: cantus-uv-cross-platform-install
 updated: 2026-05-25
 code:
   - .github/workflows/cross-platform-install.yml
-  - MIGRATION_v0.4.2_to_v0.4.3.md
+  - docs/migrations/MIGRATION_v0.4.2_to_v0.4.3.md
   - README.zhTW.md
   - docs/quickstart-desktop.md
   - docs/quickstart.md
@@ -1219,7 +1219,7 @@ source: cantus-uv-cross-platform-install
 updated: 2026-05-25
 code:
   - .github/workflows/cross-platform-install.yml
-  - MIGRATION_v0.4.2_to_v0.4.3.md
+  - docs/migrations/MIGRATION_v0.4.2_to_v0.4.3.md
   - README.zhTW.md
   - docs/quickstart-desktop.md
   - docs/quickstart.md
