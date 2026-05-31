@@ -196,16 +196,16 @@ Full docs live in [`docs/`](./docs/):
 
 Per-version migration guides for breaking changes between adjacent releases:
 
-- [v0.2 → v0.3](./MIGRATION_v0.2_to_v0.3.md)
-- [v0.3 → v0.3.1](./MIGRATION_v0.3_to_v0.3.1.md)
-- [v0.3 → v0.3.2](./MIGRATION_v0.3_to_v0.3.2.md)
-- [v0.3 → v0.3.3](./MIGRATION_v0.3_to_v0.3.3.md)
-- [v0.3.3 → v0.3.4](./MIGRATION_v0.3.3_to_v0.3.4.md)
-- [v0.3.4 → v0.3.5](./MIGRATION_v0.3.4_to_v0.3.5.md)
-- [v0.3.5 → v0.3.6](./MIGRATION_v0.3.5_to_v0.3.6.md)
-- [v0.3.6 → v0.4.0](./MIGRATION_v0.3.6_to_v0.4.0.md)
-- [v0.4.0 → v0.4.1](./MIGRATION_v0.4.0_to_v0.4.1.md)
-- [v0.4.1 → v0.4.2](./MIGRATION_v0.4.1_to_v0.4.2.md)
+- [v0.2 → v0.3](./docs/migrations/MIGRATION_v0.2_to_v0.3.md)
+- [v0.3 → v0.3.1](./docs/migrations/MIGRATION_v0.3_to_v0.3.1.md)
+- [v0.3 → v0.3.2](./docs/migrations/MIGRATION_v0.3_to_v0.3.2.md)
+- [v0.3 → v0.3.3](./docs/migrations/MIGRATION_v0.3_to_v0.3.3.md)
+- [v0.3.3 → v0.3.4](./docs/migrations/MIGRATION_v0.3.3_to_v0.3.4.md)
+- [v0.3.4 → v0.3.5](./docs/migrations/MIGRATION_v0.3.4_to_v0.3.5.md)
+- [v0.3.5 → v0.3.6](./docs/migrations/MIGRATION_v0.3.5_to_v0.3.6.md)
+- [v0.3.6 → v0.4.0](./docs/migrations/MIGRATION_v0.3.6_to_v0.4.0.md)
+- [v0.4.0 → v0.4.1](./docs/migrations/MIGRATION_v0.4.0_to_v0.4.1.md)
+- [v0.4.1 → v0.4.2](./docs/migrations/MIGRATION_v0.4.1_to_v0.4.2.md)
 
 The [`CHANGELOG.md`](./CHANGELOG.md) lists everything else (additive features, internal changes, security notes).
 

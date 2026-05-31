@@ -1,5 +1,4 @@
 include CHANGELOG.md
-include MIGRATION_*.md
 include CONTRIBUTING.md
 include CONTRIBUTING.zhTW.md
 include README.zhTW.md
@@ -12,5 +11,8 @@ prune scripts
 prune temp
 prune build
 prune dist
+
+recursive-include docs/migrations *.md
+
 global-exclude *.pyc
 global-exclude __pycache__
