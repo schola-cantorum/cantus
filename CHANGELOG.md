@@ -6,7 +6,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## ✨ [0.5.0] - 2026-05-30
 
-> C-series 教學就緒里程碑：唯讀 runtime introspection API + `cantus tui` 五分頁終端機儀表板 + Gate C 安全性硬化，全程向下相容（additive + 兩處行為收緊）。從上一個 PyPI release v0.4.7 單步升級。
+> C-series 教學就緒里程碑：唯讀 runtime introspection API + `cantus tui` 五分頁終端機儀表板 + Gate C 安全性硬化，全程向下相容（additive + 兩處行為收緊）。從上一個 PyPI release v0.4.7 單步升級。完整升版說明見 [`MIGRATION_v0.4.7_to_v0.5.0.md`](docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)。
 
 ### ✨ 新增 (Added)
 
@@ -32,7 +32,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.4.7] - 2026-05-28 — cantus-channel-gateway-pubsub + Gate B audit hardening
 
-**B-series third (and final) MINOR release.** ✨ Ships the new `cantus-channel-gateway-pubsub` capability: Google Chat over Cloud Pub/Sub streaming pull (inbound) plus the Chat REST API outbound path, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.6 default surface byte-identical. HTTPS-webhook + RS256 JWT for Google Chat is **permanently out of scope** — the Pub/Sub pull path lets a school laptop behind NAT receive Chat events without any tunnel.
+**B-series third (and final) MINOR release.** ✨ Ships the new `cantus-channel-gateway-pubsub` capability: Google Chat over Cloud Pub/Sub streaming pull (inbound) plus the Chat REST API outbound path, in a fully ADDITIVE manner that leaves the v0.4.0–v0.4.6 default surface byte-identical. HTTPS-webhook + RS256 JWT for Google Chat is **permanently out of scope** — the Pub/Sub pull path lets a school laptop behind NAT receive Chat events without any tunnel. See [`MIGRATION_v0.4.6_to_v0.4.7.md`](docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md) for the full upgrade note.
 
 ### Added
 
