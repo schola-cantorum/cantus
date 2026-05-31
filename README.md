@@ -4,9 +4,8 @@
 
 <p align="center">
   <a href="https://pypi.org/project/cantus-agent/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus-agent.svg"></a>
-  <a href="https://github.com/schola-cantorum/cantus/releases/tag/v0.4.2"><img alt="release v0.4.2" src="https://img.shields.io/badge/release-v0.4.2-blue"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
@@ -31,8 +30,8 @@ The fastest way to experience Cantus is to launch the bundled notebooks directly
 
 | Notebook | Audience | One-click launch |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.4.2/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | End user — build your first agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | Administrator — mirror Gemma 4 weights to Drive (run once before downstream users) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/admin_setup.ipynb) |
 
 See [`notebooks/README.md`](./notebooks/README.md) for the recommended order and tag-pinning conventions.
 
@@ -40,10 +39,10 @@ See [`notebooks/README.md`](./notebooks/README.md) for the recommended order and
 
 ```bash
 # PyPI (recommended — reproducible, no Git clone). Distribution name is `cantus-agent`; import name remains `cantus`.
-pip install cantus-agent==0.4.2
+pip install cantus-agent==0.5.0
 
 # Git source — escape hatch for tracking main, a feature branch, or a specific commit
-pip install git+https://github.com/schola-cantorum/cantus@v0.4.2
+pip install git+https://github.com/schola-cantorum/cantus@v0.5.0
 pip install git+https://github.com/schola-cantorum/cantus@main
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
@@ -51,13 +50,13 @@ pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 
 ```bash
-pip install 'cantus-agent[runtime]==0.4.2'
+pip install 'cantus-agent[runtime]==0.5.0'
 ```
 
 The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`):
 
 ```bash
-pip install 'cantus-agent[serve]==0.4.2'
+pip install 'cantus-agent[serve]==0.5.0'
 ```
 
 ## Serve Quickstart (v0.4.0)
@@ -76,7 +75,7 @@ Hit the health endpoint to confirm the server is up:
 
 ```bash
 curl http://localhost:8765/health
-# {"status":"ok","cantus_version":"0.4.0"}
+# {"status":"ok","cantus_version":"0.5.0"}
 ```
 
 ## Desktop (Win / macOS / Linux)
