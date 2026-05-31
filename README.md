@@ -206,6 +206,12 @@ Per-version migration guides for breaking changes between adjacent releases:
 - [v0.3.6 → v0.4.0](./docs/migrations/MIGRATION_v0.3.6_to_v0.4.0.md)
 - [v0.4.0 → v0.4.1](./docs/migrations/MIGRATION_v0.4.0_to_v0.4.1.md)
 - [v0.4.1 → v0.4.2](./docs/migrations/MIGRATION_v0.4.1_to_v0.4.2.md)
+- [v0.4.2 → v0.4.3](./docs/migrations/MIGRATION_v0.4.2_to_v0.4.3.md)
+- [v0.4.3 → v0.4.4](./docs/migrations/MIGRATION_v0.4.3_to_v0.4.4.md)
+- [v0.4.4 → v0.4.5](./docs/migrations/MIGRATION_v0.4.4_to_v0.4.5.md)
+- [v0.4.5 → v0.4.6](./docs/migrations/MIGRATION_v0.4.5_to_v0.4.6.md)
+- [v0.4.6 → v0.4.7](./docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md)
+- [v0.4.7 → v0.5.0](./docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)
 
 The [`CHANGELOG.md`](./CHANGELOG.md) lists everything else (additive features, internal changes, security notes).
 
