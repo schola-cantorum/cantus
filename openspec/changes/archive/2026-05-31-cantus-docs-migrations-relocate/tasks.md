@@ -27,6 +27,6 @@
 
 - [x] 6.1 spectra validate：執行 `spectra validate cantus-docs-migrations-relocate` 退 0。
 - [x] 6.2 spectra analyze：執行 `spectra analyze cantus-docs-migrations-relocate --json` 解析輸出，filter `severity == "Critical"` 或 `severity == "Warning"` 的 findings 數為 0。
-- [ ] 6.3 git rename detection 驗證：執行 `git log --follow docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md` 應能追溯到 commit `ac92c1a`（v0.5.0 release commit）之前的 history。
+- [x] 6.3 git rename detection 驗證：執行 `git log --follow docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md` 應能追溯到 commit `ac92c1a`（v0.5.0 release commit）之前的 history。
 - [x] 6.4 sdist tarball 內容驗證：執行 `uv run python -m build --sdist`，再執行 `tar tzf dist/cantus_agent-0.5.0.tar.gz | grep -c 'docs/migrations/MIGRATION_'` 應為 16。
-- [ ] 6.5 README 連結 cold smoke：本機 `open README.md` 後肉眼點 MIGRATION 區塊兩條連結，確認跳到正確路徑。
+- [x] 6.5 README 連結 cold smoke：本機 `open README.md` 後肉眼點 MIGRATION 區塊兩條連結，確認跳到正確路徑。

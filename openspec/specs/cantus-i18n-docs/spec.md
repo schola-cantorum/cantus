@@ -76,14 +76,6 @@ The `README.md` MUST NOT contain Traditional Chinese teaching-context paragraphs
 | `docs/migrations/MIGRATION_v0.2_to_v0.3.md`             | yes     | Earliest migration guide also under this path    |
 | `README.md`                                             | yes     | Stays at repo root, links updated to new path    |
 
-
-<!-- @trace
-source: cantus-docs-i18n-baseline
-updated: 2026-05-20
-code:
-  - libs/cantus
--->
-
 ---
 ### Requirement: Required zh-TW companion uses the `<name>.zhTW.md` suffix
 
