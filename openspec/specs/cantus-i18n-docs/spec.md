@@ -52,6 +52,8 @@ The following documents SHALL exist under the `docs/migrations/` directory:
 
 The `README.md` MUST NOT contain Traditional Chinese teaching-context paragraphs; such paragraphs SHALL reside only in `README.zhTW.md`.
 
+The `README.md` Upgrade Guides section and the `README.zhTW.md` 升版指南 section SHALL each contain a Markdown link to every file under `docs/migrations/` matching `MIGRATION_v*.md`. The `CHANGELOG.md` entry body for any release that ships with a corresponding `docs/migrations/MIGRATION_v*.md` SHALL contain a Markdown link to that file.
+
 #### Scenario: PyPI long-description renders English-only content
 
 - **WHEN** the PyPI publishing pipeline reads `README.md` as the long-description source
@@ -75,6 +77,31 @@ The `README.md` MUST NOT contain Traditional Chinese teaching-context paragraphs
 | `docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md`         | yes     | Canonical location for all migration guides      |
 | `docs/migrations/MIGRATION_v0.2_to_v0.3.md`             | yes     | Earliest migration guide also under this path    |
 | `README.md`                                             | yes     | Stays at repo root, links updated to new path    |
+
+#### Scenario: Upgrade-guide list contains every released MIGRATION
+
+- **WHEN** a contributor opens `README.md` or `README.zhTW.md` and reads the Upgrade Guides / 升版指南 section
+- **THEN** the section SHALL contain a Markdown link whose URL is the relative path `./docs/migrations/MIGRATION_v<A>.<B>_to_v<X>.<Y>.md` for every file matching that pattern under `docs/migrations/`
+- **AND** the link text SHALL follow the form `v<A>.<B> → v<X>.<Y>` matching the version pair encoded in the filename
+
+##### Example: list covers all migration files
+
+| Working-tree file                                  | Required link presence in README.md and README.zhTW.md Upgrade Guides section |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md`    | one Markdown link with URL `./docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md` and link text `v0.4.6 → v0.4.7` |
+| `docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md`    | one Markdown link with URL `./docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md` and link text `v0.4.7 → v0.5.0` |
+
+#### Scenario: CHANGELOG release entry references its MIGRATION
+
+- **WHEN** a new cantus release `<X>.<Y>` ships and a `docs/migrations/MIGRATION_v<A>.<B>_to_v<X>.<Y>.md` file is added
+- **THEN** the `## [<X>.<Y>]` entry body in `CHANGELOG.md` SHALL contain a Markdown link whose URL is the relative path `docs/migrations/MIGRATION_v<A>.<B>_to_v<X>.<Y>.md`
+
+##### Example: release entries reference their migration files
+
+| CHANGELOG release heading      | Required Markdown link in the entry body                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `## [0.4.7] - 2026-05-28 ...`  | one Markdown link with URL `docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md`            |
+| `## ✨ [0.5.0] - 2026-05-30`   | one Markdown link with URL `docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md`            |
 
 ---
 ### Requirement: Required zh-TW companion uses the `<name>.zhTW.md` suffix
