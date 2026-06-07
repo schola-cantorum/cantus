@@ -71,17 +71,17 @@ code:
 ---
 ### Requirement: load_chat_model factory dispatches by provider prefix with lazy import
 
-The framework SHALL provide a `load_chat_model(spec: str, **kwargs) -> ChatModel` factory function importable from top-level `cantus`. The `spec` argument SHALL be parsed as `"<provider>/<model_id>"`. The factory SHALL accept exactly the provider prefixes `"openai"`, `"anthropic"`, `"google"`, `"groq"`, `"nvidia"`, and `"ollama"`; any other prefix SHALL raise `ValueError` with a message naming the supported prefixes.
+The framework SHALL provide a `load_chat_model(spec: str, **kwargs) -> ChatModel` factory function importable from top-level `cantus`. The `spec` argument SHALL be parsed as `"<provider>/<model_id>"`. The factory SHALL accept exactly the provider prefixes `"openai"`, `"anthropic"`, `"google"`, `"groq"`, `"nvidia"`, `"ollama"`, and `"mlx"`; any other prefix SHALL raise `ValueError` with a message naming the supported prefixes.
 
 The error message for an unsupported prefix SHALL contain the literal substring `supported providers:` followed by the alphabetically sorted list of currently registered provider prefixes. The error message SHALL NOT contain any version string of the form `vN.N.N` (for example, `v0.2.1`, `v0.4.4`) and SHALL NOT contain the literal substrings `ships only` or `ships in`, because the supported-provider set is bound to the registry membership rather than a release version. The factory's docstring SHALL similarly describe the supported providers without referencing a specific release version.
 
-The factory SHALL lazily import the adapter module only when its prefix is requested. When the corresponding optional dependency is not installed, the factory SHALL raise `ImportError` with an installation hint. For prefixes `"openai"`, `"anthropic"`, `"google"`, and `"groq"`, the hint SHALL contain the exact substring `pip install cantus[<provider>]`. For the prefixes `"nvidia"` and `"ollama"`, the hint SHALL contain the exact substring `pip install cantus[openai]` (because both adapters are implemented on top of the OpenAI SDK and route through OpenAI-compatible endpoints; neither has its own dedicated extras dependency closure beyond a documentary alias). Additional keyword arguments SHALL pass through to the adapter's constructor (including `api_key` and `base_url`).
+The factory SHALL lazily import the adapter module only when its prefix is requested. When the corresponding optional dependency is not installed, the factory SHALL raise `ImportError` with an installation hint. For prefixes `"openai"`, `"anthropic"`, `"google"`, `"groq"`, and `"mlx"`, the hint SHALL contain the exact substring `pip install cantus[<provider>]` (each of these has its own dedicated extras dependency closure). For the prefixes `"nvidia"` and `"ollama"`, the hint SHALL contain the exact substring `pip install cantus[openai]` (because both adapters are implemented on top of the OpenAI SDK and route through OpenAI-compatible endpoints; neither has its own dedicated extras dependency closure beyond a documentary alias). The `"mlx"` adapter's extras dependency closure (`mlx-lm`) is Apple-Silicon-only; the adapter module surfaces that platform constraint in its own `ImportError`, which the factory SHALL preserve as the exception cause (`from exc`). Additional keyword arguments SHALL pass through to the adapter's constructor (including `api_key` and `base_url`).
 
 #### Scenario: Unknown provider prefix is rejected
 
 - **WHEN** `load_chat_model("vertex/gemini-2.0-flash")` is called
 - **THEN** the call raises `ValueError`
-- **AND** the message names `openai`, `anthropic`, `google`, `groq`, `nvidia`, and `ollama` as the supported prefixes
+- **AND** the message names `openai`, `anthropic`, `google`, `groq`, `nvidia`, `ollama`, and `mlx` as the supported prefixes
 
 #### Scenario: Unsupported-provider error message is version-agnostic
 
@@ -112,6 +112,18 @@ The factory SHALL lazily import the adapter module only when its prefix is reque
 - **AND** the message contains the substring `pip install cantus[openai]`
 - **AND** the message does NOT contain the substring `cantus[ollama]` as a hint that is different from `cantus[openai]`
 
+#### Scenario: mlx prefix dispatches to MLXChatModel
+
+- **WHEN** `load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")` is called in an environment where `mlx_lm` is importable
+- **THEN** the factory lazily imports `cantus.model.providers.mlx`
+- **AND** the returned instance is an `MLXChatModel` whose `model_id` is `"mlx-community/Mistral-7B-Instruct-v0.3-4bit"`
+
+#### Scenario: Missing optional extras for mlx points at the mlx extras group
+
+- **WHEN** `load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")` is called in an environment where the `mlx_lm` package is not installed
+- **THEN** the call raises `ImportError`
+- **AND** the message contains the substring `pip install cantus[mlx]`
+
 ##### Example: provider prefix dispatch table
 
 | Spec | Lazy-imported module | Constructor class | Missing-extras hint |
@@ -119,22 +131,15 @@ The factory SHALL lazily import the adapter module only when its prefix is reque
 | `openai/gpt-4o-mini` | `cantus.model.providers.openai` | `OpenAIChatModel` | `pip install cantus[openai]` |
 | `anthropic/claude-sonnet-4-6` | `cantus.model.providers.anthropic` | `AnthropicChatModel` | `pip install cantus[anthropic]` |
 | `google/gemini-2.0-flash` | `cantus.model.providers.google` | `GoogleChatModel` | `pip install cantus[google]` |
-
+| `mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit` | `cantus.model.providers.mlx` | `MLXChatModel` | `pip install cantus[mlx]` |
 
 <!-- @trace
-source: gate-a-audit-hardening
-updated: 2026-05-27
+source: cantus-local-llm-mlx-path
+updated: 2026-06-07
 code:
-  - cantus/__init__.py
   - cantus/model/factory.py
-  - cantus/model/providers/ollama.py
-  - tests/cli/fixture_registry.py
-  - cantus/cli.py
-  - pyproject.toml
+  - cantus/model/providers/mlx.py
 tests:
-  - tests/cli/test_registry_import.py
-  - tests/providers/test_ollama_adapter.py
-  - tests/cli/test_serve_args.py
   - tests/test_factory.py
 -->
 
