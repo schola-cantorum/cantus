@@ -119,6 +119,28 @@ print(response.message.content)
 
 Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@skill` before relying on it.
 
+## Local LLMs via MLX (Apple Silicon)
+
+`load_chat_model("mlx/...")` runs a model **in-process** through Apple's [`mlx-lm`](https://github.com/ml-explore/mlx-lm), the native inference framework for M-series chips — no separate daemon or server, faster load times, and lower memory use than the llama.cpp backend Ollama uses on a Mac. Unlike the Ollama path, `MLXChatModel` is not OpenAI-compatible; it loads weights with `mlx_lm.load` and generates with `mlx_lm.generate` / `mlx_lm.stream_generate`.
+
+> **Apple Silicon only.** This provider is supported **only on Apple Silicon (macOS arm64)**. On any other platform the `mlx` extras group resolves to empty and importing the adapter raises an `ImportError` telling you MLX needs Apple Silicon. Install it with:
+
+```bash
+pip install cantus[mlx]
+```
+
+Then point `load_chat_model` at any Hugging Face / MLX model id (you supply your own; cantus does not download weights for you):
+
+```python
+from cantus import Message, load_chat_model
+
+chat = load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+> **No tool use in this release.** `MLXChatModel.supports_tool_use` is `False` — mlx-lm has no native structured tool-call output, so passing a non-empty `tools` argument to `chat()` / `stream()` raises `NotImplementedError` rather than silently ignoring it. Use the Ollama path (or a cloud provider) when you need function calling.
+
 ## Where to go next
 
 - [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
