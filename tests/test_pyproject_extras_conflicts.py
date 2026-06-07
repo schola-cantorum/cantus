@@ -155,3 +155,48 @@ def test_tool_uv_conflicts_cluster_entries_are_well_formed() -> None:
             assert isinstance(entry["extra"], str) and entry["extra"], (
                 f"'extra' value must be a non-empty string; got: {entry!r}"
             )
+
+
+# --- ADDED Requirement: mlx is a platform-scoped extras group (mlx-path) ---
+
+
+def test_mlx_extras_declares_only_platform_scoped_mlx_lm() -> None:
+    """`[project.optional-dependencies].mlx` holds exactly one platform-scoped
+    `mlx-lm` requirement (Apple Silicon marker), mirroring the bitsandbytes
+    precedent."""
+    cfg = _load_pyproject()
+    extras = cfg["project"]["optional-dependencies"]
+    assert "mlx" in extras, "[project.optional-dependencies].mlx missing"
+
+    mlx = extras["mlx"]
+    assert len(mlx) == 1, f"mlx extras must hold exactly one requirement; got: {mlx}"
+
+    entry = mlx[0]
+    dist = re.match(r"^([A-Za-z0-9._-]+)", entry)
+    assert dist is not None and dist.group(1) == "mlx-lm", (
+        f"the single mlx requirement's distribution must be mlx-lm; got: {entry!r}"
+    )
+    assert "platform_machine == 'arm64'" in entry, (
+        f"mlx-lm must be scoped to platform_machine == 'arm64'; got: {entry!r}"
+    )
+    assert "sys_platform == 'darwin'" in entry, (
+        f"mlx-lm must be scoped to sys_platform == 'darwin'; got: {entry!r}"
+    )
+
+
+def test_mlx_conflicts_only_with_huggingface() -> None:
+    """`mlx-lm>=0.31.1` pulls `transformers>=5` while `cantus[huggingface]`
+    pins `transformers>=4.40,<5`, so a single `mlx`↔`huggingface` conflict pair
+    is required for uv universal resolution. No OTHER conflict pair may name
+    `mlx` (the platform marker isolates it from every group except the
+    transformers-pinned huggingface extras)."""
+    cfg = _load_pyproject()
+    conflicts = cfg["tool"]["uv"]["conflicts"]
+    mlx_pairs = [
+        {entry.get("extra") for entry in cluster}
+        for cluster in conflicts
+        if any(entry.get("extra") == "mlx" for entry in cluster)
+    ]
+    assert mlx_pairs == [{"mlx", "huggingface"}], (
+        f"mlx must conflict with exactly huggingface; got: {mlx_pairs!r}"
+    )

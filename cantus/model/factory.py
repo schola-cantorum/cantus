@@ -5,11 +5,12 @@ adapter module so users who only need one provider don't pay the import
 cost of the others (and so missing optional extras surface as actionable
 `ImportError` messages instead of import-time crashes).
 
-v0.5.0 ships six providers — `openai`, `anthropic`, `google`, `groq`,
-`nvidia`, and `ollama`. NVIDIA NIM and the local Ollama daemon are both
+cantus ships seven providers — `openai`, `anthropic`, `google`, `groq`,
+`nvidia`, `ollama`, and `mlx`. NVIDIA NIM and the local Ollama daemon are both
 OpenAI-compatible at the wire layer (subclasses of `OpenAIChatModel`), so
 their missing-extras hints point at `cantus[openai]` rather than phantom
-`cantus[nvidia]` / `cantus[ollama]` packages.
+`cantus[nvidia]` / `cantus[ollama]` packages. The `mlx` adapter runs mlx-lm
+in-process on Apple Silicon and has its own `cantus[mlx]` extras closure.
 """
 
 from __future__ import annotations
@@ -27,13 +28,16 @@ _REGISTRY: dict[str, tuple[str, str]] = {
     "groq": ("cantus.model.providers.groq", "GroqChatModel"),
     "nvidia": ("cantus.model.providers.nvidia", "NvidiaChatModel"),
     "ollama": ("cantus.model.providers.ollama", "OllamaChatModel"),
+    "mlx": ("cantus.model.providers.mlx", "MLXChatModel"),
 }
 
 # NVIDIA's adapter runs on the openai SDK (NIM exposes an OpenAI-compatible
 # endpoint), so its missing-extras hint must point at the openai extras group
 # rather than a non-existent `cantus[nvidia]`. Ollama follows the same pattern
 # (the local daemon exposes an OpenAI-compatible endpoint). Keeping the map
-# explicit makes the special cases auditable.
+# explicit makes the special cases auditable. The `mlx` adapter is in-process
+# (mlx-lm on Apple Silicon), not OpenAI-compatible, so it carries its own
+# `cantus[mlx]` extras closure rather than aliasing `openai`.
 _EXTRAS_HINT: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
@@ -41,6 +45,7 @@ _EXTRAS_HINT: dict[str, str] = {
     "groq": "groq",
     "nvidia": "openai",
     "ollama": "openai",
+    "mlx": "mlx",
 }
 
 

@@ -181,6 +181,21 @@ tui = [
     "textual>=8,<9",
     "httpx>=0.27,<1",
 ]
+# v0.5.x cantus-local-llm-mlx-path — in-process local LLM via Apple's mlx-lm.
+# `MLXChatModel` (provider prefix `mlx`) loads weights with mlx_lm.load and
+# generates with mlx_lm.generate / stream_generate; it is NOT OpenAI-compatible
+# and carries its own extras closure (unlike the ollama/nvidia documentary
+# aliases that point at `openai`). The PEP 508 marker scopes mlx-lm to Apple
+# Silicon (macOS arm64) so non-arm64 environments resolve the group to empty —
+# mirroring the `bitsandbytes; sys_platform == 'linux'` precedent in `runtime`.
+# The platform marker does NOT, however, isolate the transitive dependency
+# clash with `huggingface` (mlx-lm pulls transformers>=5; huggingface pins <5
+# on the same arm64/darwin split), so a [tool.uv] conflicts entry pairs
+# `mlx` with `huggingface` — see [tool.uv] below. CI does not install this
+# group (see test.yml).
+mlx = [
+    "mlx-lm>=0.31,<1; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -258,6 +273,9 @@ module = [
     "fastapi.*",
     "uvicorn.*",
     "pydantic_settings.*",
+    # v0.5.x cantus-local-llm-mlx-path — mlx-lm ships no py.typed marker, so
+    # strict mypy treats `import mlx_lm` as untyped without this override.
+    "mlx_lm.*",
 ]
 ignore_missing_imports = true
 
@@ -290,6 +308,12 @@ conflicts = [
     # uv does not auto-propagate alias-target conflicts, so this entry is
     # required for `uv sync` universal resolution to succeed.
     [{ extra = "ollama" }, { extra = "openhands" }],
+    # v0.5.x cantus-local-llm-mlx-path — mlx-lm>=0.31.1 pulls transformers>=5,
+    # while `cantus[huggingface]` pins transformers>=4.40,<5. Both can be
+    # requested on the same arm64/darwin split, so the platform marker alone
+    # does NOT isolate them; this conflict entry lets `uv sync` universal
+    # resolution succeed (pip is unaffected — it ignores [tool.uv]).
+    [{ extra = "mlx" }, { extra = "huggingface" }],
 ]
 
 [tool.ruff.lint.per-file-ignores]

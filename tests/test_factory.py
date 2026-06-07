@@ -318,3 +318,47 @@ def test_unsupported_provider_error_lists_all_six_providers():
     msg = str(exc.value)
     for provider in ("openai", "anthropic", "google", "groq", "nvidia", "ollama"):
         assert provider in msg, f"supported provider {provider!r} missing from {msg!r}"
+
+
+# ---------- mlx provider (cantus-local-llm-mlx-path) ------------------------
+
+
+def test_mlx_in_registry():
+    from cantus.model.factory import _REGISTRY
+
+    assert _REGISTRY["mlx"] == ("cantus.model.providers.mlx", "MLXChatModel")
+
+
+def test_mlx_extras_hint_points_at_own_mlx_closure():
+    """mlx has its OWN extras dependency closure (mlx-lm), unlike nvidia/ollama
+    which alias `openai`."""
+    from cantus.model.factory import _EXTRAS_HINT
+
+    assert _EXTRAS_HINT["mlx"] == "mlx"
+
+
+def test_unknown_provider_error_message_includes_mlx():
+    """The supported-prefix list in the ValueError message must mention mlx."""
+    with pytest.raises(ValueError) as exc:
+        load_chat_model("vertex/gemini-2.0-flash")
+    assert "mlx" in str(exc.value)
+
+
+def test_missing_mlx_extras_hint_points_to_cantus_mlx(monkeypatch):
+    """When the mlx adapter module's mlx-lm dependency is unavailable, the
+    factory surfaces `pip install cantus[mlx]` (mlx's own closure)."""
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.mlx":
+            raise ImportError("No module named 'mlx_lm'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.mlx", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")
+    assert "pip install cantus[mlx]" in str(exc.value)
