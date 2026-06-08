@@ -5,12 +5,13 @@ adapter module so users who only need one provider don't pay the import
 cost of the others (and so missing optional extras surface as actionable
 `ImportError` messages instead of import-time crashes).
 
-cantus ships seven providers — `openai`, `anthropic`, `google`, `groq`,
-`nvidia`, `ollama`, and `mlx`. NVIDIA NIM and the local Ollama daemon are both
-OpenAI-compatible at the wire layer (subclasses of `OpenAIChatModel`), so
-their missing-extras hints point at `cantus[openai]` rather than phantom
-`cantus[nvidia]` / `cantus[ollama]` packages. The `mlx` adapter runs mlx-lm
-in-process on Apple Silicon and has its own `cantus[mlx]` extras closure.
+cantus ships eight providers — `openai`, `anthropic`, `google`, `groq`,
+`nvidia`, `ollama`, `mlx`, and `omlx`. NVIDIA NIM, the local Ollama daemon, and
+the local omlx / mlx-omni-server are all OpenAI-compatible at the wire layer
+(subclasses of `OpenAIChatModel`), so their missing-extras hints point at
+`cantus[openai]` rather than phantom `cantus[nvidia]` / `cantus[ollama]` /
+`cantus[omlx]` packages. The `mlx` adapter runs mlx-lm in-process on Apple
+Silicon and has its own `cantus[mlx]` extras closure.
 """
 
 from __future__ import annotations
@@ -29,15 +30,17 @@ _REGISTRY: dict[str, tuple[str, str]] = {
     "nvidia": ("cantus.model.providers.nvidia", "NvidiaChatModel"),
     "ollama": ("cantus.model.providers.ollama", "OllamaChatModel"),
     "mlx": ("cantus.model.providers.mlx", "MLXChatModel"),
+    "omlx": ("cantus.model.providers.omlx", "OmlxChatModel"),
 }
 
 # NVIDIA's adapter runs on the openai SDK (NIM exposes an OpenAI-compatible
 # endpoint), so its missing-extras hint must point at the openai extras group
-# rather than a non-existent `cantus[nvidia]`. Ollama follows the same pattern
-# (the local daemon exposes an OpenAI-compatible endpoint). Keeping the map
-# explicit makes the special cases auditable. The `mlx` adapter is in-process
-# (mlx-lm on Apple Silicon), not OpenAI-compatible, so it carries its own
-# `cantus[mlx]` extras closure rather than aliasing `openai`.
+# rather than a non-existent `cantus[nvidia]`. Ollama and omlx follow the same
+# pattern (the local Ollama daemon and the local omlx / mlx-omni-server both
+# expose OpenAI-compatible endpoints). Keeping the map explicit makes the
+# special cases auditable. The `mlx` adapter is in-process (mlx-lm on Apple
+# Silicon), not OpenAI-compatible, so it carries its own `cantus[mlx]` extras
+# closure rather than aliasing `openai`.
 _EXTRAS_HINT: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
@@ -46,6 +49,7 @@ _EXTRAS_HINT: dict[str, str] = {
     "nvidia": "openai",
     "ollama": "openai",
     "mlx": "mlx",
+    "omlx": "openai",
 }
 
 
