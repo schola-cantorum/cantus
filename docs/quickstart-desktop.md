@@ -141,6 +141,27 @@ print(response.message.content)
 
 > **No tool use in this release.** `MLXChatModel.supports_tool_use` is `False` — mlx-lm has no native structured tool-call output, so passing a non-empty `tools` argument to `chat()` / `stream()` raises `NotImplementedError` rather than silently ignoring it. Use the Ollama path (or a cloud provider) when you need function calling.
 
+## Local LLMs via omlx (MLX server)
+
+`load_chat_model("omlx/...")` talks to a **local OpenAI-compatible MLX server** that runs as a separate process on Apple Silicon — either [`omlx`](https://omlx.ai) (default `http://localhost:8000/v1`) or [`mlx-omni-server`](https://github.com/madroidmaq/mlx-omni-server) (default `http://localhost:10240/v1`). Unlike the in-process MLX path above, `OmlxChatModel` is a thin `OpenAIChatModel` subclass, so it runs on the openai SDK with **no new dependency** — install (or reuse) the openai extras:
+
+```bash
+pip install cantus[openai]
+```
+
+Start your server of choice, then point `load_chat_model` at its `/v1` endpoint. **`base_url` is required** — omlx and mlx-omni-server listen on different ports, so there is no single sensible default and you must say which one you mean:
+
+```python
+from cantus import Message, load_chat_model
+
+# omlx defaults to :8000/v1; pass http://localhost:10240/v1 for mlx-omni-server
+chat = load_chat_model("omlx/qwen2.5-coder-7b", base_url="http://localhost:8000/v1")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+> **Function calling works here.** Unlike the in-process MLX path, `OmlxChatModel.supports_tool_use` is `True` — these servers implement OpenAI-style function calling, so you can pass a `tools=` argument to `chat()` / `stream()`. And if the server is not running, `chat()` / `stream()` raise a `ConnectionError` naming the `base_url` instead of a raw httpx stack trace.
+
 ## Where to go next
 
 - [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.

@@ -165,6 +165,18 @@ security = [
 ollama = [
     "cantus-agent[openai]",
 ]
+# v0.6.x cantus-local-llm-omlx-server — documentary alias for the local
+# OpenAI-compatible MLX server path (omlx / mlx-omni-server). `OmlxChatModel`
+# is a thin `OpenAIChatModel` subclass pointing at a localhost server, so it
+# runs on the openai SDK (same pattern as `OllamaChatModel` / `NvidiaChatModel`).
+# The `omlx` extras key resolves to the same closure as `cantus[openai]` — no
+# new third-party packages; downstream code may write `pip install cantus[omlx]`
+# to communicate intent. Because it aliases `openai`, it inherits the
+# openai↔openhands resolution split and needs a matching [tool.uv] conflicts
+# entry (see below), mirroring the `ollama`↔`openhands` pair.
+omlx = [
+    "cantus-agent[openai]",
+]
 providers = [
     "cantus-agent[openai,anthropic,google,groq]",
 ]
@@ -308,6 +320,11 @@ conflicts = [
     # uv does not auto-propagate alias-target conflicts, so this entry is
     # required for `uv sync` universal resolution to succeed.
     [{ extra = "ollama" }, { extra = "openhands" }],
+    # v0.6.x cantus-local-llm-omlx-server — `omlx` is a documentary alias for
+    # `openai` (it targets a local OpenAI-compatible MLX server), so it inherits
+    # the same transitive openai>=1.50,<2 pin and the same incompatibility with
+    # `openhands`. Mirrors the `ollama`↔`openhands` entry above.
+    [{ extra = "omlx" }, { extra = "openhands" }],
     # v0.5.x cantus-local-llm-mlx-path — mlx-lm>=0.31.1 pulls transformers>=5,
     # while `cantus[huggingface]` pins transformers>=4.40,<5. Both can be
     # requested on the same arm64/darwin split, so the platform marker alone

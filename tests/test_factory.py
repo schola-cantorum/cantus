@@ -362,3 +362,64 @@ def test_missing_mlx_extras_hint_points_to_cantus_mlx(monkeypatch):
     with pytest.raises(ImportError) as exc:
         load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")
     assert "pip install cantus[mlx]" in str(exc.value)
+
+
+# ---------- omlx provider (cantus-local-llm-omlx-server) --------------------
+
+
+@pytest.fixture
+def fake_omlx_module():
+    _install_fake_module("cantus.model.providers.omlx", "OmlxChatModel")
+    yield
+    _uninstall_fake_module("cantus.model.providers.omlx")
+
+
+def test_omlx_in_registry():
+    from cantus.model.factory import _REGISTRY
+
+    assert _REGISTRY["omlx"] == ("cantus.model.providers.omlx", "OmlxChatModel")
+
+
+def test_omlx_extras_hint_points_at_openai():
+    """omlx is a documentary alias for openai (it targets a local
+    OpenAI-compatible MLX server), so its missing-extras hint MUST point at
+    cantus[openai] — not a phantom cantus[omlx]."""
+    from cantus.model.factory import _EXTRAS_HINT
+
+    assert _EXTRAS_HINT["omlx"] == "openai"
+
+
+def test_unknown_provider_error_message_includes_omlx():
+    """The supported-prefix list in the ValueError message must mention omlx."""
+    with pytest.raises(ValueError) as exc:
+        load_chat_model("vertex/gemini-2.0-flash")
+    assert "omlx" in str(exc.value)
+
+
+def test_omlx_dispatch_constructs_adapter_via_lazy_import(fake_omlx_module):
+    model = load_chat_model(
+        "omlx/qwen2.5-coder-7b", base_url="http://localhost:8000/v1"
+    )
+    assert isinstance(model, _FakeAdapter)
+    assert model.model_id == "qwen2.5-coder-7b"
+
+
+def test_missing_omlx_extras_hint_points_to_cantus_openai_not_omlx(monkeypatch):
+    """omlx adapter runs on the openai SDK — extras hint MUST point at cantus[openai]."""
+    import importlib
+
+    real_import = importlib.import_module
+
+    def fake_import(name: str, *args, **kwargs):
+        if name == "cantus.model.providers.omlx":
+            raise ImportError("No module named 'openai'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import)
+    monkeypatch.delitem(sys.modules, "cantus.model.providers.omlx", raising=False)
+
+    with pytest.raises(ImportError) as exc:
+        load_chat_model("omlx/qwen2.5-coder-7b", base_url="http://localhost:8000/v1")
+    msg = str(exc.value)
+    assert "pip install cantus[openai]" in msg
+    assert "cantus[omlx]" not in msg

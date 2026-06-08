@@ -200,3 +200,40 @@ def test_mlx_conflicts_only_with_huggingface() -> None:
     assert mlx_pairs == [{"mlx", "huggingface"}], (
         f"mlx must conflict with exactly huggingface; got: {mlx_pairs!r}"
     )
+
+
+# --- ADDED Requirement: omlx documentary alias (cantus-local-llm-omlx-server)
+
+
+def test_omlx_extras_is_documentary_alias_to_openai() -> None:
+    """`[project.optional-dependencies].omlx` is a documentary alias holding
+    exactly the self-referential `cantus-agent[openai]` extra — no new
+    third-party package (mirrors the `ollama` alias). `OmlxChatModel` runs on
+    the openai SDK against a local OpenAI-compatible MLX server."""
+    cfg = _load_pyproject()
+    extras = cfg["project"]["optional-dependencies"]
+    assert "omlx" in extras, "[project.optional-dependencies].omlx missing"
+
+    omlx = extras["omlx"]
+    assert len(omlx) == 1, f"omlx extras must hold exactly one requirement; got: {omlx}"
+    normalized = omlx[0].replace(" ", "").lower()
+    assert normalized == "cantus-agent[openai]", (
+        f"omlx must be the self-referential cantus-agent[openai] alias; got: {omlx[0]!r}"
+    )
+
+
+def test_omlx_conflicts_only_with_openhands() -> None:
+    """omlx aliases the openai closure (transitive openai>=1.50,<2), which
+    already conflicts with the openhands extras, so a single omlx↔openhands
+    conflict pair is required for uv universal resolution — mirroring the
+    ollama↔openhands pair. No OTHER conflict pair may name omlx."""
+    cfg = _load_pyproject()
+    conflicts = cfg["tool"]["uv"]["conflicts"]
+    omlx_pairs = [
+        {entry.get("extra") for entry in cluster}
+        for cluster in conflicts
+        if any(entry.get("extra") == "omlx" for entry in cluster)
+    ]
+    assert omlx_pairs == [{"omlx", "openhands"}], (
+        f"omlx must conflict with exactly openhands; got: {omlx_pairs!r}"
+    )
