@@ -182,7 +182,7 @@ Workflows building block:
 
 ## Documentation
 
-Full docs live in [`docs/`](./docs/):
+Full docs live in [`docs/`](./docs/) — see the [docs index](./docs/README.md) for a complete table of contents:
 
 - [Overview](./docs/overview.md) — architecture and design philosophy
 - [Quickstart](./docs/quickstart.md) — from zero to first agent in 10 minutes

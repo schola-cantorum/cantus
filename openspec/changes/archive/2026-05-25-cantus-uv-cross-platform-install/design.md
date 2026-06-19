@@ -9,7 +9,7 @@
 
 結論：`cantus[runtime]` 在 macOS arm64 / Windows 上「即使裝得起來，4-bit 量化路徑也是 non-functional」；只有 macOS Intel 是純粹的 install-time 失敗。把 bnb 限制到 Linux 不是「修 install resolve」而是「**刪掉非 Linux 上沒用的 native dependency**」，順便讓 macOS Intel 的 install 解析成功。
 
-過去 v0.1.x ~ v0.4.2 假設 Colab 為主場景，所有 runtime 跑在 Linux GPU runtime；現在使用者 fhsh.tp.edu.tw 的教學情境（見 `/Users/phoenix/.claude/projects/-Users-phoenix-dev-edu-projects-cantus/memory/project_teaching_context.md`）要求三 OS 都能 install，且 uv 必須可用。
+過去 v0.1.x ~ v0.4.2 假設 Colab 為主場景，所有 runtime 跑在 Linux GPU runtime；現在使用者 fhsh.tp.edu.tw 的教學情境（見維護者本機的教學情境記錄）要求三 OS 都能 install，且 uv 必須可用。
 
 `docs/quickstart.md` 與 `README.zhTW.md` 第一個範例仍是 `mount_drive_and_load()`（Colab-only），桌面學生第一次接觸 framework 會直接踩雷。Stakeholder：
 

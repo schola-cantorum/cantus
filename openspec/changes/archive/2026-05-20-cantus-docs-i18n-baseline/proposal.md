@@ -41,7 +41,7 @@ cantus 即將上 PyPI 對外公開發佈，PyPI long-description（即 `README.m
 ## Non-Goals
 
 - **不執行 PyPI publish**：本支 change 只建立 doc i18n baseline；GHA OIDC trusted publisher、`pyproject.toml` 補 `urls` / `keywords` / `Development Status` classifier 留給下一支 `cantus-pypi-publish`。
-- **不搬遷 cantus repo 物理位置**：本支 change 在 `libs/cantus/` submodule 內進行；物理搬遷到 `/Users/phoenix/dev/edu-projects/cantus/` 留給第 4 支 `cantus-relocate-to-edu-projects`。
+- **不搬遷 cantus repo 物理位置**：本支 change 在 `libs/cantus/` submodule 內進行；物理搬遷到 `edu-projects/cantus/` 留給第 4 支 `cantus-relocate-to-edu-projects`。
 - **不重寫 `docs/api/*.md` API reference**：API doc 既有且足夠；本支僅補約定「英文 only」。
 - **不翻譯 `MIGRATION_v*.md`**：使用者導向英文（OSS 慣例）；學生若需要可在課程 NotebookLM 內提問。
 - **繁中 prose audit 不在本支範圍**：`/humane-prose-audit` 設計針對英文 prose；繁中 docs 視情況人工校對，本支不引入繁中 prose audit skill。

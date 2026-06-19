@@ -28,7 +28,7 @@ Cantus v0.4.1 目前只能透過 `pip install git+https://github.com/schola-cant
 
 - 不搬 framework spec 到 cantus repo（Phase 2 `cantus-spec-self-hosting` 另開）。
 - 不移除 `pip install git+https://github.com/schola-cantorum/cantus@<ref>` 路徑；保留作為 `main` 與 arbitrary-SHA 安裝 escape hatch。
-- 不把 cantus 物理搬到 `/Users/phoenix/dev/edu-projects/cantus/`（Phase 3 另開）。
+- 不把 cantus 物理搬到 `edu-projects/cantus/`（Phase 3 另開）。
 - 不在本支變更主 repo `libs/cantus/` submodule pin；follow-up `bump-cantus-pin-to-v0-4-2` 另開。
 - 不新增 CHANGELOG zh-TW companion 檔案。`cantus-i18n-docs` spec 把它列為 Optional companion；要 promote 為 Required 是另一支 change 的事。
 - 不加 Python 3.13 進 CI matrix。`cantus[openhands]` 既有 `python_version >= '3.12' and python_version < '3.13'` marker；擴 matrix 是獨立議題。

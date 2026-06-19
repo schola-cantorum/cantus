@@ -32,6 +32,15 @@ For "the framework is behaving oddly" reports, first confirm that the Cantus ver
 - **Naming** — protocol classes stay unprefixed (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`, `Agent`). Do not add a `Cantus` prefix.
 - **No silent fallback** — prefer raising `ImportError`, `TypeError`, or `ValueError` over silently degrading.
 
+## Pre-commit hooks
+
+The repo ships a `.pre-commit-config.yaml` whose `check-no-dev-paths` hook runs `scripts/check_no_dev_paths.sh` — a guard that blocks absolute development-environment home paths (`/Users/<name>`, `/home/<name>`) from entering tracked files. The same guard runs in CI (`.github/workflows/repo-hygiene.yml`); installing the hook locally catches leaks before they ever reach a commit:
+
+```bash
+pip install pre-commit   # or: uv tool install pre-commit
+pre-commit install
+```
+
 ## Scope (which PRs will be rejected)
 
 - Adding a new third-party dependency without a prior issue discussion.

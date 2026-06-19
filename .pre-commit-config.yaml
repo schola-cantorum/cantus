@@ -1,0 +1,15 @@
+# Pre-commit hooks for cantus contributors.
+# Enable locally with:  pre-commit install
+# The same guard runs in CI via .github/workflows/repo-hygiene.yml, so the hook
+# is a convenience that catches leaks before they ever reach a commit.
+repos:
+  - repo: local
+    hooks:
+      - id: check-no-dev-paths
+        name: no development-environment paths in tracked files
+        entry: scripts/check_no_dev_paths.sh
+        language: script
+        # The guard scans git-tracked files itself; it takes no filenames and
+        # must run on every commit regardless of which files changed.
+        pass_filenames: false
+        always_run: true

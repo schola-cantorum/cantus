@@ -1,0 +1,20 @@
+name: repo-hygiene
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  no-dev-paths:
+    name: No development-environment paths in tracked files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          # Full history is unnecessary; the guard scans the current tree only.
+          fetch-depth: 1
+
+      - name: Guard against development-environment path leakage
+        run: bash scripts/check_no_dev_paths.sh
