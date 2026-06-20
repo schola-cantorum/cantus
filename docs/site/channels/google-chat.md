@@ -1,36 +1,36 @@
-# Cookbook：用 cantus 接 Google Chat（透過 Cloud Pub/Sub，無需公開 HTTPS）
+# Cookbook: Connect cantus to Google Chat (over Cloud Pub/Sub, no public HTTPS)
 
-這份 walkthrough 帶你從零把一個 Google Chat app 接到 `cantus serve`，跑通 echo bot（成員在 space 講話 → bot 回訊息）。Google Chat 比 LINE / Telegram / Discord 多了一點 GCP 設定，但**少了一件大事**：因為走 Cloud Pub/Sub pull，你的筆電**不需要對外 HTTPS 端點**（不用 Cloudflare Tunnel），只要 service account 有權限就行。
+This walkthrough takes a Google Chat app from zero to a working echo bot on `cantus serve`: a member says something in a space, and the bot replies. Google Chat asks for more GCP setup than LINE, Telegram, or Discord, but it drops the requirement those three share: because cantus pulls from Cloud Pub/Sub, your laptop never needs a public HTTPS endpoint, so there is no Cloudflare Tunnel to run. A service account with Pub/Sub Subscriber access is enough.
 
-> 設計取捨：Google Chat 也有 HTTPS webhook 模式（RS256 JWT 簽章），但 cantus 不支援那條路徑。原因是 RS256 + JWKS 公鑰輪替會把 `pyjwt`、`cryptography` 拉進 `cantus[serve]`，且仍然需要公開端點。Pub/Sub pull 用 IAM service account 認證，學生情境（筆電 + NAT）剛好走得通。
+> Design tradeoff: Google Chat also offers an HTTPS webhook mode with RS256 JWT signing, but cantus does not support that path. RS256 plus JWKS public-key rotation would pull `pyjwt` and `cryptography` into `cantus[serve]`, and it would still need a public endpoint. Pub/Sub pull authenticates with an IAM service account, which fits the student scenario (a laptop behind NAT) cleanly.
 
-## 0. 你會用到的東西
+## 0. What you'll need
 
-- 一個 [Google Cloud](https://console.cloud.google.com/) 帳號（用 Google Workspace 或一般 Gmail 都行）。
-- 一個你能管理的 [Google Chat space](https://chat.google.com/) 作為測試目標。
-- 已安裝 `cantus-agent[serve]>=0.4.7`。
-- 一台筆電，OS 不重要 ── `google-cloud-pubsub` 與其遞移依賴 `grpcio` 在 Linux x86_64 / macOS arm64+x86_64 / Windows AMD64 都有 prebuilt wheel。
-- **不需要** `cloudflared`、`ngrok` 或任何 tunnel。
+- A [Google Cloud](https://console.cloud.google.com/) account (Google Workspace or a regular Gmail account both work).
+- A [Google Chat space](https://chat.google.com/) you can administer, to use as the test target.
+- `cantus-agent[serve]>=0.4.7` installed.
+- A laptop on any OS. `google-cloud-pubsub` and its transitive dependency `grpcio` ship prebuilt wheels for Linux x86_64, macOS arm64 and x86_64, and Windows AMD64.
+- **No** `cloudflared`, `ngrok`, or any tunnel.
 
-## 1. 在 Google Cloud Console 開 GCP project + 啟用 API
+## 1. Create a GCP project and enable APIs in the Google Cloud Console
 
-1. 進 [Google Cloud Console](https://console.cloud.google.com/) → **Select a project** → **New Project**。取個名字（例如 `cantus-chatbot`）。
-2. 進到該 project 的 **APIs & Services** → **Library**，啟用以下 API：
+1. Open the [Google Cloud Console](https://console.cloud.google.com/), then **Select a project** -> **New Project**. Give it a name, for example `cantus-chatbot`.
+2. In that project, go to **APIs & Services** -> **Library** and enable these APIs:
    - **Google Chat API**
    - **Cloud Pub/Sub API**
    - **Google Workspace Events API**
-3. 抄下 **Project ID**（不是 Project Number，是字串形式的 ID，例如 `cantus-chatbot-2026`）。
+3. Note the **Project ID** (the string-form ID, not the Project Number), for example `cantus-chatbot-2026`.
 
-## 2. 開 service account + 下載 SA JSON 金鑰
+## 2. Create a service account and download its JSON key
 
-1. **IAM & Admin** → **Service Accounts** → **Create Service Account**。取個名字（例如 `cantus-chatbot-sa`）。
-2. 給予角色：
-   - **Pub/Sub Subscriber**（讀 Pub/Sub topic）
-3. 在 service account 詳細頁 → **Keys** tab → **Add Key** → **Create new key** → **JSON** → 下載。
-4. 把下載的 JSON 檔放到本機安全位置（**不要 commit 進 git**），例如 `~/.cantus/sa.json`，並 `chmod 600 ~/.cantus/sa.json`。
-5. 在 [Google Chat admin / API console](https://developers.google.com/workspace/chat/configure-app) 把該 service account 的 email 加為 Chat app 的 service account。
+1. Go to **IAM & Admin** -> **Service Accounts** -> **Create Service Account**. Give it a name, for example `cantus-chatbot-sa`.
+2. Grant it the role:
+   - **Pub/Sub Subscriber** (to read the Pub/Sub topic)
+3. On the service account detail page, open the **Keys** tab -> **Add Key** -> **Create new key** -> **JSON** -> download.
+4. Put the downloaded JSON file somewhere safe on your machine (**do not commit it to git**), for example `~/.cantus/sa.json`, and run `chmod 600 ~/.cantus/sa.json`.
+5. In the [Google Chat admin / API console](https://developers.google.com/workspace/chat/configure-app), add this service account's email as the Chat app's service account.
 
-## 3. 開 Pub/Sub topic + subscription
+## 3. Create a Pub/Sub topic and subscription
 
 ```bash
 gcloud config set project YOUR_PROJECT_ID
@@ -38,11 +38,11 @@ gcloud pubsub topics create cantus-chat-events
 gcloud pubsub subscriptions create cantus-chat-sub --topic=cantus-chat-events
 ```
 
-兩個關鍵字串會用到：
-- **Topic**：`projects/YOUR_PROJECT_ID/topics/cantus-chat-events`
-- **Subscription**：`projects/YOUR_PROJECT_ID/subscriptions/cantus-chat-sub`
+Two strings you'll use later:
+- **Topic**: `projects/YOUR_PROJECT_ID/topics/cantus-chat-events`
+- **Subscription**: `projects/YOUR_PROJECT_ID/subscriptions/cantus-chat-sub`
 
-讓 Chat-events publisher（Google 內部 service account）可以發布到你的 topic：
+Let the Chat-events publisher (an internal Google service account) publish to your topic:
 
 ```bash
 gcloud pubsub topics add-iam-policy-binding cantus-chat-events \
@@ -50,7 +50,7 @@ gcloud pubsub topics add-iam-policy-binding cantus-chat-events \
   --role='roles/pubsub.publisher'
 ```
 
-## 4. 在 Google Workspace Events API 訂閱 Chat events
+## 4. Subscribe to Chat events through the Google Workspace Events API
 
 ```bash
 curl -X POST \
@@ -67,9 +67,9 @@ curl -X POST \
   }'
 ```
 
-`YOUR_SPACE_ID` 來自你想要 bot 監聽的 Chat space URL（例如 `https://chat.google.com/room/AAAA...` 裡的 `AAAA...`）。
+`YOUR_SPACE_ID` comes from the URL of the Chat space you want the bot to listen to (for example the `AAAA...` part in `https://chat.google.com/room/AAAA...`).
 
-## 5. 寫 `myskills/app.py`
+## 5. Write `myskills/app.py`
 
 ```python
 # myskills/app.py
@@ -86,12 +86,13 @@ def echo(text: str) -> str:
 
 registry.register("skill", echo)
 
-# 三個值都從 CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_* env vars 拿
-# （建構子也可以直接吃參數，但別把 SA 路徑寫進原始碼以免不同部署混淆）。
+# All three values come from CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_* env vars.
+# (The constructor accepts them directly too, but keep the SA path out of
+# source code so different deployments don't get crossed.)
 google_chat_channel = GoogleChatPubSubChannel()
 ```
 
-## 6. 把 SA 路徑與訂閱資訊放進 shell
+## 6. Put the SA path and subscription details in your shell
 
 ```bash
 export CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH=$HOME/.cantus/sa.json
@@ -99,9 +100,9 @@ export CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SUBSCRIPTION=projects/YOUR_PROJECT_ID/su
 export CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SPACE=spaces/YOUR_SPACE_ID
 ```
 
-> **不是 secret 的**：`CREDENTIALS_PATH` 只是檔案路徑，`SUBSCRIPTION` 與 `SPACE` 是 Google 公開識別子。**真正的 secret 是 SA JSON 檔案的內容** ── 那檔案不要 commit 進 git，且 `chmod 600` 保護讀取權限。
+> **Not secrets**: `CREDENTIALS_PATH` is just a file path, and `SUBSCRIPTION` and `SPACE` are public Google identifiers. **The real secret is the contents of the SA JSON file.** Keep that file out of git and protect read access with `chmod 600`.
 
-## 7. 跑 `cantus serve`
+## 7. Run `cantus serve`
 
 ```bash
 cantus serve \
@@ -109,41 +110,41 @@ cantus serve \
   --channels myskills.app:google_chat_channel
 ```
 
-預期 log（前面省略 cantus 啟動訊息）：
+Expected log (cantus startup lines omitted above it):
 
 ```
 INFO cantus.serve.channels GoogleChatPubSubChannel connected: projects/.../subscriptions/cantus-chat-sub
 ```
 
-## 8. 手動 smoke：在 Chat space 講一句話
+## 8. Manual smoke test: say something in the Chat space
 
-到你的 Google Chat space 講 `hello`，cantus 應該：
+Go to your Google Chat space and say `hello`. cantus should:
 
-1. 從 Pub/Sub pull 收到 `google.workspace.chat.message.v1.created` 事件。
-2. 把事件放進內部 queue（你的 skill 可以 receive 出來處理）。
-3. 假設 skill 呼叫 `channel.send({"data": {"text": "hello back"}})`，bot 會在同一 space 回覆 `hello back`。
+1. Pull a `google.workspace.chat.message.v1.created` event from Pub/Sub.
+2. Put the event on an internal queue (your skill can `receive` it for processing).
+3. Assuming the skill calls `channel.send({"data": {"text": "hello back"}})`, the bot replies `hello back` in the same space.
 
-如果沒看到事件進來，依序檢查：
-- `gcloud pubsub subscriptions pull cantus-chat-sub --auto-ack --limit=10` 看 topic 是否真的有訊息 ── 沒有的話 Workspace Events API 訂閱可能失敗。
-- SA 是否有 `roles/pubsub.subscriber` 在那條 subscription 上。
-- `cantus serve` log 是否出現 backoff 重試 ── 連續 10 次失敗會把 `self.last_error` 記下並安靜停止重連（不會 crash lifespan）。
+If no events arrive, check in order:
+- `gcloud pubsub subscriptions pull cantus-chat-sub --auto-ack --limit=10` to see whether the topic actually has messages. If not, the Workspace Events API subscription may have failed.
+- Whether the SA has `roles/pubsub.subscriber` on that subscription.
+- Whether the `cantus serve` log shows backoff retries. After 10 consecutive failures it records `self.last_error` and stops reconnecting, but the rest of the server keeps running — the channel gives up without crashing the lifespan.
 
-## 9. 關閉
+## 9. Shutdown
 
-`Ctrl+C` 停掉 `cantus serve`。lifespan 會：
-1. 呼叫 `channel.disconnect()` cancel Pub/Sub pull。
-2. 關閉 app-scoped `httpx.AsyncClient`（這順序很重要 ── 出站 send 要在 disconnect 之前還可用）。
+`Ctrl+C` stops `cantus serve`. The lifespan then:
+1. Calls `channel.disconnect()` to cancel the Pub/Sub pull.
+2. Closes the app-scoped `httpx.AsyncClient`. The order matters: outbound `send` must still work before `disconnect` runs.
 
-清理 Pub/Sub 資源（可選）：
+Clean up the Pub/Sub resources (optional):
 
 ```bash
 gcloud pubsub subscriptions delete cantus-chat-sub
 gcloud pubsub topics delete cantus-chat-events
 ```
 
-## 安全提醒
+## Security notes
 
-- **SA JSON 檔絕不要 commit**。`.gitignore` 加 `*sa.json` / `*service-account*.json` 之類的 pattern。
-- 部署到正式環境時用 [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) 取代靜態 SA key，能避免長期金鑰外洩風險。
-- `CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH` 沒設時，cantus 會回退到 `GOOGLE_APPLICATION_CREDENTIALS`（Google 官方 ADC 標準），所以兩個都不設就會在 channel 建構時直接 fail-fast，錯誤訊息固定字串、不 echo 任何輸入值。
-- `cantus serve --auth-mode bearer` 或 `--auth-mode api-key` 對 Skill HTTP endpoint 加 auth；channel inbound 走 Pub/Sub pull，沒有 HTTP route 需要 protect。
+- **Never commit the SA JSON file.** Add patterns like `*sa.json` and `*service-account*.json` to `.gitignore`.
+- For production, replace the static SA key with [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) to avoid the risk of leaking long-lived keys.
+- When `CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH` is unset, cantus falls back to `GOOGLE_APPLICATION_CREDENTIALS` (Google's standard ADC variable). So if neither is set, the channel fails fast at construction time with a fixed error string that does not echo any input value.
+- `cantus serve --auth-mode bearer` or `--auth-mode api-key` adds auth to the Skill HTTP endpoints. Channel inbound traffic goes over Pub/Sub pull, so there is no HTTP route to protect there.

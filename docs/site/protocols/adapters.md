@@ -1,22 +1,22 @@
-# `cantus.adapters` — bridges to MCP and Anthropic Memory（v0.3.2）
+# `cantus.adapters` — bridges to MCP and Anthropic Memory (v0.3.2)
 
-## 套件總覽
+## Package overview
 
-`cantus.adapters` 是 v0.3.2 引入的 bridge 層，把 cantus Skill / Memory 暴露給業界既有 agent 生態（MCP、Anthropic Memory tool），或反過來把外部 tool 拉進 cantus。三個公開 callable：
+`cantus.adapters` is the bridge layer introduced in v0.3.2. It exposes cantus Skill and Memory objects to existing agent ecosystems (MCP, the Anthropic Memory tool), and in the other direction pulls external tools into cantus. v0.3.2 ships three public callables:
 
-| 函式 | 方向 | 依賴 |
+| Function | Direction | Dependency |
 | --- | --- | --- |
-| `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install（無外部 SDK） |
+| `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install (no external SDK) |
 | `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus[mcp]` |
 | `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus[mcp]` |
 
-設計原則：
+Design principles:
 
-- **純包裝層** —— adapter **不**變動 Skill / Memory 的 runtime 行為；只做 schema 翻譯。
-- **不引入 protocol kind** —— `Registry.KINDS` 仍為 `("skill",)`。
-- **`Skill.spec_for_llm()` shape 不變** —— 任何 schema 轉換在 adapter 端完成；既有 v0.3.0 contract 全綠。
+- **Pure wrapper layer** — an adapter does **not** change the runtime behavior of a Skill or Memory; it only translates schemas.
+- **No new protocol kind** — `Registry.KINDS` stays `("skill",)`.
+- **`Skill.spec_for_llm()` shape is unchanged** — any schema conversion happens on the adapter side, so the existing v0.3.0 contract still passes.
 
-## `expose_as_anthropic_memory_tool` 5-line 範例
+## `expose_as_anthropic_memory_tool` five-line example
 
 ```python
 import anthropic
@@ -25,18 +25,18 @@ from cantus.adapters import expose_as_anthropic_memory_tool
 
 memory = AutoMemory(backend=MarkdownMemory("memo.md"))
 tool_dict = expose_as_anthropic_memory_tool(memory)
-# 直接餵給 Anthropic API
+# Feed it straight to the Anthropic API
 resp = anthropic.Anthropic().messages.create(
     model="claude-sonnet-4-6",
     max_tokens=1024,
     tools=[tool_dict],
-    messages=[{"role": "user", "content": "幫我記錄今天看了什麼書"}],
+    messages=[{"role": "user", "content": "Help me note down what I read today"}],
 )
 ```
 
-**LLM 自主 CRUD foot-gun 警告（carry-over v0.3.1 AutoMemory Trap-10）**：在這個 tool_use 迴圈裡，Claude 對 cantus Memory 有完整 CRUD 權限——它能 `view` / `create` / `str_replace` / `delete` 任何記錄。**正式應用**前請在 host code dispatch 層（你接收 `tool_use` 後 dispatch 回 `memory.recall` / `memory.remember` 的那段）加過濾，或在底層 Skill 上 `@skill(post_hook=...)` 把關。詳見 `docs/protocols/memory.md` 的「`AutoMemory`：LLM 自主 CRUD 與正式應用警告」段。
+**LLM-driven CRUD foot-gun warning (carried over from the v0.3.1 AutoMemory Trap-10)**: inside this tool_use loop, Claude has full CRUD access to the cantus Memory — it can `view`, `create`, `str_replace`, or `delete` any record. Before you ship to production, add filtering in the host-code dispatch layer (the part where you receive a `tool_use` and dispatch back to `memory.recall` / `memory.remember`), or gate the underlying Skill with `@skill(post_hook=...)`. See the "`AutoMemory`: LLM-driven CRUD and the production warning" section in `docs/protocols/memory.md`.
 
-## `export_as_mcp_server` 5-line 範例（stdio）
+## `export_as_mcp_server` five-line example (stdio)
 
 ```python
 from cantus import skill
@@ -48,21 +48,21 @@ def search_book(title: str) -> str:
     return f"found: {title}"
 
 srv = export_as_mcp_server([search_book], name="cantus-demo", version="0.3.2")
-srv.run(transport="stdio")  # 阻塞執行；Ctrl+C 終止
+srv.run(transport="stdio")  # blocks; stop with Ctrl+C
 ```
 
-接到 Claude Desktop：把 `claude_desktop_config.json` 的 `mcpServers` 一段填上你的啟動指令（例：`uv run python -m my_server`）即可。
+To wire this into Claude Desktop, add your launch command to the `mcpServers` block of `claude_desktop_config.json` (for example `uv run python -m my_server`).
 
-### HTTP transport + `port=0` 與 threading
+### HTTP transport, `port=0`, and threading
 
-`run(transport="http")` 預設 `port=8765`，但**開發環境推薦用 `port=0`** 讓 kernel 自動分配 ephemeral port，避免重啟 Jupyter 時遇到 `OSError("Address already in use")`：
+`run(transport="http")` defaults to `port=8765`, but **for development we recommend `port=0`** so the kernel assigns an ephemeral port automatically. That avoids `OSError("Address already in use")` when you restart Jupyter:
 
 ```python
 import threading
 from cantus.adapters import export_as_mcp_server
 
 srv = export_as_mcp_server([search_book], name="cantus-demo", version="0.3.2")
-# 啟動為 daemon thread，主程序可繼續做其他事
+# Start it as a daemon thread so the main program can keep working
 t = threading.Thread(
     target=srv.run,
     kwargs={"transport": "http", "host": "127.0.0.1", "port": 0},
@@ -71,9 +71,9 @@ t = threading.Thread(
 t.start()
 ```
 
-`port=0` 後實際分配的 port 由 SDK 端決定；如果你需要知道實際 port 回傳給其他服務，請看 mcp SDK 提供的 server-info hook。production-grade graceful shutdown 留給 v0.4.0 `cantus-serve-core`。
+With `port=0` the actual port is chosen by the SDK. If you need to read back the assigned port and hand it to another service, see the server-info hook the mcp SDK provides. Production-grade graceful shutdown is left to the v0.4.0 `cantus-serve-core` work.
 
-## `import_mcp_server` 5-line 範例（stdio）
+## `import_mcp_server` five-line example (stdio)
 
 ```python
 from cantus import Agent, get_registry
@@ -81,54 +81,54 @@ from cantus.adapters import import_mcp_server
 
 skills = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
 for s in skills:
-    get_registry().register("skill", s)  # 讓 Agent 看到這些遠端 tool
+    get_registry().register("skill", s)  # make these remote tools visible to the Agent
 ```
 
-### 信任邊界（重要）
+### Trust boundary (important)
 
-`command_or_url` 在 stdio transport 下會被啟動為**子程序**。cantus 強制走 `subprocess.Popen(args=[...])` 的 list 形式、**永不**用 `shell=True`，且 reject 含 shell metacharacter（`|` `>` `<` `&` `;` `$` 反引號 換行）的 input。但這只擋住意外注入；**不要餵 untrusted command_or_url**——這等同於授權執行任意程序。
+Under the stdio transport, `command_or_url` is launched as a **child process**. cantus always uses the list form `subprocess.Popen(args=[...])`, **never** `shell=True`, and it rejects input containing a shell metacharacter (`|` `>` `<` `&` `;` `$`, backtick, newline). That only stops accidental injection; **do not feed it an untrusted `command_or_url`** — doing so is equivalent to granting permission to run arbitrary programs.
 
-`http` transport 則用 `urllib.parse.urlparse` 驗 scheme 屬 `{"http", "https"}`、netloc 非空；其他 scheme（`file://`、`ftp://`、`javascript:`）會 reject。但對遠端 server 的內容**不**做信任驗證——server 回傳什麼 schema，cantus 包什麼。production 場景請對 `command_or_url` 來源做白名單管控。
+The `http` transport uses `urllib.parse.urlparse` to check that the scheme is in `{"http", "https"}` and the netloc is non-empty; other schemes (`file://`, `ftp://`, `javascript:`) are rejected. It does **not** validate the trustworthiness of the remote server's content — whatever schema the server returns, cantus wraps. In production, keep an allowlist over the source of `command_or_url`.
 
-## Schema Compatibility（audit Trap-7 fix）
+## Schema compatibility (audit Trap-7 fix)
 
-cantus `Skill.spec_for_llm()["args_schema"]` 是 Pydantic 產生的 JSON Schema，可能含 Pydantic-specific 鍵（`title`、`additionalProperties: false`、`examples`）。`export_as_mcp_server` 與 `expose_as_anthropic_memory_tool` 都**不轉換**這個 schema，直接帶入 MCP `inputSchema` / Anthropic `args_schema`。
+cantus `Skill.spec_for_llm()["args_schema"]` is a JSON Schema produced by Pydantic, so it may carry Pydantic-specific keys (`title`, `additionalProperties: false`, `examples`). Both `export_as_mcp_server` and `expose_as_anthropic_memory_tool` pass that schema through **without conversion**, straight into the MCP `inputSchema` and Anthropic `args_schema` respectively.
 
-學生需要知道的後果：
+What students need to know about the consequences:
 
-- 如果你在 Skill 內用 `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")`，產生的 schema 會帶 `additionalProperties: false`。MCP SDK 與 Claude API 兩端**多半支援**，但少數客戶端可能 strict-validate 整個 schema 後拒絕未知欄位。如果遇到問題，把 `extra="ignore"` 改回（pydantic 預設）即可。
-- `title` 欄位在 schema 內是 Pydantic 預設加入的 metadata，下游不會 break，但顯示時可能看到自動命名（`SearchBookArgs` 之類）；如果不喜歡可以在 model 內手動加 `model_config = ConfigDict(title="...")` 覆寫。
+- If you set `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")` inside a Skill, the generated schema carries `additionalProperties: false`. The MCP SDK and the Claude API both accept that key, but some stricter clients validate the whole schema and reject any field they do not recognize. If you hit that, switch back to `extra="ignore"` (the Pydantic default).
+- The `title` field is metadata Pydantic adds by default. It will not break downstream, but the display name may show an auto-generated value (something like `SearchBookArgs`). If you do not like it, override it with `model_config = ConfigDict(title="...")` inside the model.
 
-cantus framework **不**做 schema normalisation（normalisation 與「直接帶入」拍板衝突），所以這條相容性在學生端是顯式的。
+The cantus framework does **not** normalize schemas (normalization conflicts with the "pass through unchanged" decision), so this compatibility concern is explicit on the student's side.
 
-## Authorization & Memory Mutation（audit Trap-10 fix，carry-over）
+## Authorization and memory mutation (audit Trap-10 fix, carried over)
 
-`expose_as_anthropic_memory_tool` 走 Anthropic tool_use 路徑時：
+When `expose_as_anthropic_memory_tool` runs through the Anthropic tool_use path:
 
-1. Claude 看到 `tool_dict["commands"]` 的 4 個 action（`view` / `create` / `str_replace` / `delete`）
-2. Claude 自主決定何時呼叫哪個 action（cantus framework 不介入這個決策）
-3. host code 接到 `tool_use` 後，dispatch 回 `memory.recall` / `memory.remember`（或包裝過的 wrapper）
+1. Claude sees the four actions in `tool_dict["commands"]` (`view`, `create`, `str_replace`, `delete`).
+2. Claude decides on its own when to call which action (the cantus framework does not step into that decision).
+3. Your host code receives the `tool_use` and dispatches back to `memory.recall` / `memory.remember` (or a wrapper around them).
 
-**步驟 3 是你的最後一道防線**。若 Claude 決定 `delete`，你的 dispatch 直接呼叫 `memory.remove(query=...)`（如果你的 Memory backend 支援 delete）會立刻刪資料。建議：
+**Step 3 is your last line of defense.** If Claude decides to `delete` and your dispatch calls `memory.remove(query=...)` directly (assuming your Memory backend supports delete), the data is gone immediately. Recommended practice:
 
-- production 場景的 `delete` / `str_replace` 都加 explicit confirmation
-- 對寫入內容做 PII / 敏感資訊掃描（host code 端，不是 framework 責任）
-- 對特定 query pattern 設白名單（例：禁止 `query=""` 或極短 query 防止 mass delete）
+- Require explicit confirmation for `delete` and `str_replace` in production.
+- Scan written content for PII and sensitive data (in host code — this is not the framework's responsibility).
+- Allowlist specific query patterns (for example, reject `query=""` or extremely short queries to prevent a mass delete).
 
-cantus v0.3.1 audit 已標註這條 trap；v0.3.2 因為 adapter 沒新增 dispatch 層，foot-gun 完整 carry-over。
+The cantus v0.3.1 audit already flagged this trap. Because the v0.3.2 adapter adds no new dispatch layer, the foot-gun carries over unchanged.
 
-## Error naming convention（audit Trap-8 fix）
+## Error naming convention (audit Trap-8 fix)
 
-`cantus.adapters` 的錯誤分兩類：
+Errors from `cantus.adapters` fall into two categories:
 
-| 時機 | 例外類型 | 子字串標記 |
+| When | Exception type | Substring marker |
 | --- | --- | --- |
-| Handshake / connection（同步建立階段） | `RuntimeError`（或 `ValueError` / `OSError` / `ImportError` 視情況） | `<adapter>_handshake_failed` |
-| Call-time（已連上、單次 tool call 失敗） | cantus `ToolErrorObservation`（由 Agent dispatcher 自動包裝） | `<adapter>_remote_error` 或 `<adapter>_call_failed` |
+| Handshake / connection (synchronous setup phase) | `RuntimeError` (or `ValueError` / `OSError` / `ImportError` as appropriate) | `<adapter>_handshake_failed` |
+| Call-time (already connected, a single tool call fails) | cantus `ToolErrorObservation` (wrapped automatically by the Agent dispatcher) | `<adapter>_remote_error` or `<adapter>_call_failed` |
 
-`<adapter>` 為 adapter family 小寫 short name（`mcp`、`langchain`、`dspy`、`huggingface`...）。v0.3.2 的 `mcp_handshake_failed` / `mcp_remote_error` 即按此 convention；v0.3.3 加 4 個跨框架 adapter 時沿用（例 `langchain_handshake_failed`）。
+`<adapter>` is the lowercase short name of the adapter family (`mcp`, `langchain`, `dspy`, `huggingface`, and so on). The v0.3.2 `mcp_handshake_failed` / `mcp_remote_error` follow this convention, and the four cross-framework adapters added in v0.3.3 reuse it (for example `langchain_handshake_failed`).
 
-從學生角度：
+From the student's point of view:
 
 ```python
 import re
@@ -137,49 +137,49 @@ try:
     skills = import_mcp_server(transport="stdio", command_or_url="bad-server")
 except RuntimeError as exc:
     if "mcp_handshake_failed" in str(exc):
-        print("MCP server 無法連線，請檢查指令是否正確")
+        print("Could not connect to the MCP server; check that the command is correct")
     else:
         raise
 ```
 
-對 call-time 錯誤，Agent loop 已經自動把它包成 `ToolErrorObservation` 進 EventStream，學生在 Inspector 看到 `mcp_remote_error: ...` 就知道是遠端 tool call 階段失敗。
+For call-time errors, the Agent loop already wraps them into a `ToolErrorObservation` on the EventStream, so when a student sees `mcp_remote_error: ...` in the Inspector they know the failure happened during the remote tool call.
 
-## v0.3.3 預告：cross-framework adapters
+## Looking ahead to v0.3.3: cross-framework adapters
 
-v0.3.2 只交付 MCP 雙模 + Anthropic Memory 三件 MVP。v0.3.3 `cantus-adapter-layer-batch2` 排程交付：
+v0.3.2 ships only the three MVP pieces: MCP in both directions plus the Anthropic Memory tool. The v0.3.3 `cantus-adapter-layer-batch2` work is scheduled to deliver:
 
-- `cantus[langchain]` extras + LangChain `Tool` / `Runnable` 雙向 adapter
-- `cantus[dspy]` extras + DSPy `Tool` adapter
-- `cantus[huggingface]` extras + HuggingFace `transformers.tool` adapter
-- `cantus[openhands]` extras + OpenHands action adapter
+- `cantus[langchain]` extras plus a bidirectional LangChain `Tool` / `Runnable` adapter
+- `cantus[dspy]` extras plus a DSPy `Tool` adapter
+- `cantus[huggingface]` extras plus a HuggingFace `transformers.tool` adapter
+- `cantus[openhands]` extras plus an OpenHands action adapter
 
-每個都沿用本檔 「Error naming convention」段定義的 `<adapter>_handshake_failed` / `<adapter>_remote_error` 命名規則；docs/protocols/adapters.md 會持續擴張對應段落。
+Each one follows the `<adapter>_handshake_failed` / `<adapter>_remote_error` naming rules defined in the "Error naming convention" section above, and this page will keep growing the matching sections.
 
-如果你 v0.3.2 環境需要這些跨框架接點，目前的解法是手寫 glue（cantus Skill 內呼叫 LangChain Tool 等），等 v0.3.3 ship 後再切到 framework adapter。
+If your v0.3.2 environment needs these cross-framework hooks today, the workaround is to write the glue by hand (call a LangChain Tool from inside a cantus Skill, for example). Switch over to the framework adapter once v0.3.3 ships.
 
 
 <!-- merged: adapters-batch2 -->
 
-# `cantus.adapters` 跨框架 batch2（v0.3.3）
+# `cantus.adapters` cross-framework batch2 (v0.3.3)
 
-> **Status:** Superseded by [`adapters-batch3.md`](./adapters-batch3.md) (cantus v0.3.4) for the HuggingFace and OpenHands import directions; preserved as a v0.3.3 historical snapshot of the batch2 surface. HF import 方向已在 v0.3.4 補上、OpenHands import 方向永久放棄；最新雙向矩陣請看 batch3 文件。
+> **Status:** Superseded by the [batch3a section](#cantus-adapters-cross-framework-batch3a-v0-3-4) (cantus v0.3.4) for the HuggingFace and OpenHands import directions; kept here as a v0.3.3 historical snapshot of the batch2 surface. The HF import direction was added in v0.3.4, and the OpenHands import direction was permanently dropped. For the current bidirectional matrix, see the batch3a section below.
 
-## 套件總覽
+## Package overview
 
-v0.3.3 在 v0.3.2 的三件 MVP（MCP server / MCP client / Anthropic Memory）之上補上四個主流 agent stack 的 bridge：LangChain / DSPy / HuggingFace / OpenHands。共六個新 callable，每個對應一個 `cantus[<name>]` extras：
+On top of the three v0.3.2 MVP pieces (MCP server, MCP client, Anthropic Memory), v0.3.3 adds bridges to four mainstream agent stacks: LangChain, DSPy, HuggingFace, and OpenHands. That is six new callables, each tied to a `cantus[<name>]` extras:
 
-| 函式 | 方向 | 依賴 |
+| Function | Direction | Dependency |
 | --- | --- | --- |
 | `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus[langchain]` |
 | `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus[langchain]` |
 | `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus[dspy]` |
 | `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace（export only） | `pip install cantus[huggingface]` |
-| `expose_as_openhands_action(skill)` | cantus → OpenHands（export only） | `pip install cantus[openhands]` |
+| `expose_as_hf_tool(skill)` | cantus → HuggingFace (export only) | `pip install cantus[huggingface]` |
+| `expose_as_openhands_action(skill)` | cantus → OpenHands (export only) | `pip install cantus[openhands]` |
 
-設計原則延 v0.3.2 `adapters.md`：純包裝層、`Skill.spec_for_llm()` shape 不變、`Registry.KINDS` 不變、不引入 `Adapter` ABC。錯誤命名沿用 `<framework>_handshake_failed` / `<framework>_remote_error` convention。
+The design principles carry over from the v0.3.2 `adapters.md`: pure wrapper layer, `Skill.spec_for_llm()` shape unchanged, `Registry.KINDS` unchanged, and no `Adapter` ABC. Error naming reuses the `<framework>_handshake_failed` / `<framework>_remote_error` convention.
 
-## `expose_as_langchain_tool` + `import_langchain_tool` 5-line 範例
+## `expose_as_langchain_tool` + `import_langchain_tool` five-line example
 
 ```python
 from cantus import skill
@@ -190,14 +190,14 @@ def search_book(title: str) -> str:
     """Search the catalog by exact title."""
     return f"hit:{title}"
 
-lc_tool = expose_as_langchain_tool(search_book)  # 給任何 LangChain agent 用
-# 反向：拉一個既有 LangChain BaseTool 進 cantus
+lc_tool = expose_as_langchain_tool(search_book)  # hand to any LangChain agent
+# Reverse direction: pull an existing LangChain BaseTool into cantus
 # back_to_cantus = import_langchain_tool(lc_tool)
 ```
 
-**Schema 轉換 note**：`expose_*` 從 `skill.spec_for_llm()["args_schema"]` 動態建構 Pydantic v2 model 餵給 LangChain 的 `args_schema`；`import_*` 反向直接呼叫 `tool.args_schema.model_json_schema()`（強制 Pydantic v2）；遇到 `args_schema is None` fall back 為 empty JSON Schema。
+**Schema conversion note**: `expose_*` builds a Pydantic v2 model dynamically from `skill.spec_for_llm()["args_schema"]` and feeds it to LangChain's `args_schema`. `import_*` goes the other way and calls `tool.args_schema.model_json_schema()` directly (Pydantic v2 required). If `args_schema is None`, it falls back to an empty JSON Schema.
 
-## `expose_as_dspy_tool` + `import_dspy_tool` 5-line 範例
+## `expose_as_dspy_tool` + `import_dspy_tool` five-line example
 
 ```python
 from cantus import skill
@@ -208,11 +208,11 @@ def lookup_word(word: str) -> str:
     """Look up a word."""
     return word
 
-dspy_tool = expose_as_dspy_tool(lookup_word)  # 給 DSPy Module / ChainOfThought 用
+dspy_tool = expose_as_dspy_tool(lookup_word)  # hand to a DSPy Module / ChainOfThought
 # back_to_cantus = import_dspy_tool(dspy_tool)
 ```
 
-**Type mapping 表**（雙向）：
+**Type mapping table** (bidirectional):
 
 | JSON Schema `type` | Python type |
 | --- | --- |
@@ -220,11 +220,11 @@ dspy_tool = expose_as_dspy_tool(lookup_word)  # 給 DSPy Module / ChainOfThought
 | `"integer"` | `int` |
 | `"number"` | `float` |
 | `"boolean"` | `bool` |
-| 其他 | `str`（fall back） |
+| other | `str` (fallback) |
 
-複雜泛型（`list[str]` / `Optional[X]` / unions）目前統一 fall back 為 `str` / `"string"`；如果你的 Skill 真的需要複合輸入請在 docstring 補充說明。
+Complex generics (`list[str]`, `Optional[X]`, unions) all currently fall back to `str` / `"string"`. If your Skill genuinely needs compound input, spell it out in the docstring.
 
-## `expose_as_hf_tool` 5-line 範例
+## `expose_as_hf_tool` five-line example
 
 ```python
 from cantus import skill
@@ -235,12 +235,12 @@ def translate(text: str, target: str) -> str:
     """Translate text into target language."""
     return text
 
-hf_tool = expose_as_hf_tool(translate)  # 餵給 transformers.agents.HfAgent(tools=[hf_tool])
+hf_tool = expose_as_hf_tool(translate)  # feed to transformers.agents.HfAgent(tools=[hf_tool])
 ```
 
-**HF import 方向延 v0.3.4**：HF `Tool` 在 transformers 介面偏 stateless callable + JSON schema dict，沒有對等於 LangChain `BaseTool` 的執行單元，使用情境 90% 是 cantus → HF；反向 import 留 v0.3.4 batch3 評估再開。
+**HF import direction deferred to v0.3.4**: a HuggingFace `Tool` in the transformers interface leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Skill for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
 
-## `expose_as_openhands_action` 5-line 範例
+## `expose_as_openhands_action` five-line example
 
 ```python
 from cantus import skill
@@ -251,20 +251,20 @@ def run_lint(path: str) -> str:
     """Run lint on path."""
     return f"linted {path}"
 
-oh_action = expose_as_openhands_action(run_lint)  # OpenHands runtime 端 dispatch
+oh_action = expose_as_openhands_action(run_lint)  # dispatched on the OpenHands runtime side
 ```
 
-**OpenHands action 子類選擇 note**：`expose_as_openhands_action` 回傳通用 `openhands.events.Action` base 實例。如果你的 host code 要求特定子類（`CmdRunAction` / `IPythonRunCellAction` / `FileEditAction`），在你的 dispatch 層 manual cast 即可——cantus 不嘗試涵蓋全部子類，避免黏死在 OpenHands 1.16.x 的內部 API。
+**OpenHands action subclass note**: `expose_as_openhands_action` returns a generic `openhands.events.Action` base instance. If your host code requires a specific subclass (`CmdRunAction`, `IPythonRunCellAction`, `FileEditAction`), cast it manually in your dispatch layer. cantus does not try to cover every subclass, which keeps it from getting glued to the internal API of OpenHands 1.16.x.
 
-## `_RemoteSkillBase` 共用設計（給 batch3 作者）
+## `_RemoteSkillBase` shared design (for batch3 authors)
 
-v0.3.3 把 v0.3.2 `mcp_client._RemoteSkill` 三個核心模式提升到私有共用基底 `cantus.adapters._remote_skill._RemoteSkillBase`：
+v0.3.3 lifts the three core patterns of the v0.3.2 `mcp_client._RemoteSkill` into a private shared base, `cantus.adapters._remote_skill._RemoteSkillBase`:
 
-1. **繞過 `Skill.__init__` 的 signature introspection**——遠端框架的 schema 是 authoritative，cantus 不該對 `run()` 做反射。
-2. **`spec_for_llm()` 直接回傳 `{"name", "description", "args_schema"}`**——`is_remote = True` 不洩漏進這個 dict。
-3. **`validate_args()` 接 dict 即 dict-cast**——相信遠端框架的 schema 自己會驗。
+1. **Bypass the signature introspection in `Skill.__init__`** — the remote framework's schema is authoritative, so cantus should not reflect over `run()`.
+2. **`spec_for_llm()` returns `{"name", "description", "args_schema"}` directly** — `is_remote = True` does not leak into that dict.
+3. **`validate_args()` accepts a dict and dict-casts it** — trust the remote framework's schema to validate itself.
 
-要在 v0.3.4 batch3 加新的 `import_*` adapter（例：`import_hf_tool` / `import_openhands_action` / `mcp_memory_server`）只要：
+To add a new `import_*` adapter in v0.3.4 batch3 (for example `import_hf_tool`, `import_openhands_action`, or `mcp_memory_server`), you only need:
 
 ```python
 from cantus.adapters._remote_skill import _RemoteSkillBase
@@ -287,47 +287,47 @@ class _MyRemoteSkill(_RemoteSkillBase):
             ) from exc
 ```
 
-`_RemoteSkillBase` 是 framework-internal、不對外（leading underscore in module name），符合 v0.3.2 「不引入 `Adapter` ABC」精神。
+`_RemoteSkillBase` is framework-internal and not public (note the leading underscore in the module name), which honors the v0.3.2 "no `Adapter` ABC" intent.
 
 
 <!-- merged: adapters-batch3 -->
 
-# `cantus.adapters` 跨框架 batch3a（v0.3.4）
+# `cantus.adapters` cross-framework batch3a (v0.3.4)
 
-## 收尾與設計決定
+## Close-out and design decisions
 
-v0.3.3 batch2 一次出貨 6 個 cross-framework callable，但 HuggingFace 與 OpenHands 兩條都只有 export 方向，spec 標記為「deferred to v0.3.4 batch3 evaluation」。v0.3.4 把這條 deferred 收乾淨：
+v0.3.3 batch2 shipped six cross-framework callables at once, but HuggingFace and OpenHands each had only the export direction, marked in the spec as "deferred to v0.3.4 batch3 evaluation." v0.3.4 cleans up that deferral:
 
-- **HuggingFace** import 方向**完成**：新增 `import_hf_tool(tool) -> Skill`，與 v0.3.2 / v0.3.3 既有的 `_RemoteSkillBase` + lazy SDK gate 模式對齊。
-- **OpenHands** import 方向**永久放棄**（spec 措辭從 deferred 改為 not applicable）：`openhands.events.Action` 是 declarative event record，被 host runtime dispatch；本身沒有 `__call__`，cantus `Skill.run(**kwargs)` 找不到可以委派的 callable。把 Action 包成 Skill 等於要在 cantus 內 re-implement OpenHands runtime，那就不再屬於 adapter 的範疇。
+- **HuggingFace** import direction is **done**: the new `import_hf_tool(tool) -> Skill` aligns with the existing `_RemoteSkillBase` plus lazy SDK gate pattern from v0.3.2 / v0.3.3.
+- **OpenHands** import direction is **permanently dropped** (the spec wording changes from deferred to not applicable): `openhands.events.Action` is a declarative event record that the host runtime dispatches; it has no `__call__`, so cantus `Skill.run(**kwargs)` has no callable to delegate to. Wrapping an Action as a Skill would mean re-implementing the OpenHands runtime inside cantus, which falls outside the scope of an adapter.
 
-v0.3.4 收完之後，cantus.adapters 的 cross-framework 雙向矩陣完成度如下：
+After the v0.3.4 close-out, the cross-framework bidirectional matrix for `cantus.adapters` stands at:
 
-| 框架 | export（cantus → 框架） | import（框架 → cantus） | 備註 |
+| Framework | export (cantus → framework) | import (framework → cantus) | Notes |
 | --- | --- | --- | --- |
 | LangChain | ✅ `expose_as_langchain_tool` | ✅ `import_langchain_tool` | v0.3.3 |
 | DSPy | ✅ `expose_as_dspy_tool` | ✅ `import_dspy_tool` | v0.3.3 |
-| HuggingFace | ✅ `expose_as_hf_tool`（v0.3.3） | ✅ `import_hf_tool`（v0.3.4） | 本版收尾 |
-| OpenHands | ✅ `expose_as_openhands_action` | — 永久 not applicable | 語義不對齊 |
+| HuggingFace | ✅ `expose_as_hf_tool` (v0.3.3) | ✅ `import_hf_tool` (v0.3.4) | closed out this release |
+| OpenHands | ✅ `expose_as_openhands_action` | — permanently not applicable | semantics do not align |
 
-## `import_hf_tool` 設計
+## `import_hf_tool` design
 
-### 範式
+### Usage pattern
 
-跟 `import_langchain_tool` / `import_dspy_tool` 對齊：
+Aligned with `import_langchain_tool` / `import_dspy_tool`:
 
 ```python
 from cantus.adapters import import_hf_tool
 
 skill = import_hf_tool(hf_tool)
-result = skill(q="cantus")  # 等價於呼叫 hf_tool(q="cantus")
+result = skill(q="cantus")  # equivalent to calling hf_tool(q="cantus")
 ```
 
-返回的 `Skill` 是 `_HuggingFaceRemoteSkill(_RemoteSkillBase)` instance，遵守 v0.3.0 三鍵 `spec_for_llm()` 形狀；`is_remote = True` 但不洩漏到 `spec_for_llm()` 輸出。
+The returned `Skill` is a `_HuggingFaceRemoteSkill(_RemoteSkillBase)` instance. It follows the v0.3.0 three-key `spec_for_llm()` shape; `is_remote = True`, but that does not leak into the `spec_for_llm()` output.
 
-### schema 抽取規則
+### Schema extraction rule
 
-HF Tool 的 `inputs` 已經是 dict-style schema：
+A HF Tool's `inputs` is already a dict-style schema:
 
 ```python
 hf_tool.inputs = {
@@ -335,7 +335,7 @@ hf_tool.inputs = {
 }
 ```
 
-直接組 v0.3.0 JSON Schema dict，不繞 Pydantic 中間層：
+Build the v0.3.0 JSON Schema dict directly, without routing through an intermediate Pydantic layer:
 
 ```python
 {
@@ -343,40 +343,40 @@ hf_tool.inputs = {
     "properties": {
         "q": {"type": "string", "description": "Query string"},
     },
-    "required": ["q"],  # 所有 inputs 欄位都視為 required
+    "required": ["q"],  # every inputs field is treated as required
 }
 ```
 
-**所有欄位都 required** 是刻意設計：`transformers.Tool` API 沒有「optional input」的概念，把 `inputs` 列出的欄位全部標為必填最貼近 HF 慣例。若未來 HF 加入 optional flag，再開 follow-up change 調整。
+**Treating every field as required** is a deliberate choice: the `transformers.Tool` API has no concept of an "optional input," so marking every field listed in `inputs` as required matches HF convention most closely. If HF later adds an optional flag, open a follow-up change to adjust this.
 
-### dispatch 與錯誤包裝
+### Dispatch and error wrapping
 
-`_HuggingFaceRemoteSkill.run(**kwargs)` 直接呼叫 `self._tool(**kwargs)`（HF Tool 是 callable）。底層丟例外時包成 `RuntimeError("huggingface_remote_error: ...")`，由 cantus Agent dispatcher 再轉成 `ToolErrorObservation`（沿用 v0.3.2 `agent-protocols` 的「cantus.adapters error naming convention」Requirement）。
+`_HuggingFaceRemoteSkill.run(**kwargs)` calls `self._tool(**kwargs)` directly (a HF Tool is callable). When the underlying call raises, it is wrapped as `RuntimeError("huggingface_remote_error: ...")`, which the cantus Agent dispatcher then turns into a `ToolErrorObservation` (reusing the "cantus.adapters error naming convention" Requirement from the v0.3.2 `agent-protocols`).
 
-handshake 失敗（`inputs` 不是 dict、或 entry 不是 dict 形狀）丟 `RuntimeError("huggingface_handshake_failed: ...")`；型別不符丟 `TypeError("import_hf_tool expects transformers.Tool")`，全部對齊 batch2 命名慣例。
+A handshake failure (`inputs` is not a dict, or an entry is not dict-shaped) raises `RuntimeError("huggingface_handshake_failed: ...")`; a type mismatch raises `TypeError("import_hf_tool expects transformers.Tool")`. Both align with the batch2 naming convention.
 
-## OpenHands import 為什麼不做
+## Why the OpenHands import is not built
 
-| 觀察 | 後果 |
+| Observation | Consequence |
 | --- | --- |
-| `openhands.events.Action` 沒有 `__call__` | `Skill.run(**kwargs)` 沒有可委派的執行體 |
-| Action 子類別（`CmdRunAction` / `IPythonRunCellAction` ⋯⋯）是 host-side runtime dispatch 對象 | cantus 想呼叫 Action，就得 re-implement OpenHands runtime |
-| OpenHands runtime 跟 cantus Agent 是兩個獨立 dispatcher | 兩邊「執行 Action」的語義不對齊 |
-| Adapter layer 在 v0.3.2 spec 定義為「pure conversion utilities」 | re-implement runtime 不是 adapter 的職責 |
+| `openhands.events.Action` has no `__call__` | `Skill.run(**kwargs)` has no execution body to delegate to |
+| Action subclasses (`CmdRunAction`, `IPythonRunCellAction`, ...) are dispatched by the host-side runtime | for cantus to call an Action, it would have to re-implement the OpenHands runtime |
+| The OpenHands runtime and the cantus Agent are two independent dispatchers | the two notions of "executing an Action" do not align |
+| The adapter layer is defined in the v0.3.2 spec as "pure conversion utilities" | re-implementing a runtime is not an adapter's job |
 
-若使用者真的想把 cantus Skill 餵給 OpenHands runtime，應該走 export 方向：
+If you genuinely want to feed a cantus Skill into the OpenHands runtime, go through the export direction:
 
 ```python
 from cantus.adapters import expose_as_openhands_action
 
 action = expose_as_openhands_action(my_cantus_skill)
-# 把 action 註冊到 OpenHands AgentController 的 Action repo，由 OpenHands runtime dispatch
+# Register action in the OpenHands AgentController's Action repo; the OpenHands runtime dispatches it
 ```
 
 ## SDK gate
 
-`import_hf_tool` 走既有 `cantus[huggingface]` extras（`transformers>=4.40,<5`），**不引入新 dependency**。沒裝 transformers 時，import `cantus.adapters.huggingface` 直接丟 `ImportError("pip install cantus[huggingface]")`；`cantus.adapters` 套件本身（無 extras）依然可以匯入，lazy stub 在第一次呼叫時才解析。
+`import_hf_tool` uses the existing `cantus[huggingface]` extras (`transformers>=4.40,<5`) and introduces **no new dependency**. Without transformers installed, importing `cantus.adapters.huggingface` raises `ImportError("pip install cantus[huggingface]")`; the `cantus.adapters` package itself (no extras) still imports fine, and the lazy stub only resolves on the first call.
 
-## 與 batch2 文件的關係
+## Relationship to the batch2 section
 
-請見 [`adapters-batch2.md`](./adapters-batch2.md) 開頭的 supersede note。`batch2.md` 保留作為 v0.3.3 設計的歷史快照；v0.3.4 起涉及 HF 與 OpenHands import 方向的描述以 batch3.md 為準。
+See the supersede note at the top of the [batch2 section](#cantus-adapters-cross-framework-batch2-v0-3-3). That section is kept as a historical snapshot of the v0.3.3 design; from v0.3.4 on, the description of the HF and OpenHands import directions in the batch3a section above takes precedence.

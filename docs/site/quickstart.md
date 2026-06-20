@@ -1,54 +1,54 @@
-# Quickstart：30 秒跑出第一個 Agent
+# Quickstart: Your First Agent in One Colab Cell
 
-> **Desktop（Win / macOS / Linux）使用者**：本文針對 Colab 環境（會 `mount_drive_and_load` 載 4-bit Gemma）。如果你在本機桌面執行，請改讀 [`quickstart-desktop.md`](./quickstart-desktop.md)，那裡提供 API key 路徑的跨平台 walkthrough。
+> **Desktop users (Win / macOS / Linux):** This page targets the Colab environment, where `mount_drive_and_load` pulls a 4-bit Gemma model. If you run on a local desktop instead, read [`quickstart-desktop.md`](./quickstart-desktop.md), which covers the API-key path on all three platforms.
 
-這份指南帶你從 `import` 到第一次 `agent.run()` 印出結果，全部都在一個 Colab cell 內完成。預設使用 Gemma 4，但任何符合 `ModelHandle` protocol（有 `generate(prompt) -> str` 方法）的 model 都可以替換進來。
+The cell below goes from `import` to a printed answer. It loads Gemma 4 by default, but the model is swappable: anything that satisfies the `ModelHandle` protocol works, which means anything with a `generate(prompt) -> str` method.
 
-## 完整範例
+## Full Example
 
 ```python
 from cantus import skill, Agent, mount_drive_and_load
 
-# 1. 載入 Gemma 4（會自動 mount Google Drive 取 cache）
+# 1. Load Gemma 4 (mounts Google Drive automatically to reach the cache)
 model = mount_drive_and_load(variant="E2B")  # or "E4B"
 
-# 2. 寫一個 skill：每個 skill 都是純 Python function
+# 2. Write a skill: every skill is a plain Python function
 @skill
 def add(a: int, b: int) -> int:
-    """把兩個整數相加。
+    """Add two integers.
 
     Args:
-        a: 第一個整數。
-        b: 第二個整數。
+        a: The first integer.
+        b: The second integer.
     """
     return a + b
 
-# 3. 需要把 skill 串成流程，可用 cantus.workflows building block；
-#    本範例只示範單一 skill，串接範例見 cookbook。
+# 3. To chain skills into a flow, use a cantus.workflows building block.
+#    This example shows a single skill; see the cookbook for composition.
 
-# 4. 把 model handle 餵給 Agent，用自然語言 query 啟動 loop
+# 4. Hand the model handle to Agent, then start the loop with a natural-language query
 agent = Agent(model=model)
-state = agent.run("請計算 3 + 4 + 5，並把結果回報給我")
+state = agent.run("Please compute 3 + 4 + 5 and report the result back to me")
 
-# 5. 印出結果（state.stream 是完整 EventStream）
+# 5. Print the result (state.stream is the complete EventStream)
 final = state.stream[-1]
-print("Agent 答案：", getattr(final, "answer", final))
+print("Agent answer:", getattr(final, "answer", final))
 ```
 
-## 跑完之後做什麼
+## What to Do After It Runs
 
-跑完 `agent.run` 後，`state.stream` 是 append-only 的 `EventStream`，包含整段 Action / Observation 序列。如果想看 trace：
+Once `agent.run` finishes, `state.stream` is an append-only `EventStream` that holds the entire Action / Observation sequence. To inspect the trace:
 
 ```python
 from cantus import Inspector
-Inspector(state.stream).replay()      # 印出每一步
-Inspector(state.stream).summary()     # 印出 action / observation 統計
+Inspector(state.stream).replay()      # print every step
+Inspector(state.stream).summary()     # print action / observation statistics
 ```
 
-## 必知預設值
+## Defaults Worth Knowing
 
-- `max_iterations=8`：bounded loop 最多跑 8 步，避免 LLM 死循環
-- `max_retries=3`：當 validator 回傳 `Result(ok=False)`，最多自動重試 3 次
-- 所有 skill 與 `cantus.workflows` building block 例外會被包成 `ToolErrorObservation` 餵回 prompt，不會炸出 loop
+- `max_iterations=8`: the loop runs at most 8 steps, so a confused model stops instead of looping indefinitely.
+- `max_retries=3`: when a validator returns `Result(ok=False)`, the agent retries the failed action up to 3 times.
+- An exception raised by any skill or `cantus.workflows` building block becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
 
-只要這支 cell 能跑完，你就具備了所有後續章節需要的 mental model。
+That single cell is the whole loop in miniature. Read it, then the channels, serving, and memory chapters are variations on the same three pieces: a model handle, a skill, and an EventStream you can replay.

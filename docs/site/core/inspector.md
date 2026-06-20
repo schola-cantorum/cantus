@@ -1,8 +1,8 @@
-# Inspector：跑完之後再看
+# Inspector: look at the run after it finishes
 
-`agent.run()` 預設是黑盒——它跑完 loop、回傳 `AgentState`，**不向 stdout 寫任何東西**。這是 spec 等級的硬性要求，因為 Colab cell 動輒輸出幾百行很煩，而且 unit test 也不應該被 print 噪音污染。
+By default, `agent.run()` is a black box. It runs the loop, returns an `AgentState`, and **writes nothing to stdout**. The spec requires that silence on purpose: a Colab cell that dumps hundreds of lines per run becomes useless to scroll through, and tests stay clean of print noise.
 
-`Inspector` 就是那個「跑完之後想看細節」時用的手動工具。它**不會**自動啟用，也**不會**綁進 `agent.run`，要看就自己拿 stream 包一個 Inspector。
+`Inspector` is the manual tool you reach for when the run is done and you want to see the details. It does **not** turn on automatically, and it is **not** wired into `agent.run`. When you want a look, you wrap the stream in an Inspector yourself.
 
 ## Class signature
 
@@ -15,42 +15,42 @@ class Inspector:
     def summary(self, out: IO[str] | None = None) -> None
 ```
 
-兩個 method 都接受可選的 `out: IO[str]`。沒給就寫到 `sys.stdout`，給了就寫到該 IO（例如 `StringIO()` 或開好的檔案 handle）。回傳一律是 `None`，因為 print 是副作用、不是值。
+Both methods accept an optional `out: IO[str]`. Leave it out and the text goes to `sys.stdout`; pass one and it goes there instead, such as a `StringIO()` or an open file handle. Both return `None`. They print rather than hand back a value, so there is nothing to capture from the call itself.
 
-## 標準用法
+## Standard usage
 
 ```python
 from cantus import Agent, Inspector
 
 agent = Agent(model=model)
-state = agent.run("請計算 3 + 4 + 5")
+state = agent.run("Please compute 3 + 4 + 5")
 
-# 印出整段 trace：每一步是哪個 Action / Observation
+# Print the whole trace: which Action / Observation happened at each step
 Inspector(state.stream).replay()
 
-# 印出一行統計：總事件數 / action 數 / observation 數
+# Print a one-line summary: total events / action count / observation count
 Inspector(state.stream).summary()
 ```
 
-`replay()` 的輸出長這樣：
+The output of `replay()` looks like this:
 
 ```
-[0] Action :: CallSkillAction :: CallSkillAction(thought='先加前兩個', skill_name='add', args={'a': 3, 'b': 4})
+[0] Action :: CallSkillAction :: CallSkillAction(thought='add the first two', skill_name='add', args={'a': 3, 'b': 4})
 [1] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=7)
-[2] Action :: CallSkillAction :: CallSkillAction(thought='再加 5', skill_name='add', args={'a': 7, 'b': 5})
+[2] Action :: CallSkillAction :: CallSkillAction(thought='now add 5', skill_name='add', args={'a': 7, 'b': 5})
 [3] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=12)
-[4] Action :: FinalAnswerAction :: FinalAnswerAction(thought='完成', answer='3+4+5 = 12')
+[4] Action :: FinalAnswerAction :: FinalAnswerAction(thought='done', answer='3+4+5 = 12')
 ```
 
-## 寫到別的 IO
+## Writing to another IO
 
 ```python
 from io import StringIO
 buf = StringIO()
 Inspector(state.stream).replay(out=buf)
-trace_str = buf.getvalue()           # 之後可以丟去檔案、上傳 wandb、或 assert 內容
+trace_str = buf.getvalue()           # dump it to a file, upload to wandb, or assert on its contents later
 ```
 
-## 什麼時候會自動有輸出
+## When output appears automatically
 
-只有在使用者額外用 `@debug` decorator 包了某個 protocol 時，才會在 run 期間看到 trace 行——那是 `@debug` 自己的副作用，不是 Inspector 的。Inspector 永遠是「跑完再看」的事後工具。
+Trace lines only show up mid-run when you have separately wrapped a protocol with the `@debug` decorator. That output comes from `@debug`, not from the Inspector. `@debug` stacks on top of a Skill (or a hook helper such as an analyzer or validator) and prints a structured trace on every call. The Inspector never runs during the loop; you reach for it once the run is over and you want to read back what happened.

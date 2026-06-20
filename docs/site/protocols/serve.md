@@ -1,20 +1,20 @@
-# `cantus.serve` core（v0.4.0）
+# `cantus.serve` core
 
-v0.4.0 為 cantus 教學弧的 serve 入口：把 v0.3.0 收成的 Skill registry 以業界標準 HTTP/JSON 自動 expose 出去，使用者只要 `cantus.serve(registry)` 就能拿到一個配置好的 FastAPI app，搭配 uvicorn（或任何 ASGI server）即可啟動。
+`cantus.serve` is the HTTP entry point for cantus. It takes the Skill registry you have already built and exposes it over plain HTTP/JSON. Call `cantus.serve(registry)` and you get back a configured FastAPI app, ready to run under uvicorn (or any ASGI server).
 
-本文件涵蓋四個對外 surface：Quick start、`cantus.config.Settings` 12-factor 設定、Dashboard 三個 read-only endpoint、Channel Protocol 抽象 + `LocalMockReceiver`。
+This page covers four public surfaces: Quick start, the `cantus.config.Settings` 12-factor configuration, the read-only dashboard endpoints, and the Channel Protocol abstraction together with `LocalMockReceiver`.
 
-> v0.4.1 cantus-serve-security 補上 opt-in auth gate + SecretStr token 載入（見下方 [Authentication](#authentication) 段）。real channel implementations（LINE / Telegram / Discord / Google Chat）已於 B-series channel-gateway 釋出，操作見各 cookbook（[`../cookbook-line-channel.md`](../cookbook-line-channel.md)、[`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md)、[`../cookbook-discord-channel.md`](../cookbook-discord-channel.md)、[`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)）。read-only runtime 觀測層見下方 [Introspection endpoints](#introspection-endpoints) 段。HTTPS 仍建議交給上游 reverse proxy / tunnel 處理。
+> An opt-in auth gate and `SecretStr` token loading are described below under [Authentication](#authentication). The real channel implementations (LINE / Telegram / Discord / Google Chat) ship as part of the channel-gateway work; see each cookbook for the wiring details ([`../cookbook-line-channel.md`](../cookbook-line-channel.md), [`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md), [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md), [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)). The read-only runtime observability layer is described under [Introspection endpoints](#introspection-endpoints). Terminating HTTPS is still left to an upstream reverse proxy or tunnel.
 
 ## Quick start
 
-安裝 serve extras（FastAPI / uvicorn / pydantic-settings 走 lazy import gate，未裝時 `import cantus.serve` 會丟 `ImportError("... pip install cantus[serve]")`）：
+Install the serve extras. FastAPI, uvicorn, and pydantic-settings sit behind a lazy import gate, so if they are not installed, `import cantus.serve` raises `ImportError("... pip install cantus[serve]")`:
 
 ```bash
 pip install cantus[serve]
 ```
 
-最小 5 行範例 — 註冊一個 Skill、呼叫 `cantus.serve(registry)`、用 uvicorn 起 server：
+Here is a minimal example. Register a Skill, call `cantus.serve(registry)`, and start the server with uvicorn:
 
 ```python
 import cantus
@@ -22,43 +22,43 @@ import uvicorn
 from cantus.core.registry import Registry
 
 registry = Registry()
-registry.register(my_skill)             # my_skill 為任一 Skill 實例
+registry.register(my_skill)             # my_skill is any Skill instance
 app = cantus.serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
 
-啟動後打 health endpoint：
+Once it is up, hit the health endpoint:
 
 ```bash
 curl http://localhost:8765/health
 ```
 
-預期回傳：
+Expected response:
 
 ```json
 {"status":"ok","cantus_version":"0.5.0"}
 ```
 
-每個註冊到 registry 的 Skill 會自動掛上 `POST /skills/{spec_for_llm.name}` endpoint，args 走 JSON body、回傳形狀為 `{"result": <jsonable>}`。Swagger UI 預設掛在 `/docs`、OpenAPI JSON 在 `/openapi.json`、ReDoc 在 `/redoc`，每個 Skill 的 `args_schema` 會直接投到對應 endpoint 的 `requestBody.application/json.schema`，學生看 Swagger UI 就能直接知道每個 Skill 該怎麼呼叫。
+Every Skill registered in the registry is automatically mounted at `POST /skills/{spec_for_llm.name}`. Arguments go in the JSON body, and the response shape is `{"result": <jsonable>}`. The Swagger UI is mounted at `/docs` by default, the OpenAPI JSON at `/openapi.json`, and ReDoc at `/redoc`. Each Skill's `args_schema` is projected straight into the `requestBody.application/json.schema` of its endpoint, so a student can open the Swagger UI and see exactly how to call any Skill.
 
 ## Configuration
 
-`cantus.config.Settings` 是 `pydantic_settings.BaseSettings` 子類別，env prefix 為 `CANTUS_SERVE_`。所有欄位與預設值如下：
+`cantus.config.Settings` is a subclass of `pydantic_settings.BaseSettings` with the env prefix `CANTUS_SERVE_`. The fields and their defaults are:
 
-| 欄位 | 型別 | 預設值 | 用途 |
+| Field | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `host` | `str` | `"127.0.0.1"` | uvicorn 綁定的 host；v0.4.0 預設只開 localhost |
-| `port` | `int` | `8765` | uvicorn 綁定的 port |
-| `dashboard` | `bool` | `True` | 是否啟用 `/skills` `/health` `/events` 三個 dashboard endpoint |
-| `docs_url` | `str \| None` | `"/docs"` | Swagger UI 掛載路徑；設為 `None` 關閉 |
-| `openapi_url` | `str \| None` | `"/openapi.json"` | OpenAPI JSON 路徑；設為 `None` 關閉 |
-| `redoc_url` | `str \| None` | `"/redoc"` | ReDoc 路徑；設為 `None` 關閉 |
-| `auth_mode` | `AuthMode` | `AuthMode.NONE` | v0.4.1：認證模式。三種 enum value：`"none"` / `"bearer"` / `"api-key"`。預設 NONE 維持 v0.4.0 無 auth 行為 |
-| `api_key` | `SecretStr \| None` | `None` | v0.4.1：API key 模式的 token（從 env 載入後以 SecretStr 包裝、`repr` / JSON dump / OpenAPI schema 都不洩漏） |
-| `bearer_token` | `SecretStr \| None` | `None` | v0.4.1：Bearer 模式的 token；同上 SecretStr 行為 |
-| `dashboard_requires_auth` | `bool` | `True` | v0.4.1：當 `auth_mode != NONE` 時，`/skills` `/health` `/events` 三個 dashboard endpoint 是否也套 auth。設 `False` 可開放給 monitoring 系統匿名 poll |
+| `host` | `str` | `"127.0.0.1"` | Host that uvicorn binds to; the default opens localhost only |
+| `port` | `int` | `8765` | Port that uvicorn binds to |
+| `dashboard` | `bool` | `True` | Whether to enable the `/skills`, `/health`, and `/events` dashboard endpoints |
+| `docs_url` | `str \| None` | `"/docs"` | Mount path for the Swagger UI; set to `None` to disable |
+| `openapi_url` | `str \| None` | `"/openapi.json"` | Path for the OpenAPI JSON; set to `None` to disable |
+| `redoc_url` | `str \| None` | `"/redoc"` | Path for ReDoc; set to `None` to disable |
+| `auth_mode` | `AuthMode` | `AuthMode.NONE` | Authentication mode. Three enum values: `"none"` / `"bearer"` / `"api-key"`. The default `NONE` keeps the original no-auth behavior |
+| `api_key` | `SecretStr \| None` | `None` | Token for api-key mode (loaded from env and wrapped in `SecretStr`, so `repr`, JSON dumps, and the OpenAPI schema never leak it) |
+| `bearer_token` | `SecretStr \| None` | `None` | Token for bearer mode; same `SecretStr` behavior as above |
+| `dashboard_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether the `/skills`, `/health`, and `/events` dashboard endpoints also require auth. Set `False` to let a monitoring system poll them anonymously |
 
-預設情境下不需要傳任何參數：
+In the default case you do not need to pass any arguments:
 
 ```python
 from cantus.config import Settings
@@ -69,7 +69,7 @@ assert settings.port == 8765
 assert settings.dashboard is True
 ```
 
-要從環境變數 override，把欄位名大寫、加上 `CANTUS_SERVE_` prefix 即可。pydantic 會自動做型別 coercion（字串 → int / bool）：
+To override a field from the environment, uppercase the field name and add the `CANTUS_SERVE_` prefix. pydantic handles type coercion automatically (string to int / bool):
 
 ```bash
 export CANTUS_SERVE_PORT=9999
@@ -84,28 +84,28 @@ assert settings.port == 9999        # int, not "9999"
 assert settings.dashboard is False  # bool, not "false"
 ```
 
-把 `settings` 傳給 `cantus.serve`：
+Pass `settings` to `cantus.serve`:
 
 ```python
 app = cantus.serve(registry, settings=Settings())
 uvicorn.run(app, host=settings.host, port=settings.port)
 ```
 
-> v0.4.0 / v0.4.1 都**不**讀 `.env` 檔（`env_file` 故意沒開）。v0.4.1 雖然引入 SecretStr token 欄位，但載入路徑仍只走 env 變數；`.env` 檔支援不在 v0.4.x scope。
+> `Settings` does **not** read a `.env` file (`env_file` is deliberately left off). Although the `SecretStr` token fields are loaded at startup, the load path still goes through env variables only; `.env` file support is out of scope here.
 
 ## Authentication
 
-v0.4.1 cantus-serve-security 把 v0.4.0 故意延後的 auth gate 補上。預設 **opt-in**（`auth_mode = AuthMode.NONE`），既有 v0.4.0 cookbook / examples 無需改動即可升級；要啟用只需設兩個 env 變數。
+The auth gate fills in the piece that was deliberately deferred from the first serve release. It is **opt-in** by default (`auth_mode = AuthMode.NONE`), so existing cookbooks and examples upgrade without changes. To turn it on, set two env variables.
 
 ### Three auth modes
 
-| `CANTUS_SERVE_AUTH_MODE` | Header expected | Token env 變數 | 適用情境 |
+| `CANTUS_SERVE_AUTH_MODE` | Header expected | Token env variable | When to use |
 | --- | --- | --- | --- |
-| `none`（預設） | （無） | — | 本機 loopback / 教學環境 / v0.4.0 相容性 |
-| `bearer` | `Authorization: Bearer <token>` | `CANTUS_SERVE_BEARER_TOKEN` | 標準 RFC 6750 Bearer，搭配 reverse proxy 或 tunnel 對外暴露 |
-| `api-key` | `X-API-Key: <token>` | `CANTUS_SERVE_API_KEY` | 內部系統 / 監控腳本 / 不想用 Authorization header 的場景 |
+| `none` (default) | (none) | — | Local loopback / teaching environments / backward compatibility |
+| `bearer` | `Authorization: Bearer <token>` | `CANTUS_SERVE_BEARER_TOKEN` | Standard RFC 6750 Bearer, paired with a reverse proxy or tunnel for external exposure |
+| `api-key` | `X-API-Key: <token>` | `CANTUS_SERVE_API_KEY` | Internal systems / monitoring scripts / cases where you would rather not use the Authorization header |
 
-### Quick start — 啟用 bearer
+### Quick start — enabling bearer
 
 ```bash
 export CANTUS_SERVE_AUTH_MODE=bearer
@@ -123,28 +123,28 @@ app = cantus.serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
 
-呼叫：
+Calling it:
 
 ```bash
-# 無 token：401
+# No token: 401
 curl http://localhost:8765/skills/my_skill -d '{"value":"hi"}'
 # {"detail":"Authentication required"}
 
-# 對的 token：200
+# Correct token: 200
 curl http://localhost:8765/skills/my_skill \
   -H "Authorization: Bearer $CANTUS_SERVE_BEARER_TOKEN" \
   -d '{"value":"hi"}'
 # {"result":"hi"}
 ```
 
-### Quick start — 啟用 api-key
+### Quick start — enabling api-key
 
 ```bash
 export CANTUS_SERVE_AUTH_MODE=api-key
 export CANTUS_SERVE_API_KEY=$(openssl rand -hex 32)
 ```
 
-呼叫時改帶 `X-API-Key` header：
+Pass the `X-API-Key` header when you call:
 
 ```bash
 curl http://localhost:8765/skills/my_skill \
@@ -152,38 +152,38 @@ curl http://localhost:8765/skills/my_skill \
   -d '{"value":"hi"}'
 ```
 
-### Dashboard 是否套 auth
+### Whether the dashboard requires auth
 
-預設 `dashboard_requires_auth = True`：當 `auth_mode != NONE` 時，`/skills` / `/health` / `/events` 三個 dashboard endpoint 也要求認證。理由：dashboard 暴露的 Skill 名單與健康狀態本身就是 reconnaissance 資訊。
+The default is `dashboard_requires_auth = True`: when `auth_mode != NONE`, the three dashboard endpoints `/skills`, `/health`, and `/events` also require authentication. The reasoning is that the Skill list and health status the dashboard exposes are reconnaissance information in their own right.
 
-如果你要把 `/health` 給 Prometheus / Grafana 等 monitoring 系統匿名 poll，顯式關掉：
+If you want to let a monitoring system such as Prometheus or Grafana poll `/health` anonymously, turn it off explicitly:
 
 ```bash
 export CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH=false
 ```
 
-關掉後，`/skills` / `/health` / `/events` 對匿名請求回 200；`POST /skills/<name>` 仍需 token。
+With it off, `/skills`, `/health`, and `/events` return 200 to anonymous requests, while `POST /skills/<name>` still requires a token.
 
-### Fail-fast on missing token
+### Fail-fast on a missing token
 
-若設了 `CANTUS_SERVE_AUTH_MODE=bearer` 卻忘了設 `CANTUS_SERVE_BEARER_TOKEN`（或 `api-key` 模式忘了設 `CANTUS_SERVE_API_KEY`），`cantus.serve()` 在 app 建構時就會 `raise ValueError`，訊息含字面 `BEARER_TOKEN` / `API_KEY`，避免使用者誤以為 auth 已啟用但實際上每個請求都會通過。
+If you set `CANTUS_SERVE_AUTH_MODE=bearer` but forget to set `CANTUS_SERVE_BEARER_TOKEN` (or set api-key mode but forget `CANTUS_SERVE_API_KEY`), `cantus.serve()` raises `ValueError` while building the app. The message contains the literal `BEARER_TOKEN` / `API_KEY`, so you never end up thinking auth is on while every request actually passes through.
 
-> ⚠️ **生產環境警示**：`auth_mode` 預設 `NONE` 是為了維持 v0.4.0 升級路徑相容性，**不是**生產環境的 default。一旦把 cantus serve 暴露到 loopback 之外（綁 `0.0.0.0`、接 tunnel、丟到 cloud VM），**必須**把 `auth_mode` 改成 `bearer` 或 `api-key` 並設一個高熵 token（至少 32 bytes 隨機字串）。v0.4.2 tunnel helper 預期會在 spawn tunnel 時若偵測到 `auth_mode=NONE` 就以醒目警告或拒絕執行作為第二道防線。
+> ⚠️ **Production warning**: `auth_mode` defaults to `NONE` to keep the upgrade path backward compatible, **not** because that is a sensible production default. Once you expose cantus serve beyond loopback (binding `0.0.0.0`, attaching a tunnel, deploying to a cloud VM), you **must** switch `auth_mode` to `bearer` or `api-key` and set a high-entropy token (at least 32 random bytes). A future tunnel helper is expected to act as a second line of defense by warning loudly, or refusing to run, if it spawns a tunnel while `auth_mode=NONE`.
 
 ### Design notes
 
-- **Constant-time compare**：token 比對走 `hmac.compare_digest`，防 timing-oracle 推測 token 前綴。`==` 比對在某些 Python 實作會 short-circuit 並洩漏長度差。
-- **401 不區分缺/錯 token**：所有認證失敗（缺 header、錯 token、格式錯、未知 mode）一律回 HTTP 401 with body `{"detail": "Authentication required"}` byte-identical。差異化錯誤訊息會幫攻擊者區分「找對 header 名了嗎」vs「猜對 token 內容了嗎」，等於 username enumeration 的類比。
-- **SecretStr 不洩漏**：`api_key` / `bearer_token` 兩個欄位的型別是 `pydantic.SecretStr`，pydantic 內建 mask 行為確保 `repr(settings)` / `settings.model_dump_json()` / `serve(registry).openapi()` / `cantus.serve` 產生的任何 log line 都不會出現 token 明文（測試以 `assert "<token>" not in <surface>` 串四條斷言驗證）。
-- **`cantus[security]` extras**：v0.4.1 新增的 documentary alias，dependency closure 跟 `cantus[serve]` 完全相同（不引入新第三方套件、不破壞既有 `[tool.uv] conflicts` 6 pairs）。下游可寫 `pip install cantus[security]` 表達安裝意圖。
+- **Constant-time compare**: token comparison uses `hmac.compare_digest` to prevent a timing oracle from guessing a token prefix. A plain `==` comparison can short-circuit in some Python implementations and leak the length difference.
+- **401 does not distinguish a missing token from a wrong one**: every authentication failure (missing header, wrong token, malformed format, unknown mode) returns HTTP 401 with the byte-identical body `{"detail": "Authentication required"}`. A differentiated error message would help an attacker tell "did I find the right header name?" from "did I guess the token content?", which is the analog of username enumeration.
+- **`SecretStr` does not leak**: the `api_key` and `bearer_token` fields are typed as `pydantic.SecretStr`. pydantic's built-in masking guarantees that `repr(settings)`, `settings.model_dump_json()`, `serve(registry).openapi()`, and any log line `cantus.serve` produces never contain the plaintext token (tests verify this with a chain of four `assert "<token>" not in <surface>` assertions).
+- **`cantus[security]` extras**: a documentary alias whose dependency closure is identical to `cantus[serve]` (no new third-party packages, and no break to the existing `[tool.uv]` `conflicts` pairs). Downstream can write `pip install cantus[security]` to express install intent.
 
 ## Dashboard endpoints
 
-當 `Settings.dashboard is True`（預設值），`cantus.serve()` 會額外掛三個 read-only endpoint：
+When `Settings.dashboard is True` (the default), `cantus.serve()` mounts three extra read-only endpoints:
 
 ### `GET /skills`
 
-回傳 registry 內每個 Skill 的 `spec_for_llm()` 輸出，型別為 `list[dict]`，每筆形狀為 v0.3.0 三鍵 `{"name", "description", "args_schema"}`：
+Returns the `spec_for_llm()` output for every Skill in the registry, typed as `list[dict]`. Each entry has the three-key shape `{"name", "description", "args_schema"}`:
 
 ```bash
 curl http://localhost:8765/skills
@@ -198,19 +198,19 @@ curl http://localhost:8765/skills
 
 ### `GET /health`
 
-Liveness probe；回傳形狀固定為兩鍵 dict：
+A liveness probe; the response is always a two-key dict:
 
 ```json
 {"status": "ok", "cantus_version": "0.5.0"}
 ```
 
-`cantus_version` 為 runtime 解析的 `cantus.__version__`，CI / monitoring 可以用此字串確認部署的 cantus 版本。
+`cantus_version` is the runtime-resolved `cantus.__version__`. CI and monitoring can use this string to confirm which cantus version is deployed.
 
 ### `GET /events`
 
-回傳 v0.3.1 EventStream 持久化層內最近的事件，oldest-first within the page。支援兩個 query parameter：
+Returns the most recent events from the EventStream persistence layer, oldest-first within the page. It accepts two query parameters:
 
-| Query param | 型別 | 預設值 | 上限 |
+| Query param | Type | Default | Max |
 | --- | --- | --- | --- |
 | `limit` | `int` | `100` | `1000` |
 | `offset` | `int` | `0` | — |
@@ -219,11 +219,11 @@ Liveness probe；回傳形狀固定為兩鍵 dict：
 curl 'http://localhost:8765/events?limit=20&offset=0'
 ```
 
-若 EventStream 尚未配置 / 沒有任何事件被記錄，回傳空 list `[]` + HTTP `200`（**不**回 `404`）。
+If the EventStream is not configured or no events have been recorded yet, the endpoint returns an empty list `[]` with HTTP `200` (**not** `404`).
 
-### 關閉 dashboard
+### Turning the dashboard off
 
-把 `Settings(dashboard=False)` 傳進去，上述三個 endpoint 全部變 `404`，但所有 Skill invoke endpoint（`POST /skills/<name>`）**不受影響**：
+Pass `Settings(dashboard=False)` and all three endpoints become `404`, while every Skill invoke endpoint (`POST /skills/<name>`) is **unaffected**:
 
 ```python
 from cantus.config import Settings
@@ -232,15 +232,15 @@ app = cantus.serve(registry, settings=Settings(dashboard=False))
 # GET /skills  -> 404
 # GET /health  -> 404
 # GET /events  -> 404
-# POST /skills/search_book -> 200（照常）
+# POST /skills/search_book -> 200 (as usual)
 ```
 
-### 保留路徑：Skill 名稱不可撞名
+### Reserved paths: Skill names cannot collide
 
-`skills` / `health` / `events` 三個名字保留給 dashboard。若 registry 內有 Skill 的 `spec_for_llm()["name"]` 等於這三個其中之一，`cantus.serve(...)` 會在 app build 階段 raise `ValueError`，訊息含字面 `"reserved dashboard path"`：
+The names `skills`, `health`, and `events` are reserved for the dashboard. If any Skill in the registry has a `spec_for_llm()["name"]` equal to one of these three, `cantus.serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`:
 
 ```python
-# 假設 bad_skill.spec_for_llm()["name"] == "health"
+# Suppose bad_skill.spec_for_llm()["name"] == "health"
 registry = Registry()
 registry.register(bad_skill)
 
@@ -248,45 +248,45 @@ cantus.serve(registry)
 # ValueError: ... reserved dashboard path ...
 ```
 
-此 guard 在 `dashboard=True` 與 `dashboard=False` 兩種情境下**皆會觸發** — 預留 path 是常數，不隨 setting 浮動。
+This guard **fires in both** the `dashboard=True` and `dashboard=False` cases — the reserved paths are constant and do not float with the setting.
 
 ## Introspection endpoints
 
-當 `Settings.introspection is True`（預設值），`cantus.serve()` 會額外掛一組 read-only 的 `/introspection/*` endpoint，把 cantus 既有的執行期狀態（Skill registry、auth 設定、attached channels、EventStream）投影成穩定的 JSON read-model。它**只觀測、不變更**任何 registry / settings / session / channel / event-stream 狀態，與 dashboard 平行、且各自**獨立** toggle。
+When `Settings.introspection is True` (the default), `cantus.serve()` mounts an extra group of read-only `/introspection/*` endpoints that project cantus's existing runtime state (the Skill registry, auth configuration, attached channels, and EventStream) into a stable JSON read-model. It **observes only** and never changes any registry, settings, session, channel, or event-stream state. It runs in parallel with the dashboard and each toggles **independently**.
 
-| Endpoint | 內容 |
+| Endpoint | Contents |
 | --- | --- |
-| `GET /introspection/skills` | 每個註冊 Skill 的 `spec_for_llm()` 投影 |
-| `GET /introspection/sessions` | 最近被 dispatch 的 run（bounded、read-only SessionTracker） |
-| `GET /introspection/permissions` | 生效的 auth 設定（`auth_mode` + 兩個 `*_requires_auth` flag + 被 gate 的路徑清單；**永不**含 token 值） |
-| `GET /introspection/queues` | 各 channel 的 queue 深度（無此能力的 channel 以 `depth=null` 列出） |
-| `GET /introspection/workflows/{run_id}` | 單一 run 的 Action/Observation 步驟軌跡（見下方去敏感契約） |
-| `GET /introspection/dataflow` | 由 registry + channels 推導的靜態元件拓樸（nodes + edges） |
-| `GET /introspection` | 上述各切片的 roll-up（不含 per-run workflows） |
+| `GET /introspection/skills` | The `spec_for_llm()` projection of every registered Skill |
+| `GET /introspection/sessions` | The most recently dispatched runs (a bounded, read-only `SessionTracker`) |
+| `GET /introspection/permissions` | The effective auth configuration (`auth_mode` plus the two `*_requires_auth` flags plus the list of gated paths; **never** the token values) |
+| `GET /introspection/queues` | The queue depth of each channel (a channel without this capability is listed with `depth=null`) |
+| `GET /introspection/workflows/{run_id}` | The Action/Observation step trace for a single run (see the redaction contract below) |
+| `GET /introspection/dataflow` | The static component topology derived from the registry plus channels (nodes plus edges) |
+| `GET /introspection` | A roll-up of the slices above (excluding the per-run workflows) |
 
-### 啟用與 auth gating
+### Enabling and auth gating
 
-`/introspection` 由兩個 flag 控制，與 dashboard 各自獨立：
+`/introspection` is controlled by two flags, each independent of the dashboard:
 
-- `introspection`（預設 `True`）：是否掛載整組 endpoint。設 `Settings(introspection=False)` 後全部回 `404`，但 dashboard 與 Skill invoke endpoint 不受影響。
-- `introspection_requires_auth`（預設 `True`）：當 `auth_mode != NONE` 時，整組 `/introspection/*`（**包含** `/introspection/workflows/{run_id}`）是否套 `require_auth`。設 `False` 可開放匿名讀取，行為對齊 `dashboard_requires_auth`。
+- `introspection` (default `True`): whether to mount the whole group of endpoints. With `Settings(introspection=False)`, they all return `404`, while the dashboard and Skill invoke endpoints are unaffected.
+- `introspection_requires_auth` (default `True`): when `auth_mode != NONE`, whether the whole `/introspection/*` group (**including** `/introspection/workflows/{run_id}`) is wrapped with `require_auth`. Set `False` to allow anonymous reads, matching the behavior of `dashboard_requires_auth`.
 
-> ⚠️ **`auth_mode=none` 的 config cliff**：當 `auth_mode` 為 `none`（預設）時沒有任何認證可套，`introspection_requires_auth`（與 `dashboard_requires_auth`）**會被忽略**，`/introspection` 對任何能連到 server 的人都可讀。`cantus.serve()` 在此情境（`auth_mode=none` 且 `introspection` 啟用）會在 app 建構期 emit 一則 `UserWarning`，明示 `/introspection` 目前無需認證即可存取（訊息**不含**任何 token）。一旦把 server 暴露到 loopback 之外（綁 `0.0.0.0`、接 tunnel），請把 `auth_mode` 改成 `bearer` 或 `api-key`，introspection 會一併被保護。
+> ⚠️ **The `auth_mode=none` config cliff**: when `auth_mode` is `none` (the default), there is no authentication to apply, so `introspection_requires_auth` (and `dashboard_requires_auth`) **are ignored** and `/introspection` is readable by anyone who can reach the server. In this situation (`auth_mode=none` and `introspection` enabled), `cantus.serve()` emits a `UserWarning` during app build stating that `/introspection` is currently accessible without authentication (the message **contains no** token). Once you expose the server beyond loopback (binding `0.0.0.0`, attaching a tunnel), switch `auth_mode` to `bearer` or `api-key` and introspection is protected along with everything else.
 
-### Workflow-trace summary 去敏感契約
+### The workflow-trace summary redaction contract
 
-`GET /introspection/workflows/{run_id}` 把該 run 的 EventStream 投影成有序步驟，每個步驟有 `index` / `kind` / `type` / `summary` 四欄。`summary` 是**結構投影、不攜帶任何值**：
+`GET /introspection/workflows/{run_id}` projects that run's EventStream into ordered steps, each with four fields: `index`, `kind`, `type`, and `summary`. The `summary` is a **structural projection that carries no values**:
 
-- `CallSkillAction` → skill 名稱 + 引數**鍵名**排序清單（不含引數值）
-- `SkillObservation` → skill 名稱 + 結果**型別名稱**（不含結果值）
-- `ToolErrorObservation` → 例外型別名稱（不含原始例外訊息）
-- 其他型別 → event 型別名稱（不含欄位值）
+- `CallSkillAction` → the skill name plus a sorted list of argument **key names** (no argument values)
+- `SkillObservation` → the skill name plus the result **type name** (no result value)
+- `ToolErrorObservation` → the exception type name (no original exception message)
+- other types → the event type name (no field values)
 
-引數值、結果值、原始例外訊息可能帶 secret / PII，因此一律不投影；步驟的 `kind` / `type` / 順序維持不變。未知 run_id 回 `404`。TUI Inspector（`cantus tui`，見 [`docs/tui.md`](../tui.md)）是這份 server 資料的純 render 端，因此同樣只顯示去敏感後的 summary。
+Argument values, result values, and raw exception messages can carry secrets or PII, so none of them are projected; the step's `kind`, `type`, and ordering stay intact. An unknown `run_id` returns `404`. The TUI Inspector (`cantus tui`, see [`docs/tui.md`](../tui.md)) is a pure render of this server data, so it likewise shows only the redacted summary.
 
 ## Channel Protocol
 
-`cantus.serve.channel.Channel` 是 `typing.Protocol`、且加 `@typing.runtime_checkable`，所以下游可以用 `isinstance(obj, Channel)` 做 duck-typing 檢查。Protocol 只規定兩個 method：
+`cantus.serve.channel.Channel` is a `typing.Protocol` decorated with `@typing.runtime_checkable`, so downstream code can use `isinstance(obj, Channel)` for duck-typing checks. The Protocol specifies only two methods:
 
 ```python
 from typing import Protocol, runtime_checkable
@@ -297,11 +297,11 @@ class Channel(Protocol):
     def send(self, message: dict) -> None: ...
 ```
 
-任何同時提供這兩個 method 的 class 即自動 conform，**不需**繼承 `Channel` ABC（v0.3.0 protocol-reorg 收成的 typing.Protocol 風格）。
+Any class that provides both methods automatically conforms; it does **not** need to inherit from a `Channel` ABC (this follows the `typing.Protocol` style adopted in the protocol reorganization).
 
 ### `LocalMockReceiver` — in-process FIFO test stub
 
-v0.4.0 在 tree 內只 ship 一個 Channel 實作：`cantus.serve.channel.LocalMockReceiver`，純記憶體 `collections.deque[dict]` FIFO queue，零外部 dependency、零外部網路 I/O。它的角色是 ARCH-2 跨 capability smoke test 載具 — 用來在 pytest 內驗證 `cantus.serve(...)` 能跟 Memory / Agent / Channel 組合起來不互相干擾，**非生產用途**。
+The tree ships exactly one Channel implementation: `cantus.serve.channel.LocalMockReceiver`, a pure in-memory `collections.deque[dict]` FIFO queue with no external dependencies and no network I/O. It exists for smoke tests: pytest uses it to check that `cantus.serve(...)` composes with the Memory protocol and the agent layer without one stepping on another. It is **not for production use**.
 
 ```python
 from cantus.serve.channel import LocalMockReceiver
@@ -310,18 +310,18 @@ ch = LocalMockReceiver()
 ch.send({"a": 1})
 ch.send({"a": 2})
 
-assert ch.receive() == {"a": 1}   # FIFO，左邊先 pop
+assert ch.receive() == {"a": 1}   # FIFO, the left side pops first
 assert ch.receive() == {"a": 2}
 
 ch.receive()
 # IndexError: LocalMockReceiver queue is empty
 ```
 
-`send()` 收到非 dict（包括 `None`、`str`、list）會 raise `TypeError("LocalMockReceiver.send expects dict ...")`。
+Passing `send()` a non-dict (including `None`, `str`, or a list) raises `TypeError("LocalMockReceiver.send expects dict ...")`.
 
-### `app.state.channels` — 拿到 channel list
+### `app.state.channels` — getting the channel list
 
-把 channel 透過 keyword `channels=[...]` 傳給 `cantus.serve(...)` 後，會原樣存在 FastAPI app 的 `app.state.channels`，host code 可以在 server 啟動後自行 inspect 或 wire-up out-of-band consumer，**不需**重跑 `cantus.serve(...)`：
+When you pass channels via the `channels=[...]` keyword to `cantus.serve(...)`, they are stored as-is on the FastAPI app's `app.state.channels`. Host code can inspect them or wire up an out-of-band consumer after the server starts, with no need to re-run `cantus.serve(...)`:
 
 ```python
 from cantus.serve.channel import LocalMockReceiver
@@ -332,12 +332,12 @@ app = cantus.serve(registry, channels=[ch])
 assert app.state.channels == [ch]
 ```
 
-### Real channel implementations（已於 B-series 釋出）
+### Real channel implementations
 
-LINE / Telegram / Discord / Google Chat 等真實 channel 實作已於 **B-series channel-gateway** 釋出（先前 v0.4.0 僅定義 Protocol + in-memory stub）。各平台的接線（webhook / WebSocket / Pub/Sub、簽章驗證、outbound reply）與操作步驟見對應 cookbook：
+The real channel implementations for LINE, Telegram, Discord, and Google Chat ship as part of the channel-gateway work (the earlier serve release defined only the Protocol plus the in-memory stub). For each platform's wiring (webhook / WebSocket / Pub/Sub, signature verification, outbound replies) and operational steps, see the matching cookbook:
 
-- [`../cookbook-line-channel.md`](../cookbook-line-channel.md)、[`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md)（webhook gateway）
-- [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md)（WebSocket Gateway + Ed25519 interactions）
-- [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)（Pub/Sub）
+- [`../cookbook-line-channel.md`](../cookbook-line-channel.md), [`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md) (webhook gateway)
+- [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md) (WebSocket Gateway + Ed25519 interactions)
+- [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md) (Pub/Sub)
 
-`Channel` Protocol 形狀自 v0.4.0 定義後維持穩定，這些 real adapter 都在這層抽象之上實作，新增 adapter 不會再動 Protocol。
+All four adapters satisfy the same two-method `Channel` Protocol shown above — the shape has not changed since the first serve release. Adding a new adapter means writing a class with `receive` and `send`; it never touches the Protocol.

@@ -1,22 +1,22 @@
 # `@analyzer` Hook Helper
 
-## What it is + when to use
+## What it is and when to use it
 
-Analyzer 是把「LLM 吐出的一團文字」轉成「typed value」的純解析函式。常見場景：使用者在自然語言裡丟一個 `"台南"`，agent 想呼叫 `get_weather(loc: Location)`，這中間就要一支 `parse_location("台南") -> Location` 把字串塞進 `Location` instance，再把它餵給真正做事的 skill。
+An analyzer is a pure parsing function that turns raw LLM output into a typed value. Say the user mentions `"Tainan"` somewhere in natural language and the agent wants to call `get_weather(loc: Location)`. In between, you need a `parse_location("Tainan") -> Location` that packs the string into a `Location` instance before handing it to the skill that does the real work.
 
-v0.3.0 起 Analyzer **不**是 protocol kind、**不**會註冊到 registry。它是 hook helper，靠 `@skill(pre_hook=...)` 綁定到某個 skill 上；除此之外，分析結果不會自己跑到 agent 面前，也不會單獨曝露成工具。
+Since v0.3.0, an analyzer is **not** a protocol kind and is **not** registered with the registry. It is a hook helper, bound to a particular skill through `@skill(pre_hook=...)`. Apart from that binding, its result never reaches the agent on its own and is never exposed as a standalone tool.
 
-import 路徑統一從 `cantus.hooks` 拿：
+Import everything from `cantus.hooks`:
 
 ```python
 from cantus.hooks import analyzer, Analyzer, Result
 ```
 
-跟 skill 的差別：skill 是 LLM 看得到、可以挑來呼叫的工具；analyzer 對 LLM 完全透明，是框架在 dispatch skill 之前替它「先把參數整理好」的內建步驟。回傳型別 annotation 就是 analyzer 的合約，回的東西會被當成 skill 的新參數，型別不符下游就會炸。
+How it differs from a skill: a skill is a tool the LLM can see and choose to call; an analyzer is completely invisible to the LLM. It is a built-in step the framework runs before dispatching a skill, to "tidy up the arguments first." The return-type annotation is the analyzer's contract. Whatever it returns becomes the skill's new argument, and if the type doesn't match, the downstream skill blows up.
 
-## 兩種寫法（同一個 `parse_location`）
+## Two ways to write it (the same `parse_location`)
 
-### 1. Decorator entry（最常用）
+### 1. Decorator entry (most common)
 
 ```python
 from cantus import skill
@@ -34,7 +34,7 @@ def get_weather(loc: Location) -> str:
     return _do_lookup(loc)
 ```
 
-### 2. Class-first（advanced / canonical）
+### 2. Class-first (advanced / canonical)
 
 ```python
 from cantus.hooks import Analyzer
@@ -47,18 +47,18 @@ class ParseLocation(Analyzer):
     def run(self, text: str) -> Location:
         return Location.from_text(text)
 
-parse_location = ParseLocation()  # 後續 @skill(pre_hook=parse_location) 使用同名實例
+parse_location = ParseLocation()  # use the same instance later in @skill(pre_hook=parse_location)
 ```
 
-Class-first 適合「Analyzer 內要保留設定」的情境，例如「容忍多少格式錯誤就放棄」、「用哪個 schema 版本」這類 instance-level state。Decorator 版本最後也是合成一個等價的 subclass，行為一致。
+Reach for the class-first form when the analyzer needs to hold instance-level state, such as how many format errors to tolerate before giving up, or which schema version to parse against. The decorator form synthesizes an equivalent subclass under the hood, so the behavior is identical.
 
-> v0.3.0 **不**提供 function-pass entry：spec 明確規定 hook helper 沒有 `register_analyzer(fn)` 這條路；要嘛用 `@analyzer` 標起來，要嘛走 class-first，沒有第三條路。
+> The public `cantus.hooks` surface does **not** offer a function-pass entry: the spec is explicit that a hook helper has no `register_analyzer(fn)` path. Either mark it with `@analyzer` or go class-first; there is no third route.
 
-## `spec_for_llm()` 回什麼
+## What `spec_for_llm()` returns
 
-Analyzer 本身**不**會透過 registry 暴露給 LLM，所以你**不會**在 agent system prompt 裡看到它的 `spec_for_llm()`。
+An analyzer is **not** exposed to the LLM through the registry, so you will **not** see its `spec_for_llm()` in the agent's system prompt.
 
-它附在哪支 Skill 上，那支 Skill 的 `spec_for_llm()` JSON shape 還是只有三個 key：
+Whatever skill it is attached to, that skill's `spec_for_llm()` JSON shape still has only three keys:
 
 ```text
 {
@@ -68,17 +68,17 @@ Analyzer 本身**不**會透過 registry 暴露給 LLM，所以你**不會**在 
 }
 ```
 
-裡面不會出現任何 `pre_hook` / `analyzer` 字樣 — hook 是框架內部的 dispatch 細節，對 LLM 透明。模型只知道「有一支 `get_weather` 可以叫」，剩下怎麼把字串轉 `Location` 是框架的事。
+Nothing about `pre_hook` or `analyzer` shows up — the hook is an internal dispatch detail, invisible to the LLM. The model only knows that there is a `get_weather` it can call; how the string becomes a `Location` is the framework's business.
 
-## Dispatch 行為
+## Dispatch behavior
 
-- 在 `Agent._dispatch_skill` 中，pre_hook 在 `validate_args` 之後、skill body 之前執行。
-- pre_hook 的回傳值會「**取代**」args dictionary 餵給 skill body — 因此 `parse_location("台南")` 回的 `Location` instance 會以 `loc=Location(...)` 形式進入 `get_weather`。
-- pre_hook 拋例外 → `ToolErrorObservation(message="pre_hook <ExcType>: <msg>")`，那一輪 turn 不會繼續執行 skill body。
+- In `Agent._dispatch_skill`, the pre_hook runs after `validate_args` and before the skill body.
+- The pre_hook's return value **replaces** the args dictionary fed to the skill body, so the `Location` instance returned by `parse_location("Tainan")` enters `get_weather` as `loc=Location(...)`.
+- If the pre_hook raises, you get `ToolErrorObservation(message="pre_hook <ExcType>: <msg>")`, and the skill body does not run for that turn.
 
-## 常見錯誤
+## Common mistakes
 
-- **回傳型別跟 annotation 不符**：宣告 `-> Location` 卻回 `dict`，下游 skill 直接炸。
-- **試圖呼叫 `register_analyzer(fn)`**：v0.3.0 已移除這個 entry；改用 `@analyzer` + `@skill(pre_hook=fn)` 兩步綁定。
-- **試圖 `from cantus import analyzer`**：`ImportError` — 改成 `from cantus.hooks import analyzer`，單複數要對（`hooks` 帶 s）。
-- **在 analyzer 裡做 I/O 副作用**：analyzer 應該是「純解析」，要打網路、讀資料庫請拆出去做 skill，別把 side effect 偷塞進 pre_hook。
+- **Return type doesn't match the annotation**: declaring `-> Location` but returning a `dict` makes the downstream skill blow up.
+- **Trying to call `register_analyzer(fn)`**: this entry is not part of the public `cantus.hooks` surface. Use the two-step binding `@analyzer` + `@skill(pre_hook=fn)` instead.
+- **Trying `from cantus import analyzer`**: that raises `ImportError`. Use `from cantus.hooks import analyzer`, and watch the plural (`hooks` has an `s`).
+- **Doing I/O side effects inside an analyzer**: an analyzer should be pure parsing. If you need to hit the network or read a database, split that out into a skill instead of smuggling the side effect into a pre_hook.

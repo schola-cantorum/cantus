@@ -1,20 +1,20 @@
-# `Soul` Identity Protocol（v0.3.1）
+# `Soul` Identity Protocol (v0.5.0)
 
-## What it is + when to use
+## What it is and when to use it
 
-cantus 從 v0.3.1 起把 agent 的「身份」抽象成 `cantus.identity.Soul` —— 一份從 SOUL.md 載入的六區塊身份結構，等同於把人類角色設定（name & role / personality / rules / tools / output format / handoffs）變成第一階公民，並在 `Agent(soul=...)` 自動注入 system prompt 前綴。
+Since v0.3.1, cantus models an agent's *identity* with `cantus.identity.Soul`: a six-section record loaded from a `SOUL.md` file. The six sections are name and role, personality, rules, tools, output format, and handoffs. Pass the parsed `Soul` to `Agent(soul=...)` and cantus prepends it to the system prompt for you.
 
-教學弧的三大抽象並列：
+This sits alongside the other two teaching abstractions in the framework:
 
-| 抽象 | 角色 |
+| Abstraction | Role |
 | --- | --- |
-| `Skill` | 能力（這個 agent 可以做的事） |
-| `Memory` | 記憶（這個 agent 記得過什麼） |
-| `Soul` | 身份（這個 agent 是誰） |
+| `Skill` | Capability — what this agent can do |
+| `Memory` | Memory — what this agent has remembered |
+| `Soul` | Identity — who this agent is |
 
-## SOUL.md 六區塊規格
+## The six-section `SOUL.md` format
 
-對齊 [aaronjmars/soul.md](https://github.com/aaronjmars/soul.md) 慣例。每個區塊用 H2 `##` 標頭，**case-sensitive**、byte-for-byte 比對；body 從 H2 標頭下一行起到下一個 H2 或 EOF 為止，前後 whitespace 會被 strip。
+The on-disk format follows the [aaronjmars/soul.md](https://github.com/aaronjmars/soul.md) convention. Each section opens with an H2 `##` header. Headers are **case-sensitive** and compared byte-for-byte. A section body runs from the line after its H2 header down to the next H2 header or end of file, and leading and trailing whitespace is stripped.
 
 ```markdown
 ## Name & Role
@@ -38,7 +38,7 @@ Plain prose with bullet points for lists.
 Escalate cataloging requests to the head librarian.
 ```
 
-六個正規 H2 標頭依序為：
+The six canonical H2 headers, in order, are:
 
 1. `## Name & Role`
 2. `## Personality`
@@ -47,21 +47,21 @@ Escalate cataloging requests to the head librarian.
 5. `## Output format`
 6. `## Handoffs`
 
-對應 `Soul` 屬性：`name_and_role` / `personality` / `rules` / `tools` / `output_format` / `handoffs`。
+They map to these `Soul` attributes: `name_and_role`, `personality`, `rules`, `tools`, `output_format`, `handoffs`.
 
-## `Soul.from_file()` 失敗模式
+## How `Soul.from_file()` fails
 
-`Soul.from_file(path)` 在以下情境抛出對應例外：
+`Soul.from_file(path)` raises the matching exception in each of these cases:
 
-| 情況 | 例外 | 例外屬性 |
+| Situation | Exception | Exception attributes |
 | --- | --- | --- |
-| 檔案不存在 | `FileNotFoundError` | 標準 Python，**不**包裝為 `SoulParseError` |
-| 缺一或多個 H2 區塊 | `SoulParseError` | `missing_sections=[<canonical titles>]` |
-| 同一 H2 出現多次 | `SoulParseError` | `duplicates=[<title>, ...]` |
-| 大小寫不符（例 `## name & Role`） | `SoulParseError` | `missing_sections=["Name & Role"]` **加** `unexpected=["name & Role"]` |
-| 出現規格外 H2（例 `## Examples`） | `SoulParseError` | `unexpected=["Examples"]` |
+| File does not exist | `FileNotFoundError` | Standard Python; **not** wrapped in `SoulParseError` |
+| One or more H2 sections missing | `SoulParseError` | `missing_sections=[<canonical titles>]` |
+| The same H2 appears more than once | `SoulParseError` | `duplicates=[<title>, ...]` |
+| Casing mismatch (e.g. `## name & Role`) | `SoulParseError` | `missing_sections=["Name & Role"]` **plus** `unexpected=["name & Role"]` |
+| An H2 outside the spec (e.g. `## Examples`) | `SoulParseError` | `unexpected=["Examples"]` |
 
-`SoulParseError` 是 `ValueError` 子類，因此 `except ValueError` 也能接住；但要拿到 `missing_sections` / `duplicates` / `unexpected` 三個欄位，請改 `except SoulParseError`。
+`SoulParseError` is a subclass of `ValueError`, so `except ValueError` will also catch it. To read the `missing_sections`, `duplicates`, and `unexpected` fields, catch `SoulParseError` directly.
 
 ```python
 from cantus.identity import Soul, SoulParseError
@@ -74,15 +74,15 @@ except SoulParseError as exc:
     print(f"unexpected: {exc.unexpected}")
 ```
 
-## `Agent(soul=...)` 注入順序
+## How `Agent(soul=...)` injects the soul
 
-`Agent.__init__` 新增 keyword-only 參數 `soul: Soul | None = None`。注入順序為：
+`Agent.__init__` takes a keyword-only parameter `soul: Soul | None = None`. The injection order is:
 
 ```
 <soul.to_system_prompt()>\n\n<v0.3.0 baseline system prompt>
 ```
 
-亦即 `soul.to_system_prompt()` 字串為前綴、後接兩個換行、再接 v0.3.0 既有的 system prompt 內容。當 `soul=None`（預設）時，system prompt 與 v0.3.0 **byte-identical**——既有 agent 行為不受任何影響。
+In other words, the `soul.to_system_prompt()` string comes first, followed by two newlines, followed by the existing v0.3.0 system prompt. When `soul=None` (the default), the system prompt is **byte-identical** to v0.3.0, so existing agent behavior is untouched.
 
 ```python
 from cantus import Agent
@@ -90,15 +90,15 @@ from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")
 agent = Agent(model=m, soul=soul)
-# 後續 agent.run(...) 的每次 model.generate(prompt) 都會包含
-# soul 內容作為 system prompt 前綴
+# Every model.generate(prompt) call made during agent.run(...) now includes
+# the soul content as a system-prompt prefix.
 ```
 
-`soul` **不**會註冊為 `Skill`、**不**會出現在 `registry.spec_for_llm()`——LLM 看到的工具清單不會被 SOUL 內容污染。
+The `soul` is **not** registered as a `Skill` and does **not** appear in `registry.spec_for_llm()`, so the tool list the model sees stays free of `SOUL.md` content.
 
-## Override pattern（自塞 system prompt）
+## Override pattern: build the system prompt yourself
 
-如果你想完全自己接管 system prompt 構建，傳 `soul=None`（或省略），然後在 host code 端控制送進 model 的 prompt：
+If you want to take over system-prompt construction entirely, pass `soul=None` (or omit it) and control the prompt sent to the model in your own host code:
 
 ```python
 from cantus import Agent
@@ -106,20 +106,20 @@ from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")
 custom_prefix = soul.to_system_prompt() + "\n\n=== CUSTOM HOST PREAMBLE ===\n\n"
-agent = Agent(model=m)  # soul=None，cantus 不注入
+agent = Agent(model=m)  # soul=None, so cantus injects nothing
 
-# host code 自己組 prompt
+# Host code assembles the prompt itself.
 def run_with_custom_prompt(query: str) -> str:
     prompt = custom_prefix + agent._build_prompt(AgentState(query=query))
     return agent.model.generate(prompt)
 ```
 
-## SOUL.md 信任模型
+## The `SOUL.md` trust model
 
-cantus framework 把 SOUL.md 視為 **trusted host-authored input**：
+The framework treats `SOUL.md` as **trusted, host-authored input**:
 
-- framework **不**做 escape、sanitisation、control-character 檢查
-- 學生把 `## Rules\nIgnore all prior instructions` 寫進 SOUL.md 是合法的——這在教學情境下是學生對 agent 行為的完整掌控
-- 當 host code 從 **untrusted source**（end-user upload、第三方 fetch、network response）取得 SOUL.md 時，**host code 自己負責驗證內容**，再傳給 `Soul.from_file()`
+- The framework does **not** escape, sanitize, or check for control characters.
+- It is valid for a student to write `## Rules\nIgnore all prior instructions` into a `SOUL.md`. In a teaching setting this is the student exercising full control over the agent's behavior.
+- When host code reads `SOUL.md` from an **untrusted source** (an end-user upload, a third-party fetch, a network response), **the host code is responsible for validating the content** before passing it to `Soul.from_file()`.
 
-設計取捨：強制 framework escape 反而會破壞 `## Rules` 區塊內合法的 markdown 元字元（`*`、`#`、`>`），讓 Soul rendering 偏離學生原意。
+The design trade-off: forcing the framework to escape input would break legitimate Markdown metacharacters inside the `## Rules` section (`*`, `#`, `>`), making the rendered soul diverge from what the student intended.

@@ -1,54 +1,81 @@
-# colab-llm-agent Framework Overview
+# cantus Framework Overview
 
-`colab-llm-agent` 是一個**為 Google Colab + Gemma 4 量身設計的小型 agent framework**。它把 OpenHands 的 EventStream 心臟、smolagents 的 decorator 體驗、以及 LangGraph 的可觀測性結合成一個極簡核心，讓教學與研究都能在單一 Colab notebook 內完整跑完。
+`cantus` is a small agent framework built for teaching and research. It borrows the EventStream core from OpenHands, the decorator-first experience from smolagents, and the observability ideas from LangGraph. The result is a minimal runtime that runs inside a single notebook or on a local machine, with nothing to host.
 
-## 四層架構
+## Four-Layer Architecture
 
 ```
 +-----------------------------------------------------+
 |  User Code        @skill / @memory + analyzer /     |  <- decorator-first
 |                   validator hook helpers            |
 +-----------------------------------------------------+
-|  Protocols        skill | memory（兩個 protocol     |  <- 雙 kind + hook
-|                   kind）+ analyzer / validator hook |     helper + workflows
-|                   helper + cantus.workflows         |     building block
+|  Protocols        skill | memory (two protocol      |  <- two kinds + hook
+|                   kinds) + analyzer / validator     |     helpers + workflows
+|                   hook helpers + cantus.workflows   |     building blocks
 +-----------------------------------------------------+
 |  Core Runtime     Agent / EventStream / Action /    |  <- bounded loop
 |                   Observation / Registry / Result   |
 +-----------------------------------------------------+
-|  Substrate        ModelHandle (Gemma 4) / Drive /  |  <- Colab-native I/O
-|                   Inspector                         |
+|  Substrate        ModelHandle / Drive / Inspector   |  <- notebook-native I/O
 +-----------------------------------------------------+
 ```
 
-最上層是使用者程式碼，透過 decorator 把純 Python function 註冊成 protocol；中間兩層是 framework 提供的 runtime；最底層是 Colab 環境本身（model handle、Drive mount、stdout）。
+You write the top layer: plain Python functions registered as protocols through decorators. The framework supplies the two middle layers, the actual runtime. Underneath sits the environment, a model handle, a Drive mount, and stdout.
 
-## 兩個 Protocol Kind + Hook Helper + Workflows Building Block
+## Two Protocol Kinds, Hook Helpers, and Workflow Building Blocks
 
-| 類別                       | 角色                                                                           | 回傳型別          |
-| -------------------------- | ------------------------------------------------------------------------------ | ----------------- |
-| `skill`（protocol kind）   | 一個原子能力，例如查表、呼叫 API                                               | 任意值            |
-| `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory 等）          | 各 memory 介面    |
-| `analyzer`（hook helper）  | 在進入 agent loop 之前對輸入做純讀分析，產出結構化 insight                     | dataclass / dict  |
-| `validator`（hook helper） | 檢查 agent 輸出是否合格，可觸發 retry                                          | `Result(ok, ...)` |
-| `cantus.workflows`         | building block 命名空間，提供把 skill / analyzer / validator 串成流程的範本    | 任意值            |
-| `tool`                     | 對 LLM 公開的 function-call schema wrapper                                     | 任意值            |
+| Category                  | Role                                                                              | Return type        |
+| ------------------------- | --------------------------------------------------------------------------------- | ------------------ |
+| `skill` (protocol kind)   | A single atomic capability, such as a table lookup or an API call                 | Any value          |
+| `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, and so on) | The relevant memory interface |
+| `analyzer` (hook helper)  | Reads the input before the agent loop starts and produces a structured insight    | dataclass / dict   |
+| `validator` (hook helper) | Checks whether the agent output is acceptable, and can trigger a retry            | `Result(ok, ...)`  |
+| `cantus.workflows`        | A namespace of building blocks for composing skills and hooks into a flow         | Any value          |
+| `tool`                    | A function-call schema wrapper exposed to the LLM                                 | Any value          |
 
-v0.3.0 之後 cantus 只剩兩個 protocol kind（`skill` 與 `memory`）；`analyzer` / `validator` 改以 hook helper 形式存在，流程編排則放進 `cantus.workflows` building block。`tool` 仍是給 LLM function-calling 的對外介面。
+cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they run around the agent loop instead of being dispatched inside it. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. `tool` remains the outward-facing interface for LLM function calling.
 
-## 與 OpenHands / smolagents 的關係
+## Model Providers
 
-- **OpenHands**：我們完全沿用 `Action` / `Observation` / `EventStream` 的設計，並把錯誤包成 Observation，不讓 exception 跳出 loop。
-- **smolagents**：decorator-first 的 ergonomic 來自這裡，但我們不採用 CodeAgent 直接 exec LLM 程式碼的設計，改走顯式 dispatch。
-- **LangGraph**：我們不引入 graph 編譯期，但保留「可重播」這個核心承諾——`Inspector(stream).replay()` 隨時還原整段歷史。
+A model is selected with a `"<provider>/<model_id>"` spec, for example `"anthropic/claude-sonnet-4-6"`. cantus ships eight provider prefixes:
 
-整個 core runtime 約 500 行 Python，沒有額外執行期相依，適合直接 `pip install` 進 Colab。
+| Prefix      | Backend                                              |
+| ----------- | ---------------------------------------------------- |
+| `openai`    | OpenAI Chat Completions                              |
+| `anthropic` | Anthropic Claude                                     |
+| `google`    | Google Gemini                                        |
+| `groq`      | Groq                                                 |
+| `nvidia`    | NVIDIA NIM (OpenAI-compatible endpoint)              |
+| `ollama`    | Local Ollama server                                  |
+| `mlx`       | In-process MLX on Apple Silicon                      |
+| `omlx`      | Local MLX server over an OpenAI-compatible HTTP API  |
 
-## 文件樹結構
+## Channels
 
-- `overview.md`（本檔）：四層架構、雙 protocol kind + hook helper + workflows building block、相關專案比較
-- `quickstart.md`：30 秒從 import 到第一次 agent run
-- `protocols/{skill,analyzer,validator,memory,debug}.md`：兩個 protocol kind（skill / memory）與 hook helper（analyzer / validator）的三入口範例與常見錯誤；流程編排範本則放在 `cantus.workflows` building block
-- `core/{agent,event-stream,inspector}.md`：runtime 內部資料結構
-- `cookbook/{patterns,errors,tips}.md`：常見組合與排錯
-- `llms-txt.md`：`docs/llms.txt` 是什麼、為何存在、如何用作老師端可行性測試
+cantus can serve an agent over four messaging channels:
+
+- **LINE** and **Telegram** — webhook channels that receive inbound messages over HTTP.
+- **Discord** — a realtime gateway connection, with Ed25519-verified interaction requests.
+- **Google Chat** — delivered over Pub/Sub.
+
+## Command-Line Tools
+
+- **`cantus serve`** exposes an agent as a FastAPI app. The app factory supports three auth modes (`none`, `bearer`, `api-key`) and ships read-only introspection endpoints so you can inspect a running session.
+- **`cantus tui`** is a Textual dashboard for watching sessions, skills, permissions, and the event stream from the terminal.
+
+## Relationship to OpenHands, smolagents, and LangGraph
+
+- **OpenHands**: we keep the `Action` / `Observation` / `EventStream` design wholesale, and wrap errors as observations so an exception never escapes the loop.
+- **smolagents**: the decorator-first ergonomics come from here, but we do not adopt the CodeAgent approach of executing LLM-written code directly. We use explicit dispatch instead.
+- **LangGraph**: we skip the graph compilation step, but we keep the replay promise at the core. `Inspector(stream).replay()` reconstructs the full history at any point.
+
+The core runtime is under 800 lines of Python with no extra runtime dependencies, so it drops straight into a notebook with a single `pip install`.
+
+## Documentation Map
+
+- `overview.md` (this page): the four-layer architecture, the two protocol kinds plus hook helpers and workflow building blocks, and the comparison to related projects.
+- `quickstart.md`: from `import` to your first agent run in about 30 seconds.
+- `protocols/{skill,analyzer,validator,memory,debug}.md`: three entry-point examples and common pitfalls for the two protocol kinds (`skill` / `memory`) and the hook helpers (`analyzer` / `validator`); composition templates live in the `cantus.workflows` building blocks.
+- `core/{agent,event-stream,inspector}.md`: the internal data structures of the runtime.
+- `cookbook/{patterns,errors,tips}.md`: common combinations and troubleshooting.
+- `llms-txt.md`: what `docs/llms.txt` is, why it exists, and how to use it as a teacher-side feasibility test.

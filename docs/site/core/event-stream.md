@@ -1,26 +1,26 @@
-# EventStream：一條時間軸的真相
+# EventStream: the single record of a run
 
-`EventStream` 是 agent 跑過的歷史，**append-only**、嚴格依時間排序、永遠可重播。它在 OpenHands 裡叫 event stream；在 LangGraph 裡叫 trace；在這裡就是一個薄到不能再薄的 list wrapper。
+`EventStream` is the history of everything an agent did during a run. It is **append-only**, kept in strict chronological order, and always replayable. OpenHands calls this an event stream; LangGraph calls it a trace. In cantus it is a thin wrapper around a list, and not much more than that.
 
-## 介面
+## Interface
 
 ```python
 @dataclass
 class EventStream:
     events: list[Event] = field(default_factory=list)
 
-    def append(event)        # 只接受 Action / Observation；其他型別會 raise TypeError
-    def __iter__()           # 可以 for event in stream
+    def append(event)        # Accepts Action / Observation only; other types raise TypeError
+    def __iter__()           # for event in stream
     def __len__()            # len(stream)
     def __getitem__(i)       # stream[0] / stream[-1]
-    def replay() -> str      # 回傳人類可讀的多行字串（不印任何東西）
+    def replay() -> str      # Returns a human-readable, multi-line string (prints nothing)
 ```
 
-`Event = Action | Observation`。注意 `replay()` 只「回傳字串」，要不要印是 caller 的事——這個分工讓 `Inspector` 能用同一個 stream 印到任何 IO（stdout / file / StringIO）。
+`Event = Action | Observation`. Note that `replay()` only *returns* a string; whether to print it is the caller's decision. That split is what lets `Inspector` send the same stream to any IO target (stdout, a file, a `StringIO`).
 
-## Action 階層
+## The Action hierarchy
 
-所有 `Action` 都是 `frozen dataclass`，跑過就不能改，確保 stream 真的是不可變歷史。
+Every `Action` is a `frozen` dataclass. Once it has run, it cannot be changed, so the stream stays a true history of what happened rather than a mutable scratchpad.
 
 ```
 Action (base, thought: str)
@@ -28,21 +28,21 @@ Action (base, thought: str)
 └── FinalAnswerAction(answer: str)
 ```
 
-- `CallSkillAction` 是 LLM 決定「呼叫某個 protocol」
-- `FinalAnswerAction` 是 LLM 決定「夠了，回答使用者」並終止 loop
+- `CallSkillAction` is the LLM deciding to "call a particular protocol".
+- `FinalAnswerAction` is the LLM deciding "that's enough, answer the user" and terminating the loop.
 
-## Observation 階層
+## The Observation hierarchy
 
 ```
 Observation (base, frozen)
-├── SkillObservation(skill_name, result)              # 成功
-├── ToolErrorObservation(skill_name, message)         # skill 失敗或 name 不存在
-├── ValidationErrorObservation(validator_name, feedback)  # 觸發 retry
-└── MaxIterationsObservation(iterations, last_action_summary)  # loop 跑滿
+├── SkillObservation(skill_name, result)              # Success
+├── ToolErrorObservation(skill_name, message)         # Skill failed, or the name does not exist
+├── ValidationErrorObservation(validator_name, feedback)  # Triggers a retry
+└── MaxIterationsObservation(iterations, last_action_summary)  # Loop ran to its bound
 ```
 
-每個 Observation 都帶足夠的上下文讓 LLM 在下一輪 prompt 看懂發生什麼事，例如 `ToolErrorObservation.message` 會列出可用的 skill 名稱，方便模型自我糾正 typo。
+Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, `ToolErrorObservation.message` lists the available skill names so the model can correct its own typo.
 
-## 為什麼要 frozen
+## Why frozen
 
-frozen dataclass 強制 stream 真的是 append-only，沒有任何 helper 可以「修補」歷史。這樣 `Inspector(stream).replay()` 在跑完一週後重新打開 notebook 仍然是同一段 trace，這對教學除錯與論文重現都至關重要。
+A frozen dataclass forces the stream to be append-only: there is no helper that can "patch" the history. So `Inspector(stream).replay()` produces the same trace when you reopen the notebook a week later. In a classroom that means a student's run is reproducible the next day; when chasing a bug it means the trace you stare at is the trace that actually ran.

@@ -1,14 +1,16 @@
-# `@debug` Decorator
+# The `@debug` Decorator
 
-## What it is + when to use
+## What it is and when to use it
 
-`@debug` 是疊加（stacking）decorator：它不註冊新的協定，而是把已經註冊好的 `Skill` / `Analyzer` / `Validator` / `Workflow` instance 包一層 trace。每次該協定被呼叫，就把 args、結果、例外印到 stdout，讓你在 Colab notebook 或 CLI 裡用最低成本看到「LLM 到底傳了什麼進來、回了什麼出去」。
+`@debug` is a stacking decorator. It does not register a new protocol. Instead, it takes an already-registered `Skill` (or a hook helper — `Analyzer` or `Validator`) and wraps it in a trace. Every time that object is called, its arguments, result, and any exception are printed to stdout. This gives you the cheapest possible way to see "what the LLM actually passed in, and what came back out" from a Colab notebook or the CLI.
 
-它解決的問題是：agent loop 裡每一輪 turn 都會生很多事件，光看 LLM 的 reasoning 文字看不出工具呼叫的細節；`@debug` 補上這條觀察線，但又不會干擾正式行為。
+The problem it solves: every turn of the agent loop produces a lot of events, and the LLM's reasoning text alone doesn't show you the details of a tool call. `@debug` adds that observation line without changing the production behavior of the thing it wraps.
 
-## 必須疊在協定 decorator 之上
+Note that `@debug` accepts `Skill`, `Analyzer`, and `Validator`. Analyzer and validator are hook helpers, not separate protocol kinds. There is no `@workflow` to wrap: orchestration lives in `cantus.workflows` as plain-Python building blocks (`PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, `EvaluatorOptimizer`). To trace orchestration, wrap the underlying skills those building blocks call.
 
-`@debug` 的輸入是「協定 instance」，所以它必須**疊在 `@skill`、`@analyzer`、`@validator`、`@workflow` 上面**：
+## It must stack on top of a protocol decorator
+
+`@debug` takes a protocol *instance* as its input, so it must stack **on top of `@skill`, `@analyzer`, or `@validator`**:
 
 ```python
 from cantus import skill, debug
@@ -20,34 +22,38 @@ def search_book(title: str) -> str:
     return _do_search(title)
 ```
 
-順序很關鍵：Python decorator 由下而上套用——`@skill` 先把函式變成 `Skill` instance，`@debug` 才拿到那個 instance 並包裝它的 `run`。倒過來寫成 `@skill` `@debug` 會直接拋 `TypeError: @debug can only wrap a registered protocol ... Make sure @debug is on top: '@debug' then '@skill'.`。
-
-## stdout 輸出範例
-
-註冊時會立刻印一行確認：
+The order matters. Python applies decorators bottom-up: `@skill` turns the function into a `Skill` instance first, and only then does `@debug` receive that instance and wrap its `run`. Writing it the other way around — `@skill` on top of `@debug` — raises:
 
 ```
-[debug] registered SearchBook 'search_book'
+TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function. Make sure @debug is on top: `@debug` then `@skill`.
+```
+
+## Example stdout output
+
+Registration prints a confirmation line right away:
+
+```
+[debug] registered Skill 'search_book'
 [debug] spec={"name": "search_book", "description": "Search the library catalog.", "args_schema": {...}}
 ```
 
-執行時，每次呼叫印一行：
+At call time, each invocation prints one line:
 
 ```
 [debug] search_book thought='look up by title' args=[]/{"title": "三體"} result="《三體》劉慈欣 / 9787536692930"
 ```
 
-如果發生例外：
+If an exception is raised:
 
 ```
 [debug] search_book thought='' args=[]/{"title": 123} raised ValidationError: 1 validation error for SearchBookArgs
 ```
 
-`thought` 來自呼叫端的 `_debug_thought` kwarg；agent loop 在 LLM 回吐 reasoning 時會自動帶上，手動呼叫不傳也沒關係（會印成空字串）。
+The `thought` comes from the caller's `_debug_thought` keyword argument. The agent loop fills it in automatically from the LLM's reasoning. When you call a skill by hand and leave it out, that's fine — it prints as an empty string.
 
-## Memory 不能直接 `@debug`
+## Memory cannot be wrapped with `@debug` directly
 
-`@debug` 只支援 `(Skill, Analyzer, Validator, Workflow)`。Memory 是 **class-only 協定**，不存在「被 decorator 包成 instance 的那個瞬間」可以掛 trace。要追 memory 存取，請在 subclass 裡 override：
+`@debug` only supports `Skill`, `Analyzer`, and `Validator`. Memory is a **class-only protocol**: there is no "moment when a decorator wraps a function into an instance" where you could attach a trace. To trace memory access, override the methods in a subclass instead:
 
 ```python
 class TracedShortTerm(ShortTermMemory):
@@ -61,11 +67,11 @@ class TracedShortTerm(ShortTermMemory):
         super().remember(turn)
 ```
 
-這個非對稱跟「memory 沒有 decorator」是同一個原因：狀態化協定不能用「外掛一個 wrapper」這種無狀態手法處理，要從 class 層介入。
+This asymmetry has the same root cause as "memory has no decorator": there is no decorator call to intercept, because memory is instantiated as a class rather than registered through a function wrapper. So you step in at the class level instead.
 
-## 常見錯誤
+## Common mistakes
 
-- **decorator 順序寫反**：`@skill` 在上、`@debug` 在下，會炸 `TypeError`。
-- **對未註冊的純函式 `@debug`**：因為它不是 `Skill`/`Analyzer`/`Validator`/`Workflow` instance，同樣拒絕。
-- **在 production log 開 `@debug`**：stdout 會被淹沒，請只在教學或 debug session 啟用。
-- **忘記 `@debug` 會修改原 instance 的 `run`**：拿掉 decorator 重跑前請重新 import 模組，避免殘留狀態。
+- **Decorator order reversed.** `@skill` on top with `@debug` underneath raises a `TypeError`.
+- **Applying `@debug` to a plain, unregistered function.** Because it isn't a `Skill`, `Analyzer`, or `Validator` instance, it's rejected the same way.
+- **Enabling `@debug` in production logging.** stdout gets flooded, so turn it on only during a teaching or debugging session.
+- **Forgetting that `@debug` mutates the original instance's `run`.** Before rerunning without the decorator, re-import the module so no traced wrapper lingers.

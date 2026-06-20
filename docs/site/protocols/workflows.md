@@ -1,6 +1,6 @@
 # `cantus.workflows` Building Blocks
 
-v0.3.0 用五個明確的 Python 類別取代了 v0.2.x 的 `@workflow` decorator。建構子收 registered Skill 實例（或任何 callable），`.run(input)` 把編排寫成 host code 而不是 framework-managed registry entry。它們**不**會註冊到 registry、**不**會出現在 `registry.spec_for_llm()` — LLM agent 看不到它們；組合是程式設計師自己用 Python 寫的。靈感來源：Anthropic 的 *Building Effective Agents* playbook。
+v0.3.0 replaced the `@workflow` decorator from v0.2.x with five explicit Python classes. The constructor takes registered Skill instances (or any callable), and `.run(input)` expresses the orchestration as host code rather than a framework-managed registry entry. These classes do **not** register themselves, and they do **not** appear in `registry.spec_for_llm()` — an LLM agent never sees them. You compose them yourself in Python. The patterns are drawn from Anthropic's *Building Effective Agents* playbook.
 
 ```python
 from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
@@ -8,7 +8,7 @@ from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, 
 
 ## PromptChain
 
-對應 Anthropic playbook 的 **Prompt Chaining** pattern。把多個 Skill 依序串起來，前一步的 return 直接餵給下一步當 input；最後一步的 return 就是整條 chain 的 return。適合可拆成穩定線性步驟的任務（例如 outline → draft → polish）。
+This maps to the **Prompt Chaining** pattern in the Anthropic playbook. It runs several Skills in order, feeding each step's return value straight into the next step as input; the final step's return value is the return value of the whole chain. It fits tasks that break down into a stable linear sequence, such as outline → draft → polish.
 
 ```python
 class PromptChain:
@@ -23,15 +23,15 @@ chain = PromptChain(steps=[outline, draft, polish])
 final = chain.run("write a haiku about Tainan")
 ```
 
-使用時請注意：
+Things to keep in mind:
 
-- `steps` 是空 list（或空 iterable）時，建構子立刻拋 `ValueError("PromptChain requires at least one step")`。
-- 中介值的型別由你自己負責：上一步的 return 必須是下一步 callable 簽章吃得下的型別，PromptChain 本身不做轉換。
-- 任何一步丟例外，整條 chain 直接中斷往上拋，沒有 retry 機制。
+- If `steps` is an empty list (or empty iterable), the constructor raises `ValueError("PromptChain requires at least one step")` immediately.
+- You own the types of the intermediate values: each step's return value must be a type that the next callable's signature accepts. PromptChain does no conversion of its own.
+- If any step raises, the whole chain stops and the exception propagates upward. There is no retry mechanism.
 
 ## Router
 
-對應 Anthropic playbook 的 **Routing** pattern。先用 classifier 把 input 分類成一個 string key，再分派給對應的 Skill；同一個 input 最終只會打到一條 route。適合做 intent classification 後接專責 handler。
+This is the **Routing** pattern. A classifier first sorts the input into a single string key, then dispatches to the matching Skill; a given input only ever reaches one route. It fits intent classification followed by a dedicated handler.
 
 ```python
 class Router:
@@ -53,15 +53,15 @@ router = Router(
 router.run("typhoon update")
 ```
 
-使用時請注意：
+Things to keep in mind:
 
-- `routes` 為空時拋 `ValueError("Router requires at least one route")`。
-- classifier 回傳的 key 不在 `routes` 時拋 `KeyError`，錯誤訊息會列出可用的 routes（`sorted(self.routes)`）給你比對。
-- classifier 自己要回 `str`；如果回了別的型別，由 `dict` lookup 行為決定（通常會落到 `KeyError`）。
+- If `routes` is empty, the constructor raises `ValueError("Router requires at least one route")`.
+- If the key the classifier returns is not in `routes`, `Router` raises `KeyError`, and the message lists the available routes (`sorted(self.routes)`) so you can compare.
+- The classifier itself must return a `str`. If it returns some other type, the outcome is decided by `dict` lookup behavior (which usually lands on a `KeyError`).
 
 ## Parallel
 
-對應 Anthropic playbook 的 **Parallelization** pattern。把同一個 input fan-out 給多條 branch Skill，收集每條的 return 成一個 `list`，順序與 `branches` 的宣告順序一致。適合需要多視角輸出再 aggregate 的情境。
+This is the **Parallelization** pattern. It fans the same input out to several branch Skills and collects each one's return value into a `list`, in the same order the branches were declared. It fits cases where you want several perspectives on the same input and aggregate them afterward.
 
 ```python
 class Parallel:
@@ -76,15 +76,15 @@ fanout = Parallel(branches=[summarize_en, summarize_zh])
 en_summary, zh_summary = fanout.run("Long article ...")
 ```
 
-使用時請注意：
+Things to keep in mind:
 
-- `branches` 為空時拋 `ValueError("Parallel requires at least one branch")`。
-- **v0.3.0 是 sequential 執行**（list comprehension，逐個跑），不是真的同時併發；要 concurrency 請由 host code 自己包 `asyncio.gather` / `ThreadPoolExecutor` 等。
-- return 的 list 順序與 `branches` 完全一致，可以放心 destructure。
+- If `branches` is empty, the constructor raises `ValueError("Parallel requires at least one branch")`.
+- **In v0.3.0 execution is sequential** — branches run one after another via a list comprehension, not truly concurrently. If you want concurrency, wrap it in your own host code with `asyncio.gather`, `ThreadPoolExecutor`, or similar.
+- The returned list matches the order of `branches` exactly, so you can destructure it safely.
 
 ## OrchestratorWorker
 
-對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator Skill 拿到 input 後回一串 subtask；framework 把 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
+This is the **Orchestrator-Workers** pattern. The orchestrator Skill takes the input and returns a series of subtasks; `OrchestratorWorker` dispatches the subtasks one at a time to the workers and returns a list of results in the same order the orchestrator produced the subtasks. It fits cases where you don't know the number of subtasks ahead of time and need to plan dynamically.
 
 ```python
 class OrchestratorWorker:
@@ -100,19 +100,19 @@ class OrchestratorWorker:
 from cantus.workflows import OrchestratorWorker, PromptChain
 
 ow = OrchestratorWorker(orchestrator=plan_cities, workers=[fetch_section])
-sections = ow.run("Tainan travel guide")  # plan_cities 可能回 5 個城市
+sections = ow.run("Tainan travel guide")  # plan_cities might return 5 cities
 guide = PromptChain(steps=[ow.run, synthesize]).run("Tainan travel guide")
 ```
 
-使用時請注意：
+Things to keep in mind:
 
-- `workers` 為空時拋 `ValueError("OrchestratorWorker requires at least one worker")`；`orchestrator` 不檢查 None，傳錯會在 `.run` 時才炸。
-- 多個 worker 時採 **round-robin by index**：第 `i` 個 subtask 派給 `workers[i % len(workers)]`，沒有 load balancing 或重試。
-- **沒有自動 aggregation** — `.run` 回的是 raw list；要合成最終答案，請用 `PromptChain` 在後面接一個 synthesis 步驟，或自己處理。
+- If `workers` is empty, the constructor raises `ValueError("OrchestratorWorker requires at least one worker")`. The `orchestrator` is not checked for `None`; passing a bad value only blows up at `.run` time.
+- With multiple workers it uses **round-robin by index**: the `i`-th subtask goes to `workers[i % len(workers)]`. There is no load balancing or retry.
+- There is **no automatic aggregation** — `.run` returns the raw list. To synthesize a final answer, follow it with a synthesis step via `PromptChain`, or handle it yourself.
 
 ## EvaluatorOptimizer
 
-對應 Anthropic playbook 的 **Evaluator-Optimizer** pattern。一個 generator 產 candidate、一個 evaluator 判斷；不過就再生，過了就回，最多跑 `max_iters` 輪。適合品質可被檢核、值得多輪修正的輸出（例如論點、翻譯、程式碼）。
+This is the **Evaluator-Optimizer** pattern. A generator produces a candidate and an evaluator judges it; if it fails, the generator runs again; if it passes, the result is returned. It runs at most `max_iters` rounds. It fits output whose quality can be checked and is worth refining over several rounds, such as an argument, a translation, or code.
 
 ```python
 class EvaluatorOptimizer:
@@ -132,16 +132,16 @@ eo = EvaluatorOptimizer(generator=draft, evaluator=critique, max_iters=3)
 best = eo.run("Argue for solar over wind")
 ```
 
-使用時請注意：
+Things to keep in mind:
 
-- `max_iters < 1` 拋 `ValueError("max_iters must be >= 1")`。
-- evaluator 回 `Result(ok=True, value=v)` 時，return `v`；若 `value is None` 則 return 當輪 candidate。回 `Result(ok=False, ...)` 時用**同一個 input** 重跑 generator。
-- evaluator 回非 `Result` 但 truthy 的值（例如 `True`、非空字串）時，直接 return 當輪 candidate；回 falsy 值則重跑。
-- 跑滿 `max_iters` 仍沒被批准，會 return 最後一輪的 candidate（不會丟例外）。
+- `max_iters < 1` raises `ValueError("max_iters must be >= 1")`.
+- When the evaluator returns `Result(ok=True, value=v)`, `.run` returns `v`; if `value is None`, it returns the current round's candidate. When the evaluator returns `Result(ok=False, ...)`, the generator runs again with the **same input**.
+- When the evaluator returns a non-`Result` truthy value (such as `True` or a non-empty string), `.run` returns the current round's candidate. A falsy value triggers another round.
+- If `max_iters` rounds are exhausted without approval, `.run` returns the last round's candidate (it does not raise).
 
-## 共通契約
+## Shared contract
 
-- 五個 building block **不**註冊到 registry：實例化前後 `get_registry().names_for("skill")` 內容不變，`registry.spec_for_llm()` 的 top-level keys 永遠只有 `"skill"`。
-- LLM agent 看不到 building block — 它們是 host code 自己寫的編排層；如果你要 agent 看到入口，把整段編排再包成一個 `@skill` 函式（agent 看到的就是那個 skill）。
-- building block 本身不會留 trace 進 `EventStream`，但組成元件若是 registered Skill，個別 Skill 呼叫**仍會**被 `_dispatch_skill` trace。要紀錄編排層次請手動加 `@debug` 到組成的 Skill 上。
-- 五個類別都是 plain Python class、沒有非同步介面；`.run` 是同步方法，concurrency 一律由 host code 負責。
+- The five building blocks do **not** register themselves: `get_registry().names_for("skill")` is unchanged before and after instantiation, and the top-level keys of `registry.spec_for_llm()` are always just `"skill"`.
+- An LLM agent never sees a building block — they are an orchestration layer you write in host code. If you want the agent to see an entry point, wrap the whole orchestration in a single `@skill` function; what the agent sees is that skill.
+- A building block leaves no trace in the `EventStream` on its own, but if its component pieces are registered Skills, the individual Skill calls **are still** traced by `_dispatch_skill`. To record the orchestration layer itself, add `@debug` to the component Skills by hand.
+- All five classes are plain Python classes with no async interface; `.run` is a synchronous method, and concurrency is always the host code's responsibility.

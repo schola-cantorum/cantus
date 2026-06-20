@@ -1,29 +1,29 @@
-# Cookbook：用 cantus 接 Discord（echo bot + slash command）
+# Cookbook: connecting Discord with cantus (echo bot + slash command)
 
-這份 walkthrough 帶你從零把一個 Discord application 接到 `cantus serve`，跑通 echo bot（成員在 server 講話 → bot 回訊息）跟一個 `/ping` slash command。Discord 比 LINE / Telegram 多一層複雜度：cantus 同時需要 **Gateway WebSocket**（持續連線收事件）和 **Interactions HTTP**（Ed25519 簽章驗證 slash command / 按鈕回呼）。所有指令都假設你已經跑過 [`docs/quickstart-desktop.md`](./quickstart-desktop.md) 的「Serve via CLI」與「Expose via Cloudflare Tunnel」兩段。
+This walkthrough takes you from an empty Discord application to a working `cantus serve` deployment that runs an echo bot (a member types in a server, the bot replies) plus a `/ping` slash command. Discord carries one extra layer of complexity compared with LINE or Telegram: cantus needs both a **Gateway WebSocket** (a long-lived connection that streams events in) and an **Interactions HTTP** endpoint (Ed25519-signature verification for slash-command and button callbacks). Every command below assumes you have already worked through the "Serve via CLI" and "Expose via Cloudflare Tunnel" sections of [`docs/quickstart-desktop.md`](./quickstart-desktop.md).
 
-## 0. 你會用到的東西
+## 0. What you'll need
 
-- 一個 [Discord Developer Portal](https://discord.com/developers/applications) 帳號（你的一般 Discord 帳號就可以登入）。
-- 你自己擁有管理員權限的 Discord 伺服器（測試用，新開一個也行）。
-- 已安裝 `cantus-agent[serve]>=0.4.6` 與 `cloudflared`。
-- 一台筆電，OS 不重要 — `pynacl` 與 `websockets` 在 Linux x86_64 / macOS arm64+x86_64 / Windows AMD64 都有 prebuilt wheel。
+- A [Discord Developer Portal](https://discord.com/developers/applications) account (your regular Discord account can sign in).
+- A Discord server where you have administrator rights (a fresh server for testing is fine).
+- `cantus-agent[serve]>=0.5.0` and `cloudflared` installed.
+- A laptop on any OS. Both `pynacl` and `websockets` ship prebuilt wheels for Linux x86_64, macOS arm64 + x86_64, and Windows AMD64.
 
-## 1. 在 Discord Developer Portal 開一個 application
+## 1. Create an application in the Discord Developer Portal
 
-1. 進 [Discord Developer Portal](https://discord.com/developers/applications)，**New Application** → 取個名字（例如 `cantus-echo-bot`）。
-2. 進到 application 詳細頁，記下三個值：
-   - **Application ID**（**General Information** tab）── 這是 `CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID`。它是**公開值**，會出現在 OAuth invite URL 裡，不算 secret。
-   - **Public Key**（同一頁稍下） ── 64 字元的 hex 字串。這是 `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY`；cantus 會用它驗證 Discord 送進 `/channels/discord/interactions` 的 Ed25519 簽章。
-3. 切到 **Bot** tab：
-   - 點 **Reset Token** 拿到 bot token（只會顯示一次，重整就消失） ── 這是 `CANTUS_SERVE_CHANNEL_DISCORD_BOT_TOKEN`。**真正的 secret，外洩等於別人可以用你的 bot 身分。**
-   - 在 **Privileged Gateway Intents** 區開啟 **MESSAGE CONTENT INTENT**。沒開的話 cantus 收到的 `MESSAGE_CREATE` 事件 `content` 欄位會是空字串。`GUILDS` 與 `GUILD_MESSAGES` 是非 privileged，預設就開。
-4. 切到 **OAuth2** → **URL Generator**：
-   - **Scopes** 勾 `bot` 與 `applications.commands`。
-   - **Bot Permissions** 勾 `Send Messages`、`Read Message History`、`Use Slash Commands`。
-   - 複製下面生成的 URL，貼到瀏覽器執行，把 bot 加進你的測試伺服器。
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications), click **New Application**, and give it a name (for example `cantus-echo-bot`).
+2. On the application's detail page, note three values:
+   - **Application ID** (the **General Information** tab). This becomes `CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID`. It is a **public value** that appears in the OAuth invite URL, so it is not a secret.
+   - **Public Key** (a little further down the same page). A 64-character hex string. This becomes `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY`; cantus uses it to verify the Ed25519 signature that Discord attaches to requests sent to `/channels/discord/interactions`.
+3. Switch to the **Bot** tab:
+   - Click **Reset Token** to obtain the bot token (shown only once; it disappears on refresh). This becomes `CANTUS_SERVE_CHANNEL_DISCORD_BOT_TOKEN`. It is the **real secret** — leaking it lets someone else act as your bot.
+   - Under **Privileged Gateway Intents**, enable **MESSAGE CONTENT INTENT**. Without it, the `content` field arrives empty on every `MESSAGE_CREATE` event cantus receives. `GUILDS` and `GUILD_MESSAGES` are non-privileged and enabled by default.
+4. Switch to **OAuth2** → **URL Generator**:
+   - Under **Scopes**, check `bot` and `applications.commands`.
+   - Under **Bot Permissions**, check `Send Messages`, `Read Message History`, and `Use Slash Commands`.
+   - Copy the generated URL, paste it into your browser, and use it to add the bot to your test server.
 
-## 2. 寫 `myskills/app.py`
+## 2. Write `myskills/app.py`
 
 ```python
 # myskills/app.py
@@ -40,12 +40,12 @@ def echo(text: str) -> str:
 
 registry.register("skill", echo)
 
-# 三個 secret 都從 CANTUS_SERVE_CHANNEL_DISCORD_* env vars 拿
-# （建構子也可以直接吃參數，但別把 secret 寫進原始碼）。
+# All three secrets come from the CANTUS_SERVE_CHANNEL_DISCORD_* env vars.
+# (The constructor also accepts them as arguments, but never put secrets in source.)
 discord_channel = DiscordRealtimeChannel()
 ```
 
-## 3. 把 secrets 放進 shell（**不要**寫進 source）
+## 3. Put the secrets in your shell (**not** in source)
 
 ```bash
 export CANTUS_SERVE_CHANNEL_DISCORD_BOT_TOKEN="<bot token from step 1>"
@@ -53,9 +53,9 @@ export CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY="<public key hex string from step
 export CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID="<application id from step 1>"
 ```
 
-cantus v0.4.6 仍**不**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己的腳本。
+cantus v0.5.0 still does **not** read `.env` automatically. Either use `direnv` or `source` your own script.
 
-## 4. 啟動 cantus serve
+## 4. Start cantus serve
 
 ```bash
 cantus serve \
@@ -65,30 +65,30 @@ cantus serve \
   --channels myskills.app:discord_channel
 ```
 
-啟動後會看到 cantus 印 Discord Gateway 連線狀態（IDENTIFY → READY），bot 在 Discord client 上的「online/offline」會切到 online。FastAPI lifespan 把 `discord_channel.connect()` 包成 `asyncio.create_task` 在背景跑；`Ctrl-C` 觸發 lifespan shutdown，cantus 呼叫 `discord_channel.disconnect()` 乾淨斷線（close code 1000），bot 切回 offline。
+Once it starts, cantus prints the Discord Gateway connection progress (IDENTIFY → READY), and the bot flips from offline to online in your Discord client. The FastAPI lifespan wraps `discord_channel.connect()` in an `asyncio.create_task` that runs in the background; `Ctrl-C` triggers the lifespan shutdown, cantus calls `discord_channel.disconnect()` to close cleanly (close code 1000), and the bot goes back to offline.
 
-## 5. 用 Cloudflare Tunnel 暴露 interactions 公網 URL
+## 5. Expose the interactions URL with Cloudflare Tunnel
 
-Slash command / 按鈕的事件是 Discord 用 HTTP push 給 cantus，所以也需要公網 URL：
+Slash-command and button events are pushed to cantus by Discord over HTTP, so you also need a public URL:
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
-你的 interactions 公網入口是 `https://<slug>.trycloudflare.com/channels/discord/interactions`。
+Your public interactions entry point is `https://<slug>.trycloudflare.com/channels/discord/interactions`.
 
-## 6. 回 Discord Developer Portal 設 Interactions Endpoint URL
+## 6. Set the Interactions Endpoint URL in the Developer Portal
 
-在 application **General Information** tab：
+On the application's **General Information** tab:
 
-1. **Interactions Endpoint URL** 貼上 `https://<slug>.trycloudflare.com/channels/discord/interactions`。
-2. 點 **Save Changes**。Discord 會立刻送一個 type=1 的 Ping interaction 來驗 URL：
-   - cantus 看到正確的 `X-Signature-Ed25519` + `X-Signature-Timestamp` 就回 `{"type":1}`（PONG），URL 通過。
-   - 簽章對不上就回 401 `{"detail":"Authentication required"}`，Discord Console 顯示「validation failed」。**90% 的失敗原因是 public key 貼錯，不是 cantus 程式問題**。
+1. Paste `https://<slug>.trycloudflare.com/channels/discord/interactions` into **Interactions Endpoint URL**.
+2. Click **Save Changes**. Discord immediately sends a type=1 Ping interaction to validate the URL:
+   - With a correct `X-Signature-Ed25519` and `X-Signature-Timestamp`, cantus replies `{"type":1}` (PONG) and the URL passes.
+   - On a signature mismatch, cantus returns `401 {"detail":"Authentication required"}` and the Discord Console shows "validation failed". Almost every validation failure here is a pasted public key that doesn't match the application's, not a cantus bug — re-copy the Public Key from **General Information** before you suspect anything else.
 
-## 7. 手動註冊一個 slash command（cantus 不代註冊）
+## 7. Register a slash command by hand (cantus does not register it for you)
 
-cantus 故意**不**幫你自動呼叫 `PUT /applications/{id}/commands`（同 LINE / Telegram cookbook「不代註冊 webhook URL」的紀律：secret 永遠在你手上）。用 `curl` 自己註冊一個 `/ping`：
+cantus deliberately does **not** call `PUT /applications/{id}/commands` on your behalf (the same discipline as the "we don't register your webhook URL" note in the LINE and Telegram cookbooks: the secret always stays in your hands). Register a `/ping` command yourself with `curl`:
 
 ```bash
 APP_ID="$CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID"
@@ -100,11 +100,11 @@ curl -X POST "https://discord.com/api/v10/applications/$APP_ID/commands" \
   -d '{"name":"ping","description":"Reply with pong","type":1}'
 ```
 
-幾秒後在 Discord 你的測試伺服器輸入 `/`，會看到 `/ping`。
+A few seconds later, type `/` in your test server and you'll see `/ping`.
 
-## 8. 跑 echo + ping loop
+## 8. Run the echo + ping loop
 
-cantus 收進來的 Discord event 會 push 到 `discord_channel` 的內部 queue。寫一個 worker loop：
+The Discord events cantus receives are pushed onto an internal queue inside `discord_channel`. Write a worker loop:
 
 ```python
 # scripts/worker.py
@@ -119,10 +119,11 @@ async def main():
             await asyncio.sleep(0.1)
             continue
 
-        # 兩條入口：(a) Gateway 推進來的 MESSAGE_CREATE；(b) interactions HTTP 推進來的 slash command。
-        # 用 dict shape 區分。
+        # Two inbound paths: (a) a MESSAGE_CREATE pushed in by the Gateway;
+        # (b) a slash command pushed in over the interactions HTTP endpoint.
+        # Tell them apart by dict shape.
         if "interaction" in event:
-            # Slash command callback。回 type=4 (CHANNEL_MESSAGE_WITH_SOURCE)
+            # Slash-command callback. Reply with type=4 (CHANNEL_MESSAGE_WITH_SOURCE).
             cmd = event["interaction"].get("data", {}).get("name")
             if cmd == "ping":
                 await discord_channel.send({
@@ -130,7 +131,8 @@ async def main():
                     "data": {"type": 4, "data": {"content": "pong"}},
                 })
         elif event.get("t") == "MESSAGE_CREATE":
-            # Gateway MESSAGE_CREATE。echo 回去（避開自己的訊息免得無限迴圈）。
+            # Gateway MESSAGE_CREATE. Echo it back (skip the bot's own
+            # messages to avoid an infinite loop).
             msg = event["d"]
             if msg.get("author", {}).get("bot"):
                 continue
@@ -143,26 +145,26 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-第三個 shell 跑：
+In a third shell, run:
 
 ```bash
 python scripts/worker.py
 ```
 
-在 Discord 伺服器隨便講話 → 看到 `echo: <你打的字>` 回來。打 `/ping` → 看到 `pong`。
+Say anything in your Discord server and you'll see `echo: <what you typed>` come back. Type `/ping` and you'll see `pong`.
 
-## 9. 常見坑
+## 9. Common pitfalls
 
-- **MESSAGE_CREATE event 的 `content` 是空字串**：你忘了在 Developer Portal **Bot** tab 開 MESSAGE CONTENT INTENT。
-- **Discord Console 顯示「validation failed」**：90% 是 `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY` 貼錯（少了字元、貼到 client secret），10% 是 Cloudflare Tunnel 還沒起來。
-- **`ChannelSendError: discord send failed: HTTP 403 Missing Permissions`**：bot 在那個頻道沒有 `Send Messages` 權限，回去 OAuth 重新邀請或在頻道設定加權限。
-- **`ChannelSendError: discord send failed: HTTP 401 Unauthorized`**：bot token 失效（你 reset 了卻沒更新 env var）。
-- **bot 一直 reconnect**：看 cantus log 印的 `last_error`。Discord 對 IDENTIFY 有 1000/24h rate limit，連續 10 次失敗 cantus 會 stop reconnect 而**不**會 crash，但 bot 會掛在 offline。重啟 cantus 前先確認 token 正確。
-- **token 不小心 commit 出去**：立刻去 Developer Portal **Bot** tab **Reset Token**，舊的會立即失效。public key 不能單獨 reset，application 重建。
+- **The `content` of a MESSAGE_CREATE event is an empty string**: you forgot to enable MESSAGE CONTENT INTENT on the **Bot** tab of the Developer Portal.
+- **The Discord Console shows "validation failed"**: check the public key first — `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY` is usually short a character or is actually the client secret. If the key is right, the Cloudflare Tunnel probably isn't up yet.
+- **`ChannelSendError: discord send failed: HTTP 403 Missing Permissions`**: the bot lacks `Send Messages` in that channel. Re-invite via OAuth, or add the permission in the channel settings.
+- **`ChannelSendError: discord send failed: HTTP 401 Unauthorized`**: the bot token is invalid (you reset it but didn't update the env var).
+- **The bot keeps reconnecting**: check the `last_error` that cantus logs. Discord enforces a 1000/24h rate limit on IDENTIFY; after 10 consecutive failures cantus stops reconnecting **without** crashing, but the bot stays offline. Confirm the token is correct before restarting cantus.
+- **You accidentally committed the token**: go to the **Bot** tab of the Developer Portal and **Reset Token** right away; the old one is invalidated immediately. The public key can't be reset on its own — you'd have to recreate the application.
 
-## 下一步
+## Next steps
 
-- 把 worker loop 包進你的 Agent / Workflow，讓 LLM 決定要回什麼。
-- 加更多 slash command：複製第 7 步的 curl、改 `name` / `description` / `options`。
-- 加 component（按鈕、select menu）：你 `send` 回去的 `data` payload 加 `components` array；Discord 把使用者點擊事件用 type=3 interaction 推回，跟 slash command 走同一條路徑。
-- 上線部署：把 Cloudflare Tunnel 換成有固定 hostname 的 named tunnel，或直接部到自己的 reverse proxy。bot token / public key 用平台的 secrets manager 管理。
+- Fold the worker loop into your Agent or Workflow so the LLM decides what to reply.
+- Add more slash commands: copy the `curl` from step 7 and change `name` / `description` / `options`.
+- Add components (buttons, select menus): add a `components` array to the `data` payload you `send` back. Discord pushes the user's click back as a type=3 interaction, which travels the same path as a slash command.
+- Deploy for real: replace the Cloudflare Tunnel with a named tunnel that has a fixed hostname, or front cantus with your own reverse proxy. Manage the bot token and public key with your platform's secrets manager.

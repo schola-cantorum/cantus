@@ -1,54 +1,54 @@
-# Cookbook：常見組合範式（Patterns）
+# Cookbook: Common Composition Patterns
 
-這份文件收集 cantus framework 在實際任務裡反覆出現的組合方式。每個 recipe 都附可直接複製到 Colab cell 跑的程式碼。
+This page collects the ways cantus pieces tend to fit together on real tasks. Each recipe ships with code you can paste straight into a Colab cell and run.
 
-## Recipe 1：「skill → analyzer → validator」三段管線
+A quick orientation before the recipes. cantus has exactly two protocol kinds: a **Skill** is something the agent can call, and a **Memory** is stateful and therefore class-only. `analyzer` and `validator` are not protocol kinds — they are **hook helpers** that attach to a Skill as a `pre_hook` or `post_hook`. Multi-step composition lives in `cantus.workflows`, which gives you five plain-Python building blocks: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`.
 
-最常見的組合：skill 從外部世界拿回字串，analyzer 把字串解析成 Pydantic model，validator 檢查語意層級的正確性。三者用 `@workflow` 串起來。
+## Recipe 1: the "parse-then-validate" skill
+
+The most common shape: a skill fetches a string from the outside world, an analyzer parses that string into a Pydantic model, and a validator checks the result at the semantic level. You wire all three together by attaching the analyzer and validator to the skill as hooks.
 
 ```python
-from cantus import skill, analyzer, validator, workflow, Result
+from cantus import skill
+from cantus.hooks import analyzer, validator, Result
 from pydantic import BaseModel
 
 class Book(BaseModel):
     title: str
     isbn: str
 
-@skill
-def search_book(topic: str) -> str:
-    """從館藏 API 撈書。回傳 'title|isbn' 換行分隔字串。"""
-    return "基地|9789573324867\n沙丘|9789573332749"
-
 @analyzer
-def parse_book_list(text: str) -> list[Book]:
-    """把 search_book 的字串解析為 Book list。"""
-    return [Book(title=t, isbn=i) for t, i in
-            (line.split("|") for line in text.strip().splitlines())]
+def parse_book(text: str) -> Book:
+    """Parse a 'title|isbn' string into a Book."""
+    title, isbn = text.strip().split("|")
+    return Book(title=title, isbn=isbn)
 
 @validator
 def ensure_isbn(book: Book) -> Result:
-    """驗證 ISBN-13 checksum。"""
+    """Verify the ISBN-13 checksum."""
     digits = [int(c) for c in book.isbn]
     s = sum(d * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits))
-    return Result.success(book) if s % 10 == 0 else Result.failure("ISBN 錯")
+    if s % 10 == 0:
+        return Result.success(book)
+    return Result.failure("ISBN checksum mismatch — re-check the digits.")
 
-@workflow
-def recommend(topic: str) -> list[Book]:
-    return [b for b in parse_book_list(search_book(topic))
-            if ensure_isbn(b).ok]
+@skill(pre_hook=parse_book, post_hook=ensure_isbn)
+def lookup_book(text: str) -> Book:
+    """Read a book from a 'title|isbn' record and validate it."""
+    return text  # the pre_hook turns the raw string into a Book first
 ```
 
-關鍵：每段職責互不重疊。skill 不解析、analyzer 不驗證、validator 只回 `Result`。
+The point is that each piece has a single job and they do not overlap. The skill does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry.
 
-## Recipe 2：class-first 共享狀態
+## Recipe 2: class-first shared state
 
-當 skill 需要在多次呼叫之間維持狀態（連線池、cache、計數器），decorator 寫法做不到——free function 沒有 instance state。改用 class-first：
+When a skill needs to keep state across calls — a connection pool, a cache, a counter — the decorator form cannot help you, because a free function has no instance state. Switch to the class-first form instead:
 
 ```python
 from cantus import Skill
 
 class CachedSearch(Skill):
-    """從 API 查書，同一個 topic 只查一次。"""
+    """Fetch a book from an API, querying each topic only once."""
 
     name = "search_book"
 
@@ -61,57 +61,62 @@ class CachedSearch(Skill):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# 註冊：手動 register（class-first 不會自動 register）
+# Class-first skills do not register themselves — register one by hand.
 from cantus.core.registry import get_registry
 get_registry().register("skill", CachedSearch())
 ```
 
-什麼時候需要：跨呼叫 cache、外部連線、計數器、lazy-load 資源。decorator 寫法每次呼叫都共用 module-level globals，難測試也難 reset。
+Reach for this when you need a cross-call cache, an external connection, a counter, or a lazily loaded resource. The decorator form shares module-level globals on every call, which is hard to test and hard to reset.
 
-## Recipe 3：`@workflow` 內呼叫多個 skill
+## Recipe 3: chaining several skills
 
-workflow 就是一個普通 Python 函式，框架不會強制你只呼叫一個 skill。你可以在裡面任意組合多個 protocol：
+A `PromptChain` runs a sequence of skills in order, threading each one's output into the next one's input. The classes in `cantus.workflows` are plain Python: they take registered skills (or any callable) in the constructor and expose a `.run(input)` method. They never touch the runtime registry and never show up in the spec the agent sees.
 
 ```python
-@skill
-def fetch_topic_books(topic: str) -> str: ...
+from cantus import skill
+from cantus.workflows import PromptChain
 
 @skill
-def fetch_author_books(author: str) -> str: ...
+def outline(topic: str) -> str:
+    """Sketch an outline for the given topic."""
+    ...
 
-@analyzer
-def parse_book_list(text: str) -> list[Book]: ...
+@skill
+def draft(outline: str) -> str:
+    """Expand an outline into prose."""
+    ...
 
-@workflow
-def cross_reference(topic: str, author: str) -> list[Book]:
-    """同時用 topic 與 author 查，取交集。"""
-    by_topic = parse_book_list(fetch_topic_books(topic))
-    by_author = parse_book_list(fetch_author_books(author))
-    isbn_set = {b.isbn for b in by_author}
-    return [b for b in by_topic if b.isbn in isbn_set]
+@skill
+def polish(text: str) -> str:
+    """Tighten the prose."""
+    ...
+
+chain = PromptChain(steps=[outline, draft, polish])
+result = chain.run("write a haiku about Tainan")
 ```
 
-`recommend_books` 也可以呼叫另一個 `@workflow`，組合是任意層級的。
+When the branches are independent rather than sequential, use `Parallel` to fan out and collect; when the next step depends on classifying the input first, use `Router`. `OrchestratorWorker` and `EvaluatorOptimizer` cover the cases where one skill plans work for others, or where a generator and a critic iterate together. All five share the same `.run(input)` shape, so you can nest them: a step inside a `PromptChain` can itself be another workflow.
 
-## Recipe 4：Memory 三實作切換
+## Recipe 4: swapping between the three Memory implementations
 
-教學弧線是「資料結構 → IR → ML」。三個實作的 interface 完全相同，只要換建構子。
+The teaching arc runs from "data structure" to "information retrieval" to "machine learning". All three implementations share the exact same interface, so moving up a tier is only a constructor change.
 
 ```python
 from cantus import ShortTermMemory, BM25Memory, EmbeddingMemory
 from cantus.protocols.memory import Turn
 
-# 階段一：原型 / 短對話。零依賴、O(1)。
+# Tier 1: prototype / short conversation. Zero dependencies, O(1).
 mem = ShortTermMemory(n=10)
 
-# 階段二：對話變多、需要關鍵字搜尋。O(N) per query，需 rank-bm25。
+# Tier 2: longer conversation, keyword search. O(N) per query, needs rank-bm25.
 mem = BM25Memory(top_k=5)
 
-# 階段三：要找語意相近、跨語言。需 sentence-transformers + 第一次 encode 較慢。
+# Tier 3: semantic / cross-lingual recall. Needs sentence-transformers;
+# the first encode is slower.
 mem = EmbeddingMemory(top_k=5)
 
-mem.remember(Turn(user="科幻小說", assistant="基地、沙丘"))
-hits = mem.recall("space opera")  # ShortTermMemory 忽略 query
+mem.remember(Turn(user="science fiction novels", assistant="Foundation, Dune"))
+hits = mem.recall("space opera")  # ShortTermMemory ignores the query
 ```
 
-切換時機：對話 < 20 turn 用 ShortTerm；要做 RAG-lite 用 BM25；使用者會用同義詞或多語言用 Embedding。
+How to choose: under ~20 turns, `ShortTermMemory` is enough; for RAG-lite keyword recall, use `BM25Memory`; when users phrase the same idea with synonyms or in another language, reach for `EmbeddingMemory`. Memory is the one protocol that is class-only, because there is no useful stateless form of it.

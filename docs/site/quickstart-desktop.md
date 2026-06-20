@@ -84,7 +84,7 @@ cloudflared tunnel --url http://127.0.0.1:8765
 
 `cloudflared` prints a randomly-assigned `https://<slug>.trycloudflare.com` URL. Press `Ctrl-C` to tear the tunnel down — the URL stops resolving immediately.
 
-**Security note.** The quick-tunnel mode shown above is unauthenticated — anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The same applies to the read-only `/introspection` endpoints, which are enabled by default and are equally reachable over the tunnel — `cantus serve --auth-mode bearer` protects them alongside `/skills` (with `auth_mode=none`, the server prints a startup warning that `/introspection` is open). The quick-tunnel mode persists no token to disk; if you upgrade to a named tunnel later, the resulting `cert.pem` MUST NOT be committed to version control (it is the long-lived credential for your tunnel namespace).
+**Security note.** The quick-tunnel mode shown above is unauthenticated. Anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The read-only `/introspection` endpoints are enabled by default and are just as reachable over the tunnel. `--auth-mode bearer` protects them alongside `/skills`; with `auth_mode=none`, the server prints a startup warning that `/introspection` is open. The quick-tunnel mode writes no token to disk. If you later upgrade to a named tunnel, do not commit the resulting `cert.pem` to version control — it is the long-lived credential for your tunnel namespace.
 
 ## Inspect with `cantus tui`
 
@@ -95,7 +95,7 @@ pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`; press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server: with `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment, and with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY` — treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
+It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`. Press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server. With `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment; with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY`. Treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
 
 ## Local LLMs via Ollama
 
