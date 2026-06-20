@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "project": "cantus",
+    "version": "0.5.0",
+    "generated_by": "codebase-grounded knowledge graph (understand-style), hand-curated from the v0.5.0 source tree for the teaching manual",
+    "import_name": "cantus",
+    "pypi_name": "cantus-agent"
+  },
+  "layers": [
+    { "id": "user", "name": "User code", "blurb": "What a learner writes: @skill functions, Memory subclasses, analyzer/validator hooks, and a SOUL.md identity." },
+    { "id": "protocols", "name": "Protocols & hooks", "blurb": "The two registered protocol kinds (Skill, Memory), the Analyzer/Validator hook helpers, and the cantus.workflows building blocks." },
+    { "id": "runtime", "name": "Core runtime", "blurb": "The bounded agent loop: Agent steps over Actions and Observations, records them in an EventStream, and dispatches through the Registry." },
+    { "id": "substrate", "name": "Substrate", "blurb": "Where the model and the outside world plug in: model handles and providers, the serve HTTP layer, channels, the TUI, and the environment profiles." }
+  ],
+  "nodes": [
+    { "id": "skill", "label": "Skill", "layer": "protocols", "kind": "protocol", "path": "cantus/protocols/skill.py", "symbols": ["@skill", "Skill", "register_skill"], "blurb": "A callable the agent can invoke. Define it three ways: @skill decorator (recommended), register_skill(fn), or subclass Skill (advanced)." },
+    { "id": "memory", "label": "Memory", "layer": "protocols", "kind": "protocol", "path": "cantus/protocols/memory.py", "symbols": ["Memory", "ShortTermMemory", "BM25Memory", "EmbeddingMemory", "AutoMemory"], "blurb": "Stateful retrieval. Class-only — there is no @memory decorator because memory needs to hold state. Ships four implementations plus an AutoMemory wrapper that exposes view/create/str_replace/delete skills." },
+    { "id": "analyzer", "label": "Analyzer (hook)", "layer": "protocols", "kind": "hook", "path": "cantus/protocols/analyzer.py", "symbols": ["@analyzer", "Analyzer", "Result"], "blurb": "A pre-loop hook helper: read the input, return a structured Result before the agent loop starts. Not a protocol kind." },
+    { "id": "validator", "label": "Validator (hook)", "layer": "protocols", "kind": "hook", "path": "cantus/protocols/validator.py", "symbols": ["@validator", "Validator", "Result"], "blurb": "A post-output hook helper: check the agent's answer and trigger a retry when it fails. Not a protocol kind." },
+    { "id": "workflows", "label": "cantus.workflows", "layer": "protocols", "kind": "module", "path": "cantus/workflows/", "symbols": ["PromptChain", "Router", "Parallel", "OrchestratorWorker", "EvaluatorOptimizer"], "blurb": "Composition building blocks that wire skills and hooks into multi-step flows." },
+    { "id": "identity", "label": "Soul (identity)", "layer": "user", "kind": "module", "path": "cantus/identity/", "symbols": ["Soul", "Soul.from_file"], "blurb": "Loads an agent persona from a six-section SOUL.md (name & role, personality, rules, tools, output format, handoffs)." },
+    { "id": "agent", "label": "Agent", "layer": "runtime", "kind": "core", "path": "cantus/core/agent.py", "symbols": ["Agent", "Agent.step", "Agent.run", "max_iterations", "max_retries"], "blurb": "The bounded loop. step() takes one read-act-observe turn; run() loops until a non-empty FinalAnswer or the iteration cap." },
+    { "id": "eventstream", "label": "EventStream", "layer": "runtime", "kind": "core", "path": "cantus/core/event_stream.py", "symbols": ["EventStream", "Action", "Observation", "FinalAnswerAction", "ValidationErrorObservation"], "blurb": "The append-only trace of every Action and Observation. Errors are wrapped as Observations, never raised out of the loop." },
+    { "id": "registry", "label": "Registry", "layer": "runtime", "kind": "core", "path": "cantus/core/registry.py", "symbols": ["Registry", "Registry.KINDS"], "blurb": "Holds the registered Skills and Memories and dispatches calls by name." },
+    { "id": "inspector", "label": "Inspector", "layer": "runtime", "kind": "core", "path": "cantus/inspect.py", "symbols": ["Inspector", "Inspector.replay", "Inspector.summary", "@debug"], "blurb": "Read-only view over an EventStream. Inspector(stream).replay() reconstructs the full run; @debug marks a Skill/hook for tracing." },
+    { "id": "grammar", "label": "Tool-call grammar", "layer": "runtime", "kind": "module", "path": "cantus/grammar/", "symbols": ["build_schema", "minLength"], "blurb": "Constrains the model's tool-call JSON. Adds minLength:1 to final_answer so a constrained decoder cannot emit an empty answer." },
+    { "id": "model", "label": "Model layer", "layer": "substrate", "kind": "module", "path": "cantus/model/", "symbols": ["mount_drive_and_load", "ModelHandle", "load_chat_model", "ChatModel", "ChatModelAsHandle"], "blurb": "Tier 1 loads local Gemma on Colab (mount_drive_and_load -> ModelHandle). Tier 2 loads any provider (load_chat_model -> ChatModel)." },
+    { "id": "providers", "label": "Model providers (8)", "layer": "substrate", "kind": "module", "path": "cantus/model/providers/", "symbols": ["openai", "anthropic", "google", "groq", "nvidia", "ollama", "mlx", "omlx"], "blurb": "Eight prefixes resolved by the factory: openai, anthropic, google, groq, nvidia (OpenAI-compatible), ollama (local), mlx (Apple Silicon, no tool use), omlx (local OpenAI-compatible server)." },
+    { "id": "adapters", "label": "Adapters", "layer": "substrate", "kind": "module", "path": "cantus/adapters/", "symbols": ["expose_as_anthropic_memory_tool", "export_as_mcp_server", "import_mcp_server", "expose_as_langchain_tool", "expose_as_dspy_tool", "expose_as_hf_tool", "expose_as_openhands_action"], "blurb": "Bridges a cantus Skill to/from other SDKs (Anthropic Memory tool, MCP, LangChain, DSPy, HuggingFace, OpenHands). Each SDK is lazily imported." },
+    { "id": "serve", "label": "serve (HTTP)", "layer": "substrate", "kind": "module", "path": "cantus/serve/", "symbols": ["serve", "Settings", "AuthMode", "require_auth", "introspection"], "blurb": "FastAPI app factory that exposes a Registry over HTTP, with auth modes none/bearer/api-key and read-only introspection endpoints." },
+    { "id": "channels", "label": "Channels (4)", "layer": "substrate", "kind": "module", "path": "cantus/serve/channels/", "symbols": ["LineWebhookChannel", "TelegramWebhookChannel", "DiscordRealtimeChannel", "GoogleChatPubSubChannel"], "blurb": "LINE + Telegram over webhooks (HMAC / secret token), Discord over a Gateway WebSocket plus Ed25519 interactions, Google Chat over Cloud Pub/Sub." },
+    { "id": "tui", "label": "cantus tui", "layer": "substrate", "kind": "module", "path": "cantus/tui/", "symbols": ["run_tui"], "blurb": "A Textual terminal dashboard that polls a running serve instance over HTTP — Dashboard, Skills, Permissions, Dataflow, and Inspector panes." },
+    { "id": "env", "label": "Environments", "layer": "substrate", "kind": "module", "path": "cantus/env/", "symbols": ["ColabEnvironment", "LocalEnvironment", "CloudOnlyEnvironment"], "blurb": "Environment profiles that decide how the model loads and where I/O goes (Colab Drive, local disk, cloud-only)." },
+    { "id": "cli", "label": "cantus CLI", "layer": "substrate", "kind": "module", "path": "cantus/cli.py", "symbols": ["cantus serve", "cantus tui"], "blurb": "Two subcommands: serve (start the FastAPI app from a registry import path) and tui (launch the dashboard against a serve URL)." }
+  ],
+  "edges": [
+    { "from": "skill", "to": "registry", "kind": "registers", "label": "registered in" },
+    { "from": "memory", "to": "registry", "kind": "registers", "label": "registered in" },
+    { "from": "agent", "to": "registry", "kind": "dispatches", "label": "dispatches via" },
+    { "from": "agent", "to": "eventstream", "kind": "writes", "label": "records into" },
+    { "from": "agent", "to": "grammar", "kind": "uses", "label": "constrains tool calls with" },
+    { "from": "agent", "to": "model", "kind": "uses", "label": "generates with" },
+    { "from": "analyzer", "to": "agent", "kind": "hooks", "label": "runs before" },
+    { "from": "validator", "to": "agent", "kind": "hooks", "label": "checks output of" },
+    { "from": "workflows", "to": "skill", "kind": "composes", "label": "composes" },
+    { "from": "inspector", "to": "eventstream", "kind": "reads", "label": "replays" },
+    { "from": "model", "to": "providers", "kind": "contains", "label": "Tier 2 providers" },
+    { "from": "agent", "to": "identity", "kind": "uses", "label": "persona from" },
+    { "from": "serve", "to": "registry", "kind": "exposes", "label": "exposes over HTTP" },
+    { "from": "serve", "to": "channels", "kind": "mounts", "label": "mounts" },
+    { "from": "tui", "to": "serve", "kind": "polls", "label": "polls" },
+    { "from": "channels", "to": "agent", "kind": "drives", "label": "delivers messages to" },
+    { "from": "adapters", "to": "skill", "kind": "bridges", "label": "bridges" },
+    { "from": "cli", "to": "serve", "kind": "starts", "label": "starts" },
+    { "from": "cli", "to": "tui", "kind": "starts", "label": "starts" }
+  ],
+  "scenarios": [
+    {
+      "id": "colab",
+      "title": "Colab agent loop (local Gemma)",
+      "blurb": "A student runs an agent inside a notebook against 4-bit Gemma.",
+      "steps": [
+        { "node": "model", "action": "mount_drive_and_load(variant='E4B') returns a ModelHandle." },
+        { "node": "skill", "action": "Student-written @skill functions are registered." },
+        { "node": "agent", "action": "Agent(model=handle).run(query) starts the bounded loop." },
+        { "node": "grammar", "action": "Each turn the model emits a tool call constrained by the schema (final_answer minLength:1)." },
+        { "node": "eventstream", "action": "Every Action/Observation is appended, including any ValidationErrorObservation retries." },
+        { "node": "inspector", "action": "Inspector(state.stream).replay() shows the full trace." }
+      ]
+    },
+    {
+      "id": "cloud",
+      "title": "Multi-provider cloud model",
+      "blurb": "The same agent code points at a cloud provider instead of local Gemma.",
+      "steps": [
+        { "node": "model", "action": "load_chat_model('anthropic/claude-sonnet-4-6') returns a ChatModel." },
+        { "node": "providers", "action": "The prefix selects the provider adapter; its SDK is lazily imported." },
+        { "node": "model", "action": "ChatModelAsHandle wraps the ChatModel so the Agent's Tier 1 protocol still applies." },
+        { "node": "agent", "action": "Agent(model=handle).run(query) — the loop is identical to the Colab path." }
+      ]
+    },
+    {
+      "id": "channel",
+      "title": "Serve + channel inbound (LINE)",
+      "blurb": "A LINE message reaches a deployed agent and a reply goes back.",
+      "steps": [
+        { "node": "cli", "action": "cantus serve --registry-import app:registry --channels ... starts the app." },
+        { "node": "serve", "action": "The FastAPI app mounts the LINE webhook route and validates the HMAC-SHA256 signature." },
+        { "node": "channels", "action": "LineWebhookChannel parses the inbound message." },
+        { "node": "agent", "action": "The registered agent processes the message and produces an answer." },
+        { "node": "channels", "action": "The channel sends the reply back via the LINE reply API." }
+      ]
+    },
+    {
+      "id": "observe",
+      "title": "Live observation (TUI)",
+      "blurb": "An operator watches a running server from the terminal.",
+      "steps": [
+        { "node": "cli", "action": "cantus tui --url http://127.0.0.1:8765 launches the dashboard." },
+        { "node": "tui", "action": "The TUI polls the serve introspection endpoints on an interval." },
+        { "node": "serve", "action": "Read-only endpoints return skills, sessions, permissions, queues, and desensitized workflow traces." },
+        { "node": "tui", "action": "The Dashboard / Skills / Permissions / Dataflow / Inspector panes render the live state." }
+      ]
+    }
+  ]
+}
