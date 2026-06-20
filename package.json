@@ -1,0 +1,16 @@
+{
+  "name": "cantus-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Documentation site toolchain for the cantus framework (VitePress). Not published to npm.",
+  "scripts": {
+    "docs:dev": "vitepress dev docs/site",
+    "docs:build": "vitepress build docs/site",
+    "docs:preview": "vitepress preview docs/site",
+    "docs:api": "node scripts/gen_docs_api.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

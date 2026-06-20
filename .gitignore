@@ -103,3 +103,10 @@ uv.lock
 # Spectra runtime state
 .spectra/
 openspec/.vector-search.db*
+
+# Documentation site (VitePress) toolchain + generated analysis artifacts
+# (the committed interactive manual under docs/interactive/ stays tracked)
+node_modules/
+docs/site/.vitepress/dist/
+docs/site/.vitepress/cache/
+.understand-anything/
