@@ -3,6 +3,11 @@
 A table of contents for everything under `docs/`. New here? Start with the
 [Overview](overview.md), then the [Quickstart](quickstart.md).
 
+> The polished, bilingual reading experience is the **VitePress site** under
+> [`site/`](site/) (build with `npm run docs:build`, deployed to Cloudflare
+> Pages). The files below are the underlying Markdown; a NotebookLM-ready
+> corpus is generated under [`api/`](api/).
+
 ## Getting started
 
 - [Overview](overview.md) — architecture and design philosophy
