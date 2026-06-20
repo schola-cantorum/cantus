@@ -1,6 +1,6 @@
 # Cookbook：常見錯誤與修法（Errors）
 
-這份文件收集學生在 cantus 上最容易踩的雷，以及對應的最小修法。每條錯誤都附觸發程式碼與對應 fix。
+這份文件收集學生在 cantus 上最容易踩的雷，每條都配一段觸發它的程式碼，外加一個剛好夠用的修法。出狀況時直接對號入座即可。
 
 ## 1. 呼叫不存在的 skill
 
@@ -38,7 +38,7 @@ print(search_book.spec_for_llm()["args_schema"])
 
 ## 3. Validator 沒回 Result
 
-Validator 的 contract 是 **必須回 `Result`**，否則 `__call__` 直接 raise `TypeError`：
+Validator 的 contract 是 **必須回 `Result`**，否則 `__call__` 會直接 raise `TypeError`。（`validator` 和 `analyzer` 是 skill 的 hook helper，不是 protocol kind——把它們掛到某個 skill 上，dispatch 時才會跑。）
 
 ```python
 @validator
@@ -65,14 +65,14 @@ def ensure_isbn(book: Book) -> Result:
 
 ## 4. `@debug @skill` 順序顛倒
 
-`@debug` 必須在 **最外層**，因為它要 wrap 已經建立好的 protocol instance：
+`@debug` 必須在 **最外層**，因為它要 wrap 一個已經建立好的 protocol instance：
 
 ```python
 # 錯誤
 @skill
 @debug
 def f(x): ...
-# TypeError: @debug can only wrap a registered protocol; got function
+# TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function
 
 # 正確
 @debug
@@ -80,7 +80,7 @@ def f(x): ...
 def f(x): ...
 ```
 
-修法：永遠把 `@debug` 放最上面。Python decorator 由下往上套，`@skill` 要先把 function 變成 `Skill` instance，`@debug` 才能接到 instance。
+修法：永遠把 `@debug` 放最上面。Python decorator 由下往上套，`@skill` 要先把 function 變成 `Skill` instance，`@debug` 才能接到這個 instance。`@debug` 同樣可以 wrap `Analyzer` 和 `Validator` 這兩個 hook helper。
 
 ## 5. Memory 用 decorator → ImportError
 
@@ -145,34 +145,36 @@ except GrammarError as e:
 
 ## 8. 空 FinalAnswer 與小模型 robustness
 
-學生在 Colab 用 Gemma 4 E2B（2B 參數量）跑 cantus，最常踩到的雷是「`agent.run` 第一輪就回 `FinalAnswerAction(answer="")` 終止 loop，從來沒呼叫任何 skill」。看起來 agent 沒做事就直接結束。原因是 sub-3B 模型容易在 grammar-constrained decoding 下走捷徑——既然 `final_answer` 接受任意字串，最省 token 的合法輸出就是空字串。v0.1.2 起 cantus 從四個層面把這條捷徑堵死：
+學生在 Colab 用 Gemma 4 E2B（2B 參數量）跑 cantus，最常踩到的雷長這樣：`agent.run` 第一輪就回 `FinalAnswerAction(answer="")`，loop 當場結束，一個 skill 都沒呼叫過。表面上看，agent 啥事沒做就交卷了。
 
-1. **Schema-level `minLength: 1` 約束**：`cantus/grammar/tool_call.py` 的 `build_schema()` 對 `final_answer` 欄位加上 `{"type": "string", "minLength": 1}`，讓 `outlines` / `xgrammar` 之類 grammar-constrained decoder 在生成階段就不會輸出空字串。
+癥結在於小模型的偷懶習性。sub-3B 模型在 grammar-constrained decoding 下特別愛走捷徑——`final_answer` 既然吃任意字串，那最省 token 的合法輸出，當然就是空字串。v0.1.2 把這條捷徑分兩層堵掉，外加兩條給呼叫端的實用配套。
 
-2. **Runtime fallback `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`**：若 caller 沒走 grammar 路徑（例如自己直接 `agent.step()` 或測試用 mock model），`_parse_action()` 在解析後仍會 `final_answer.strip() != ""` 檢查；觸發失敗時 append `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer")` 到 `state.stream`，loop 繼續 retry 直到 `max_retries` 用盡或 `max_iterations` 用盡。同樣的 `validator_name` 也用於 grammar 層；下游 grep / NotebookLM 索引一個字串就能涵蓋兩層。
+先講堵漏的兩層。第一層在 schema：`cantus/grammar/tool_call.py` 的 `build_schema()` 給 `final_answer` 欄位加上 `{"type": "string", "minLength": 1}`，`outlines` / `xgrammar` 這類 grammar-constrained decoder 在生成階段就不會吐出空字串。第二層是 runtime fallback，補的是沒走 grammar 路徑的 caller——例如自己直接 `agent.step()`、或測試時塞了 mock model。這時 `_parse_action()` 解析完仍會做一次 `final_answer.strip() != ""` 檢查，沒過就 append 一筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer")` 進 `state.stream`，讓 loop 繼續 retry，直到 `max_retries` 或 `max_iterations` 其中一個先見底。
 
-3. **Sub-3B 建議 `max_iterations=12`**：`Agent.run` 預設 `max_iterations=8` 對 4B+ 模型夠用，但 sub-3B 模型（Gemma 4 E2B、其他 2B 級別 instruct 變體）容易吃掉 8 次 retry 才生出非空答；caller 顯式傳 `max_iterations=12` 可提供餘裕：
+兩層刻意共用同一個 `validator_name`。這樣下游不管 grep 還是丟給 NotebookLM 建索引，盯一個字串就同時涵蓋了 schema 層和 runtime 層，省得追兩套命名。
 
-   ```python
-   state = agent.run("找一本科幻小說", max_iterations=12)
-   ```
+接著是兩條配套。第一條：sub-3B 模型建議把 `max_iterations` 開到 `12`。`Agent.run` 預設 `max_iterations=8`，對 4B 以上的模型綽綽有餘；但 sub-3B 那一票（Gemma 4 E2B、其他 2B 級的 instruct 變體）常常前 8 次 retry 全砸在空答上，根本來不及生出像樣的回覆。caller 顯式傳 `max_iterations=12` 就是多留幾次機會給它收斂：
 
-   注意這是 caller-supplied override，不是框架 default——4B+ 模型保留 `8` 即可。
+```python
+state = agent.run("找一本科幻小說", max_iterations=12)
+```
 
-4. **EventStream replay 觀察 retry 流程**：碰到非空答之前，stream 會塞入一筆或多筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`。用 `state.stream.replay()` 可看到完整 retry 軌跡：
+這是呼叫端自己覆寫的設定，不是框架 default——4B 以上的模型，`8` 就夠了，別動。
 
-   ```python
-   from cantus import Agent, mount_drive_and_load
+第二條配套是觀測用的：拿 `state.stream.replay()` 把整段 retry 攤開來看。在生出非空答之前，stream 會夾進一筆或多筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`，replay 出來就是一條清楚的軌跡：
 
-   handle = mount_drive_and_load(variant="E4B")
-   agent = Agent(model=handle)
-   state = agent.run("找一本詩集", max_iterations=12)
-   print(state.stream.replay())
-   # [0] Action      :: CallSkillAction(skill_name='search_book', ...)
-   # [1] Observation :: ValidationErrorObservation(validator_name='non_empty_final_answer', feedback='FinalAnswerAction.answer must be non-empty...')
-   # [2] Action      :: CallSkillAction(skill_name='search_book', ...)
-   # [3] Observation :: SkillObservation(skill_name='search_book', result=[Book(title=...), ...])
-   # [4] Action      :: FinalAnswerAction(answer='推薦《零號宇宙》— ...')
-   ```
+```python
+from cantus import Agent, mount_drive_and_load
 
-EventStream 中出現一筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)` 是**框架自動 retry**，不是 bug；若連續三次以上同類條目出現在同一個 `agent.run` 內，回 `mount_drive_and_load(variant="E4B")` 通常比繼續加 retry 更實用。
+handle = mount_drive_and_load(variant="E4B")
+agent = Agent(model=handle)
+state = agent.run("找一本詩集", max_iterations=12)
+print(state.stream.replay())
+# [0] Action      :: CallSkillAction(skill_name='search_book', ...)
+# [1] Observation :: ValidationErrorObservation(validator_name='non_empty_final_answer', feedback='FinalAnswerAction.answer must be non-empty...')
+# [2] Action      :: CallSkillAction(skill_name='search_book', ...)
+# [3] Observation :: SkillObservation(skill_name='search_book', result=[Book(title=...), ...])
+# [4] Action      :: FinalAnswerAction(answer='推薦《零號宇宙》— ...')
+```
+
+最後提醒一點：stream 裡冒出 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)` 是框架在自動 retry，不是 bug，別急著改 code。但要是同一個 `agent.run` 內這類條目連續出現三次以上，與其再往上加 retry，不如回頭 `mount_drive_and_load(variant="E4B")` 換顆大一點的模型，通常更省事。

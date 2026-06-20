@@ -3,26 +3,26 @@ layout: home
 
 hero:
   name: Cantus
-  text: Compose LLM agents like polyphony
-  tagline: A teaching-oriented, Colab-first framework for building agent harnesses from two protocols — Skill and Memory.
+  text: 像複音音樂一樣組合 LLM agent
+  tagline: 教學導向、Colab 優先的框架，用 Skill 與 Memory 兩個 protocol 組出 agent harness。
   actions:
     - theme: brand
-      text: Quickstart (Colab)
-      link: /quickstart
+      text: 快速上手（Colab）
+      link: /zh-tw/quickstart
     - theme: alt
-      text: Overview
-      link: /overview
+      text: 總覽
+      link: /zh-tw/overview
     - theme: alt
-      text: Interactive manual
+      text: 互動式手冊
       link: /interactive/
 
 features:
-  - title: Two protocols, one loop
-    details: Skills are callable behaviours; Memory holds state. An Agent runs the read–act–observe loop over them, recording every step in an EventStream.
-  - title: Local or cloud models
-    details: Run Gemma on Colab, MLX on Apple Silicon, or any of eight providers — OpenAI, Anthropic, Google, Groq, NVIDIA, Ollama, MLX, and a local OpenAI-compatible server.
-  - title: Serve and observe
-    details: Expose a registry over HTTP with `cantus serve`, connect LINE, Telegram, Discord, or Google Chat, and watch sessions live in the `cantus tui` dashboard.
-  - title: Built for the classroom
-    details: Designed so students write a skill, swap a provider, and inspect what the agent did — without leaving a notebook.
+  - title: 兩個 protocol、一個迴圈
+    details: Skill 是可呼叫的行為，Memory 持有狀態。Agent 在它們之上跑「讀取—行動—觀察」迴圈，每一步都記進 EventStream。
+  - title: 本機或雲端模型
+    details: 在 Colab 跑 Gemma、在 Apple Silicon 跑 MLX，或接八個 provider——OpenAI、Anthropic、Google、Groq、NVIDIA、Ollama、MLX、本機 OpenAI 相容伺服器。
+  - title: 服務化與觀測
+    details: 用 cantus serve 把 registry 開成 HTTP，接上 LINE、Telegram、Discord 或 Google Chat，再用 cantus tui 儀表板即時看 session。
+  - title: 為課堂而生
+    details: 設計成讓學生寫一個 skill、換一個 provider、檢視 agent 做了什麼——全程不用離開 notebook。
 ---

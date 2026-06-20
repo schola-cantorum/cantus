@@ -2,9 +2,9 @@
 
 ## What it is + when to use
 
-Skill 是 LLM agent 可以呼叫的「工具型能力」（tool-style capability）。每一個 skill 都是 agent 在 reasoning 過程中能挑選並執行的單一動作，例如查資料庫、發 HTTP request、解一次方程式。當你希望 LLM 能「主動使用某個函式」時就把它包成 skill；如果只是內部 helper、沒有要曝露給模型，就不要註冊。
+Skill 就是 agent 在推理到一半時可以呼叫的「單一動作」：查一筆資料庫、發一個 HTTP request、解一條方程式。當你希望模型能直接動手呼叫某個函式時，就把它註冊成 skill。反過來說，那些只給內部用的 helper 就別註冊，模型根本看不到它們。
 
-每個 skill 註冊後會被放進 `Registry` 的 `kind="skill"` 集合，agent 會把它的 `spec_for_llm()` 結果序列化進 system prompt，讓模型知道有什麼工具可選。Skill 的參數會用 Pydantic 自動建模，呼叫前會用 `validate_args()` 驗證一次型別。
+一旦註冊，skill 就會落在 registry 裡 `kind="skill"` 這一組底下。Agent 會把每個 skill 的 `spec_for_llm()` 輸出序列化進 system prompt，模型才知道自己手上有哪些工具可以挑。Skill 的參數用 Pydantic 建模，真正跑起來之前，`validate_args()` 會先把型別檢查過一遍。
 
 ## 三種寫法（同一個 `search_book`）
 
@@ -47,7 +47,7 @@ class SearchBook(Skill):
 get_registry().register("skill", SearchBook())
 ```
 
-三種寫法走的都是同一條路徑：最後都得到一個 `Skill` instance，並在 registry 留下一筆 `kind="skill"` 紀錄。Decorator 跟 function-pass 會用 `_from_function()` 自動合成一個 synthetic subclass，把 docstring 第一段當 description，把 `Args:` 區塊當作個別參數說明。
+三種寫法走的是同一條路：最後都會變成一個 `Skill` instance，在 registry 留下一筆 `kind="skill"` 紀錄。Decorator 跟 function-pass 這兩種會去呼叫 `_from_function()`，它當場合成一個 subclass，把 docstring 的第一段拿來當 description，再讀 `Args:` 區塊取得每個參數各自的說明。
 
 ## `spec_for_llm()` 回什麼
 
@@ -59,11 +59,11 @@ get_registry().register("skill", SearchBook())
 }
 ```
 
-`args_schema` 是從函式 signature（class-first 則是 `run`）反射推出的 JSON schema，型別註記不可省略，否則會退化成 `Any`，模型就拿不到型別線索。
+`args_schema` 是從函式 signature（class-first 的話則是從 `run`）反射出來的 JSON schema。型別註記千萬別省：少了它，schema 就退化成 `Any`，模型原本可以拿到的型別線索也跟著全沒了。
 
 ## 常見錯誤
 
-- **未註冊**：忘記 `@skill` 或忘記 import 該模組，agent 看不到這個工具。
-- **沒有 type annotation**：`def search_book(title)`（沒寫 `: str`）會讓 args schema 變成 `Any`，LLM 容易亂塞。
-- **Pydantic 驗證失敗**：呼叫端傳了 `title=123`，`validate_args()` 會丟 `ValidationError`，agent 會把這個錯誤回給模型重試。
-- **回傳值不是 JSON-serialisable**：observation 序列化會掉到 `repr()` fallback，模型讀到的會很雜。
+- **沒註冊**：你忘了加 `@skill`，或是忘了 import 定義它的那個模組，於是 agent 從頭到尾都看不到這個工具。
+- **沒寫型別註記**：`def search_book(title)`（沒寫 `: str`）會讓 args schema 塌成 `Any`，LLM 很容易就亂塞東西進來。
+- **Pydantic 驗證失敗**：呼叫端傳了 `title=123`，`validate_args()` 會丟出 `ValidationError`，agent 再把這個錯誤交回給模型重試。
+- **回傳值不是 JSON-serializable**：序列化這個 observation 時會掉到 `repr()` fallback，模型最後讀到的會是一坨很亂的東西。

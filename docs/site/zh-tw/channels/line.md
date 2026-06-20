@@ -1,27 +1,27 @@
-# Cookbook：用 cantus 接 LINE Messaging API（echo bot）
+# Cookbook：把 cantus 接上 LINE Messaging API（echo bot）
 
-這份 walkthrough 帶你從零把一個 LINE 官方帳號接到 `cantus serve`，跑通 echo bot（學生發訊息→bot 回訊息）。所有指令都假設你已經跑過 [`docs/quickstart-desktop.md`](./quickstart-desktop.md) 的「Serve via CLI」與「Expose via Cloudflare Tunnel」兩段。
+這份教學帶你從零開始，把一個 LINE 官方帳號接到 `cantus serve`，跑出一個 echo bot：學生丟一句話進來，bot 就原封不動回一句。每一道指令都假設你已經做完 [`docs/quickstart-desktop.md`](../quickstart-desktop.md) 裡的「Serve via CLI」與「Expose via Cloudflare Tunnel」兩節，所以這裡不會再重講那兩段。
 
 ## 0. 你會用到的東西
 
-- 一個 [LINE Developers Console](https://developers.line.biz/console/) 帳號（用 LINE App 登入即可）。
-- 已安裝 `cantus-agent[serve]>=0.4.5` 與 `cloudflared`。
-- 一台筆電，OS 不重要。
+- 一個 [LINE Developers Console](https://developers.line.biz/console/) 帳號（直接用 LINE App 登入就行）。
+- 裝好 `cantus-agent[serve]>=0.4.5` 和 `cloudflared`。
+- 一台筆電。是 macOS、Windows 還是 Linux 都沒差。
 
 ## 1. 在 LINE Developers Console 開一個 Messaging API channel
 
-1. 進 LINE Developers Console，建一個新 Provider（沒有就建一個）。
-2. 在這個 Provider 底下 **Create a new channel** → 選 **Messaging API**。
-3. 填完基本資料（channel name、icon、category）後送出，進到該 channel 的詳細頁。
-4. 切到 **Messaging API** tab，記下兩個 token：
-   - **Channel secret**（在 **Basic settings** tab）── 這是 `CANTUS_SERVE_CHANNEL_LINE_SECRET`。
-   - **Channel access token (long-lived)** ── 在 **Messaging API** tab 下方 **Issue** 一個，這是 `CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN`。
+1. 打開 LINE Developers Console，建一個新的 Provider（如果你手邊已經有一個，拿來重用也可以）。
+2. 在這個 Provider 底下選 **Create a new channel**，channel 類型挑 **Messaging API**。
+3. 把基本欄位填一填（channel name、icon、category）後送出，畫面會帶你到這個 channel 的詳細頁。
+4. 切到 **Messaging API** 分頁，把兩個 token 記下來：
+   - **Channel secret**（在 **Basic settings** 分頁）── 它對應到 `CANTUS_SERVE_CHANNEL_LINE_SECRET`。
+   - **Channel access token (long-lived)** ── 在 **Messaging API** 分頁靠近底部的地方按 issue 發一個出來，它對應到 `CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN`。
 
-兩個 token 都是純字串，**不要**貼到聊天訊息、commit、或 issue 裡。
+這兩個 token 都只是普通字串。**千萬不要**把它們貼進聊天訊息、commit 或 issue 裡。
 
 ## 2. 寫 `myskills/app.py`
 
-把 channel 物件與 registry 都放在 module top-level 變數裡，cantus CLI 的 `--channels` 參數靠 dotted path 解析：
+把 channel 物件和 registry 都放在 module 最外層當變數。cantus CLI 的 `--channels` 參數是靠 dotted path 去 import 的，所以這兩個東西一定要能被 import 到：
 
 ```python
 # myskills/app.py
@@ -43,14 +43,14 @@ registry.register("skill", echo)
 line_channel = LineWebhookChannel()
 ```
 
-## 3. 把 secrets 放進 shell（**不要**寫進 source）
+## 3. 把 secrets 放進 shell（**不要**寫死在程式碼裡）
 
 ```bash
 export CANTUS_SERVE_CHANNEL_LINE_SECRET="<channel secret from step 1>"
 export CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN="<channel access token from step 1>"
 ```
 
-如果你習慣 `.env` 檔，記得把它加到 `.gitignore`；cantus 本身 v0.4.5 仍**不**自動讀 `.env`，需要 `direnv` 或自己 source。
+如果你比較習慣用 `.env` 檔，記得把它加進 `.gitignore`。cantus 本身**不會**自動去讀 `.env`，所以你得搭配 `direnv`，或是自己手動 `source` 一下。
 
 ## 4. 啟動 cantus serve
 
@@ -62,32 +62,32 @@ cantus serve \
   --channels myskills.app:line_channel
 ```
 
-CLI 解析後會把 `line_channel` 推到 `app.state.channels`、`serve()` 對它呼叫 `mount(app)` 註冊 `POST /channels/line`、FastAPI lifespan 起一個 app-scoped `httpx.AsyncClient`。`Ctrl-C` 乾淨關閉。
+CLI 解析完你的參數後，會把 `line_channel` 推進 `app.state.channels`。接著 `serve()` 會對它呼叫 `mount(app)`，註冊出 `POST /channels/line` 這條路由。FastAPI 的 lifespan 會開一個 app 等級的 `httpx.AsyncClient`，專門用來送回覆。按 `Ctrl-C` 就會把整套乾淨關掉。
 
-## 5. 用 Cloudflare Tunnel 暴露公網 URL
+## 5. 用 Cloudflare Tunnel 開一個對外網址
 
-另開一個 shell：
+另外開一個 shell：
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
-`cloudflared` 會印出 `https://<slug>.trycloudflare.com` 這種臨時 URL；複製起來，你的 webhook 公網入口就是 `https://<slug>.trycloudflare.com/channels/line`。
+`cloudflared` 會印出一個像 `https://<slug>.trycloudflare.com` 的臨時網址，把它複製起來。你對外的 webhook 入口就是 `https://<slug>.trycloudflare.com/channels/line`。
 
-## 6. 回 LINE Developers Console 設 webhook URL
+## 6. 回 LINE Developers Console 設定 webhook URL
 
-在 channel 的 **Messaging API** tab：
+回到這個 channel 的 **Messaging API** 分頁：
 
-1. **Webhook URL** 貼上 `https://<slug>.trycloudflare.com/channels/line`。
-2. 點 **Update**，再點 **Verify** ── LINE 會發一個空的 verification event 給你。
-   - cantus 看到正確的 `X-Line-Signature` 就回 200，看不到或對不上就回 401 `{"detail": "Authentication required"}`。Verify 通過代表 secret 對了。
-3. **Use webhook** 撥到 ON。
-4. 同一頁更下面，把 **Auto-reply messages** 與 **Greeting messages** 關掉（不然 LINE 會替你的 bot 自動回，蓋掉你的 echo 邏輯）。
-5. 用手機加這個 channel 為好友（QR code 在 **Messaging API** tab 下方）。
+1. 把 `https://<slug>.trycloudflare.com/channels/line` 貼進 **Webhook URL**。
+2. 按 **Update**，再按 **Verify**。LINE 會丟一個空的 verification event 過來。
+   - cantus 看到正確的 `X-Line-Signature` 就回 200；header 不見了或對不上，就回 401，body 是 `{"detail": "Authentication required"}`。Verify 過得了，就代表你的 secret 設對了。
+3. 把 **Use webhook** 切到 ON。
+4. 在同一頁再往下捲，把 **Auto-reply messages** 和 **Greeting messages** 都關掉。不然 LINE 會搶在你前面替 bot 自動回，把你的 echo 邏輯整個蓋掉。
+5. 用手機把這個 channel 加為好友（QR code 就在 **Messaging API** 分頁靠近底部的地方）。
 
-## 7. 跑 echo loop
+## 7. 跑起 echo loop
 
-cantus 收進來的 LINE event 會 push 到 `line_channel` 的內部 queue。需要你寫一個 worker loop（最小範例）：
+每收到一筆 webhook，cantus 就會把整包 payload 推進 `line_channel` 的內部 queue。一筆 payload 裡可能裝了好幾個 event，所以 `receive()` 是把整個信封交給你，要由你的 loop 自己去走 `events` 這個陣列。把 queue 抽乾的 worker loop 得你自己寫，下面是一個最精簡的版本：
 
 ```python
 # scripts/worker.py
@@ -117,17 +117,17 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-第三個 shell 跑：
+開第三個 shell 把它跑起來：
 
 ```bash
 python scripts/worker.py
 ```
 
-用手機在 LINE App 對這個 bot 講話，幾秒內就會看到 `echo: <你打的字>` 回來。
+接著用手機上的 LINE App 對這個 bot 說句話，幾秒之內你就會看到 `echo: <你剛剛打的字>` 跳回來。
 
-## 8. curl 自我測試（不靠手機）
+## 8. 用 curl 自我測試（不用手機也行）
 
-想驗證 `cantus serve` 那邊沒問題、不依賴 LINE 端，可以用 `curl` 直接戳 webhook：
+想確認 `cantus serve` 這一側本身沒問題、又不想牽扯到 LINE 那邊，可以用 `curl` 直接戳 webhook：
 
 ```bash
 SECRET="$CANTUS_SERVE_CHANNEL_LINE_SECRET"
@@ -140,16 +140,16 @@ curl -i -X POST http://127.0.0.1:8765/channels/line \
   -d "$BODY"
 ```
 
-預期回 `HTTP/1.1 200 OK` 與 body `{"ok":true}`。把 `SIG` 改錯，回的是 `HTTP/1.1 401 Unauthorized` 與 `{"detail":"Authentication required"}`。
+你應該會拿到 `HTTP/1.1 200 OK`，body 是 `{"ok":true}`。試著把 `SIG` 改壞，這次回的就是 `HTTP/1.1 401 Unauthorized`，body 是 `{"detail":"Authentication required"}`。
 
-## 9. 常見坑
+## 9. 常見的坑
 
-- **Verify 在 LINE Console 失敗**：90% 是 `CANTUS_SERVE_CHANNEL_LINE_SECRET` 與 channel secret 不一致；剩下 10% 是 Cloudflare Tunnel 還沒起來。
-- **bot 已加好友但發訊息沒反應**：先確認 worker loop 有跑、再確認 LINE Console 的 Auto-reply / Greeting 都已關閉。
-- **`ChannelSendError: line send failed: HTTP 400 Invalid reply token`**：reply token 只有約 30 秒效期，被你 sleep 卡太久就過期；echo bot 收到 event 後請立刻回。
-- **token 不小心 commit 出去**：立刻去 LINE Developers Console **Issue a new channel access token**，舊的會 revoke；channel secret 不能單獨重新發，整個 channel 重建。
+- **在 LINE Console 按 Verify 失敗**：十次有九次是 `CANTUS_SERVE_CHANNEL_LINE_SECRET` 跟 channel secret 對不起來，剩下那一成是 Cloudflare Tunnel 還沒起來。
+- **bot 加了好友卻不回話**：先確認 worker loop 真的有在跑，再回去確認 LINE Console 裡的 Auto-reply 和 Greeting 兩個都關掉了。
+- **`ChannelSendError: line send failed: HTTP 400 Invalid reply token`**：reply token 大概只有 30 秒效期，你的 loop 要是睡太久它就過期了。Event 一進來就要趕快回。
+- **不小心把 token commit 出去了**：馬上回 LINE Developers Console 按 **Issue a new channel access token**，這個動作會把舊的作廢。Channel secret 沒辦法單獨重發，真的外洩就只能把整個 channel 重建一次。
 
 ## 下一步
 
-- 把 worker loop 包進你的 Agent / Workflow，讓 LLM 來決定怎麼回。
-- 接 Telegram bot：見 [`docs/cookbook-telegram-channel.md`](./cookbook-telegram-channel.md)。
+- 把 worker loop 包進一個 Agent 或 Workflow，改讓 LLM 來決定要怎麼回。
+- 接一個 Telegram bot：看 [`docs/cookbook-telegram-channel.md`](./telegram.md)。

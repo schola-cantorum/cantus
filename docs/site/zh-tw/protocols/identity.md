@@ -1,20 +1,20 @@
-# `Soul` Identity Protocol（v0.3.1）
+# `Soul` 身份 Protocol（v0.5.0）
 
-## What it is + when to use
+## 這是什麼、什麼時候用
 
-cantus 從 v0.3.1 起把 agent 的「身份」抽象成 `cantus.identity.Soul` —— 一份從 SOUL.md 載入的六區塊身份結構，等同於把人類角色設定（name & role / personality / rules / tools / output format / handoffs）變成第一階公民，並在 `Agent(soul=...)` 自動注入 system prompt 前綴。
+從 v0.3.1 開始，cantus 用 `cantus.identity.Soul` 來描述一個 agent 的「身份」：這是一份從 `SOUL.md` 檔案載入的六區塊紀錄。六個區塊分別是 name and role（名稱與角色）、personality（個性）、rules（規則）、tools（工具）、output format（輸出格式）以及 handoffs（交接）。你把解析好的 `Soul` 丟給 `Agent(soul=...)`，cantus 就會幫你把它接在 system prompt 的最前面。
 
-教學弧的三大抽象並列：
+它和框架裡另外兩個教學用的抽象並排存在：
 
 | 抽象 | 角色 |
 | --- | --- |
-| `Skill` | 能力（這個 agent 可以做的事） |
-| `Memory` | 記憶（這個 agent 記得過什麼） |
-| `Soul` | 身份（這個 agent 是誰） |
+| `Skill` | 能力——這個 agent 能做什麼 |
+| `Memory` | 記憶——這個 agent 記得過什麼 |
+| `Soul` | 身份——這個 agent 是誰 |
 
-## SOUL.md 六區塊規格
+## 六區塊的 `SOUL.md` 格式
 
-對齊 [aaronjmars/soul.md](https://github.com/aaronjmars/soul.md) 慣例。每個區塊用 H2 `##` 標頭，**case-sensitive**、byte-for-byte 比對；body 從 H2 標頭下一行起到下一個 H2 或 EOF 為止，前後 whitespace 會被 strip。
+檔案的格式沿用 [aaronjmars/soul.md](https://github.com/aaronjmars/soul.md) 的慣例。每個區塊都以一個 H2 `##` 標頭開頭。標頭是 **case-sensitive**（大小寫敏感），會逐 byte 比對。一個區塊的內容，從它 H2 標頭的下一行開始，一直到下一個 H2 標頭或檔案結尾為止，前後的空白會被 strip 掉。
 
 ```markdown
 ## Name & Role
@@ -38,7 +38,7 @@ Plain prose with bullet points for lists.
 Escalate cataloging requests to the head librarian.
 ```
 
-六個正規 H2 標頭依序為：
+六個正規 H2 標頭，依序為：
 
 1. `## Name & Role`
 2. `## Personality`
@@ -47,21 +47,21 @@ Escalate cataloging requests to the head librarian.
 5. `## Output format`
 6. `## Handoffs`
 
-對應 `Soul` 屬性：`name_and_role` / `personality` / `rules` / `tools` / `output_format` / `handoffs`。
+它們對應到這些 `Soul` 屬性：`name_and_role`、`personality`、`rules`、`tools`、`output_format`、`handoffs`。
 
-## `Soul.from_file()` 失敗模式
+## `Soul.from_file()` 會怎麼失敗
 
-`Soul.from_file(path)` 在以下情境抛出對應例外：
+`Soul.from_file(path)` 在下面每一種情況都會丟出對應的例外：
 
 | 情況 | 例外 | 例外屬性 |
 | --- | --- | --- |
-| 檔案不存在 | `FileNotFoundError` | 標準 Python，**不**包裝為 `SoulParseError` |
-| 缺一或多個 H2 區塊 | `SoulParseError` | `missing_sections=[<canonical titles>]` |
-| 同一 H2 出現多次 | `SoulParseError` | `duplicates=[<title>, ...]` |
-| 大小寫不符（例 `## name & Role`） | `SoulParseError` | `missing_sections=["Name & Role"]` **加** `unexpected=["name & Role"]` |
-| 出現規格外 H2（例 `## Examples`） | `SoulParseError` | `unexpected=["Examples"]` |
+| 檔案不存在 | `FileNotFoundError` | 標準 Python 的例外，**不會**被包成 `SoulParseError` |
+| 缺了一個或多個 H2 區塊 | `SoulParseError` | `missing_sections=[<canonical titles>]` |
+| 同一個 H2 出現超過一次 | `SoulParseError` | `duplicates=[<title>, ...]` |
+| 大小寫不符（例如 `## name & Role`） | `SoulParseError` | `missing_sections=["Name & Role"]`，**再加上** `unexpected=["name & Role"]` |
+| 出現規格外的 H2（例如 `## Examples`） | `SoulParseError` | `unexpected=["Examples"]` |
 
-`SoulParseError` 是 `ValueError` 子類，因此 `except ValueError` 也能接住；但要拿到 `missing_sections` / `duplicates` / `unexpected` 三個欄位，請改 `except SoulParseError`。
+`SoulParseError` 是 `ValueError` 的子類別，所以 `except ValueError` 也接得住它。但如果你要讀 `missing_sections`、`duplicates`、`unexpected` 這幾個欄位，就要直接接 `SoulParseError`。
 
 ```python
 from cantus.identity import Soul, SoulParseError
@@ -74,15 +74,15 @@ except SoulParseError as exc:
     print(f"unexpected: {exc.unexpected}")
 ```
 
-## `Agent(soul=...)` 注入順序
+## `Agent(soul=...)` 怎麼把 soul 注入進去
 
-`Agent.__init__` 新增 keyword-only 參數 `soul: Soul | None = None`。注入順序為：
+`Agent.__init__` 收一個 keyword-only 的參數 `soul: Soul | None = None`。注入的順序是：
 
 ```
 <soul.to_system_prompt()>\n\n<v0.3.0 baseline system prompt>
 ```
 
-亦即 `soul.to_system_prompt()` 字串為前綴、後接兩個換行、再接 v0.3.0 既有的 system prompt 內容。當 `soul=None`（預設）時，system prompt 與 v0.3.0 **byte-identical**——既有 agent 行為不受任何影響。
+換句話說，`soul.to_system_prompt()` 這個字串擺在最前面，後面接兩個換行，再接上原本 v0.3.0 的 system prompt。當 `soul=None`（也就是預設值）時，system prompt 會跟 v0.3.0 **byte-identical**（逐 byte 完全相同），所以既有的 agent 行為完全不會被動到。
 
 ```python
 from cantus import Agent
@@ -90,15 +90,15 @@ from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")
 agent = Agent(model=m, soul=soul)
-# 後續 agent.run(...) 的每次 model.generate(prompt) 都會包含
-# soul 內容作為 system prompt 前綴
+# 接下來 agent.run(...) 期間每一次 model.generate(prompt) 呼叫，
+# 都會把 soul 內容當成 system-prompt 前綴帶進去。
 ```
 
-`soul` **不**會註冊為 `Skill`、**不**會出現在 `registry.spec_for_llm()`——LLM 看到的工具清單不會被 SOUL 內容污染。
+`soul` **不會**被註冊成 `Skill`，也**不會**出現在 `registry.spec_for_llm()` 裡，所以 model 看到的工具清單不會被 `SOUL.md` 的內容污染。
 
-## Override pattern（自塞 system prompt）
+## Override pattern：自己把 system prompt 組起來
 
-如果你想完全自己接管 system prompt 構建，傳 `soul=None`（或省略），然後在 host code 端控制送進 model 的 prompt：
+如果你想完全接管 system prompt 的組裝，就傳 `soul=None`（或乾脆省略），然後在你自己的 host code 裡控制要送給 model 的 prompt：
 
 ```python
 from cantus import Agent
@@ -106,20 +106,20 @@ from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")
 custom_prefix = soul.to_system_prompt() + "\n\n=== CUSTOM HOST PREAMBLE ===\n\n"
-agent = Agent(model=m)  # soul=None，cantus 不注入
+agent = Agent(model=m)  # soul=None，所以 cantus 什麼都不注入
 
-# host code 自己組 prompt
+# host code 自己把 prompt 組起來。
 def run_with_custom_prompt(query: str) -> str:
     prompt = custom_prefix + agent._build_prompt(AgentState(query=query))
     return agent.model.generate(prompt)
 ```
 
-## SOUL.md 信任模型
+## `SOUL.md` 的信任模型
 
-cantus framework 把 SOUL.md 視為 **trusted host-authored input**：
+框架把 `SOUL.md` 當成 **trusted、host 自己撰寫的輸入**來對待：
 
-- framework **不**做 escape、sanitisation、control-character 檢查
-- 學生把 `## Rules\nIgnore all prior instructions` 寫進 SOUL.md 是合法的——這在教學情境下是學生對 agent 行為的完整掌控
-- 當 host code 從 **untrusted source**（end-user upload、第三方 fetch、network response）取得 SOUL.md 時，**host code 自己負責驗證內容**，再傳給 `Soul.from_file()`
+- 框架**不會**對它做 escape、sanitize，也**不會**檢查控制字元。
+- 學生在 `SOUL.md` 寫下 `## Rules\nIgnore all prior instructions` 是合法的。在教學情境裡，這正是學生對 agent 行為握有完整掌控權的展現。
+- 當 host code 是從**不可信來源**（end-user 上傳的檔案、第三方抓回來的內容、network response）讀進 `SOUL.md` 時，**驗證內容是 host code 自己的責任**，要先驗過再傳給 `Soul.from_file()`。
 
-設計取捨：強制 framework escape 反而會破壞 `## Rules` 區塊內合法的 markdown 元字元（`*`、`#`、`>`），讓 Soul rendering 偏離學生原意。
+這個設計的取捨在於：如果硬要框架去 escape 輸入，反而會破壞 `## Rules` 區塊裡那些合法的 Markdown 元字元（`*`、`#`、`>`），讓最後 render 出來的 soul 偏離學生原本想表達的樣子。

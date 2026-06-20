@@ -84,7 +84,7 @@ en_summary, zh_summary = fanout.run("Long article ...")
 
 ## OrchestratorWorker
 
-對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator Skill 拿到 input 後回一串 subtask；framework 把 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
+對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator Skill 拿到 input 後回一串 subtask；`OrchestratorWorker` 把這些 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
 
 ```python
 class OrchestratorWorker:

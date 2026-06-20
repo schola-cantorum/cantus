@@ -1,26 +1,26 @@
-# Cantus Desktop Quickstart (Windows / macOS / Linux)
+# Cantus 桌面版快速上手（Windows / macOS / Linux）
 
-Five minutes from a clean `pip` to your first `Agent.run(...)` reply, using an API-key-backed chat model. This is the recommended entry point for first-time cantus users running on a desktop or laptop (i.e. anywhere outside Google Colab).
+從乾淨的 `pip` 環境到你第一個 `Agent.run(...)` 回覆，只要五分鐘，過程中會用上一個以 API key 驗證的 chat model。如果你是第一次接觸 cantus，又是在桌機或筆電上跑（也就是 Google Colab 以外的任何地方），這份就是建議的入門起點。
 
-If you are running in Colab and want to load 4-bit Gemma from Google Drive, see [`quickstart.md`](./quickstart.md) instead.
+如果你是在 Colab 裡跑、想從 Google Drive 載入 4-bit Gemma，請改看 [`quickstart.md`](./quickstart.md)。
 
-## Requirements
+## 需求
 
-- Python 3.10 or newer
-- [`uv`](https://docs.astral.sh/uv/) installed — `brew install uv` on macOS, `pipx install uv` on most systems, or the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
-- An API key from a Chat Completions provider. This walkthrough uses OpenAI; Anthropic, Google, and Groq work the same way through `load_chat_model("<provider>/<model>")`.
+- Python 3.10 以上
+- 裝好 [`uv`](https://docs.astral.sh/uv/)：macOS 上用 `brew install uv`，多數系統用 `pipx install uv`，或是走[官方安裝程式](https://docs.astral.sh/uv/getting-started/installation/)
+- 一把來自 Chat Completions 供應商的 API key。這份教學用 OpenAI；Anthropic、Google、Groq 都是同一套用法，透過 `load_chat_model("<provider>/<model>")` 就行。
 
-## Five-minute walkthrough
+## 五分鐘走一遍
 
-### 1. Install cantus
+### 1. 安裝 cantus
 
 ```bash
 uv pip install cantus-agent
 ```
 
-`cantus-agent` publishes wheels for Linux, macOS, and Windows. The default install pulls a single runtime dependency (`pydantic`). It does not pull `bitsandbytes` — that package is gated behind `sys_platform == 'linux'` because its 4-bit quantization kernels target CUDA and are non-functional outside Linux + CUDA.
+`cantus-agent` 為 Linux、macOS、Windows 都發了 wheel。預設安裝只會拉進一個 runtime 相依套件（`pydantic`），不會拉 `bitsandbytes`——那個套件被 `sys_platform == 'linux'` 這個條件擋住，因為它的 4-bit 量化 kernel 是針對 CUDA 寫的，在 Linux + CUDA 以外的環境根本跑不動。
 
-### 2. Provide an API key
+### 2. 提供 API key
 
 ```bash
 # macOS / Linux
@@ -33,7 +33,7 @@ $env:OPENAI_API_KEY = "sk-..."
 set OPENAI_API_KEY=sk-...
 ```
 
-### 3. Define a skill
+### 3. 定義一個 skill
 
 ```python
 from cantus import skill, Agent, load_chat_model
@@ -44,16 +44,16 @@ def add(a: int, b: int) -> int:
     return a + b
 ```
 
-### 4. Load a chat model
+### 4. 載入 chat model
 
 ```python
 model = load_chat_model("openai/gpt-4o-mini")
 agent = Agent(model=model)
 ```
 
-`load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`).
+`load_chat_model("openai/gpt-4o-mini")` 會從環境變數讀取 `OPENAI_API_KEY`，再走 OpenAI Chat Completions API。同一個 factory 也吃 `"anthropic/claude-..."`、`"google/gemini-..."`、`"groq/..."`，前提是你裝好對應的 extras（`uv pip install "cantus-agent[anthropic,google,groq]"`）。
 
-### 5. Run the agent
+### 5. 跑這個 agent
 
 ```python
 state = agent.run("What is 17 plus 25?")
@@ -61,53 +61,53 @@ final = state.stream[-1]
 print(getattr(final, "answer", final))
 ```
 
-You should see the agent invoke the `add` skill and print `42`.
+你應該會看到 agent 呼叫 `add` 這個 skill，然後印出 `42`。
 
-## Serve via CLI
+## 用 CLI 啟動服務
 
-Once your `Registry` is exposed as a top-level binding in a module, you can start the FastAPI server from the shell — no need to write `import uvicorn` yourself:
+只要你的 `Registry` 在某個 module 裡以頂層名稱（top-level binding）曝露出來，就能直接從 shell 啟動 FastAPI 伺服器——不必自己寫 `import uvicorn`：
 
 ```bash
 pip install cantus-agent[serve]
 cantus serve --host 0.0.0.0 --port 8765 --registry-import myskills.app:registry
 ```
 
-The CLI accepts overrides for `--host`, `--port`, `--auth-mode {none,bearer,api-key}`, `--dashboard` / `--no-dashboard`, and one or more `--channels DOTTED_PATH`. Unset flags fall through to `CANTUS_SERVE_*` env vars and finally to `Settings` defaults; press `Ctrl-C` for a graceful uvicorn shutdown.
+這個 CLI 接受幾種覆寫參數：`--host`、`--port`、`--auth-mode {none,bearer,api-key}`、`--dashboard` / `--no-dashboard`，以及一個或多個 `--channels DOTTED_PATH`。沒設定的旗標會往下退到 `CANTUS_SERVE_*` 環境變數，最後再退到 `Settings` 預設值；按 `Ctrl-C` 就能讓 uvicorn 優雅關機。
 
-## Expose via Cloudflare Tunnel
+## 透過 Cloudflare Tunnel 對外曝露
 
-Once `cantus serve` is running on `127.0.0.1`, a single `cloudflared` invocation gives you a public HTTPS URL you can hand to a webhook (LINE, Discord, Telegram, Google Chat) without opening any inbound firewall port. Install `cloudflared` from the [official Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then in a second shell:
+只要 `cantus serve` 跑在 `127.0.0.1` 上，一行 `cloudflared` 指令就能給你一個公開的 HTTPS URL，可以直接拿去掛 webhook（LINE、Discord、Telegram、Google Chat），完全不用開任何對內的防火牆 port。先從 [Cloudflare 官方下載頁](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)裝好 `cloudflared`，然後另開一個 shell：
 
 ```bash
 cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
-`cloudflared` prints a randomly-assigned `https://<slug>.trycloudflare.com` URL. Press `Ctrl-C` to tear the tunnel down — the URL stops resolving immediately.
+`cloudflared` 會印出一個隨機指派的 `https://<slug>.trycloudflare.com` URL。按 `Ctrl-C` 就能把 tunnel 收掉——那個 URL 會立刻失效、解析不到。
 
-**Security note.** The quick-tunnel mode shown above is unauthenticated — anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The same applies to the read-only `/introspection` endpoints, which are enabled by default and are equally reachable over the tunnel — `cantus serve --auth-mode bearer` protects them alongside `/skills` (with `auth_mode=none`, the server prints a startup warning that `/introspection` is open). The quick-tunnel mode persists no token to disk; if you upgrade to a named tunnel later, the resulting `cert.pem` MUST NOT be committed to version control (it is the long-lived credential for your tunnel namespace).
+**安全提醒：** 這種 quick-tunnel 模式沒有任何驗證，任何人只要拿到 URL，就能直接打你的 FastAPI app。把它搭配 `cantus serve --auth-mode bearer` 一起用，這樣呼叫方就得帶上 token 才行，而且記得每次 session 之間都把 token 換掉。唯讀的 `/introspection` 端點也是同一回事：它們預設就開著，從 tunnel 一樣打得到——`cantus serve --auth-mode bearer` 會跟 `/skills` 一起把它們保護起來（若是 `auth_mode=none`，伺服器啟動時會印出一行警告，提醒你 `/introspection` 正開著沒擋）。quick-tunnel 模式不會把任何 token 寫到硬碟上；之後如果你升級成 named tunnel，產生出來的 `cert.pem` 千萬不要 commit 進版控（它是你整個 tunnel namespace 的長期憑證）。
 
-## Inspect with `cantus tui`
+## 用 `cantus tui` 觀測
 
-`cantus tui` is a read-only terminal dashboard over a running server's `/introspection` and `/health` endpoints. Install the `tui` extra and point it at the same server (local or tunnelled):
+`cantus tui` 是一個唯讀的終端機儀表板，掛在某台執行中伺服器的 `/introspection` 與 `/health` 端點之上。裝好 `tui` 這個 extra，再把它指向同一台伺服器（本機或走 tunnel 的都行）：
 
 ```bash
 pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`; press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server: with `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment, and with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY` — treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
+它會開出五個分頁——**Dashboard**、**Skills**、**Permissions**、**Dataflow**、**Inspector**——用按鍵 `1`–`5` 切換；在 Sessions 清單的某一列上按 `Enter`，就能跳到那次執行的 step trace（在 Inspector 裡看）。`--auth-mode` 要跟伺服器對上：用 `--auth-mode bearer` 時，它會從環境變數讀 `CANTUS_SERVE_BEARER_TOKEN`；用 `--auth-mode api-key` 時則讀 `CANTUS_SERVE_API_KEY`——兩者都當成機密看待，絕對別記進 log，也別分享出去。workflow 的 step trace 只會顯示去敏化後的摘要（skill 名稱、參數的 key 名稱，以及結果／例外的型別名稱，永遠不會是它們的值），所以就算對方是走 tunnel 的伺服器，觀測起來也很安全。完整的 pane 說明請見 [`docs/tui.md`](./tui.md)。
 
-## Local LLMs via Ollama
+## 透過 Ollama 跑本機 LLM
 
-`load_chat_model("ollama/...")` runs against a local [Ollama](https://ollama.com/download) daemon and works on macOS, Linux, and Windows without CUDA or `bitsandbytes`. The Linux-only 4-bit Gemma path (`LocalEnvironment.prepare_model`) is still available where supported, but Ollama is the recommended cross-platform local-LLM option.
+`load_chat_model("ollama/...")` 會接上本機的 [Ollama](https://ollama.com/download) daemon，在 macOS、Linux、Windows 上都能跑，不需要 CUDA 也不需要 `bitsandbytes`。那條 Linux 限定的 4-bit Gemma 路徑（`LocalEnvironment.prepare_model`）在支援的環境下還是可以用，但 Ollama 才是我們建議的跨平台本機 LLM 選項。
 
-After installing the daemon from [https://ollama.com/download](https://ollama.com/download), pull a model:
+從 [https://ollama.com/download](https://ollama.com/download) 裝好 daemon 之後，先 pull 一個模型：
 
 ```bash
 ollama pull gemma3:4b
 ```
 
-Then use it from Python exactly like any other provider:
+接著在 Python 裡用它，就跟其他任何供應商一模一樣：
 
 ```python
 from cantus import Agent, Message, load_chat_model
@@ -117,19 +117,19 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@skill` before relying on it.
+能不能用 tool-use 要看模型本身：`OllamaChatModel.supports_tool_use` 是 `True`（從 `OpenAIChatModel` 繼承而來），但某個特定的 Ollama 模型究竟支不支援 OpenAI 風格的 function calling，得看那個模型怎麼訓練的。正式依賴它之前，先寫一個小小的 `@skill` 驗證一下。
 
-## Local LLMs via MLX (Apple Silicon)
+## 透過 MLX 跑本機 LLM（Apple Silicon）
 
-`load_chat_model("mlx/...")` runs a model **in-process** through Apple's [`mlx-lm`](https://github.com/ml-explore/mlx-lm), the native inference framework for M-series chips — no separate daemon or server, faster load times, and lower memory use than the llama.cpp backend Ollama uses on a Mac. Unlike the Ollama path, `MLXChatModel` is not OpenAI-compatible; it loads weights with `mlx_lm.load` and generates with `mlx_lm.generate` / `mlx_lm.stream_generate`.
+`load_chat_model("mlx/...")` 會透過 Apple 的 [`mlx-lm`](https://github.com/ml-explore/mlx-lm)——M 系列晶片的原生推論框架——**在 process 內（in-process）**直接跑模型：不需要另外的 daemon 或伺服器，載入更快，在 Mac 上的記憶體用量也比 Ollama 採用的 llama.cpp 後端更省。和 Ollama 那條路徑不同，`MLXChatModel` 並非 OpenAI 相容；它用 `mlx_lm.load` 載入權重，再用 `mlx_lm.generate` / `mlx_lm.stream_generate` 生成。
 
-> **Apple Silicon only.** This provider is supported **only on Apple Silicon (macOS arm64)**. On any other platform the `mlx` extras group resolves to empty and importing the adapter raises an `ImportError` telling you MLX needs Apple Silicon. Install it with:
+> **只限 Apple Silicon：** 這個供應商只支援 Apple Silicon（macOS arm64）。在其他平台上，`mlx` 這個 extras 群組會解析成空的，import 這個 adapter 時就會丟出 `ImportError`，明白告訴你 MLX 需要 Apple Silicon。安裝方式：
 
 ```bash
 pip install cantus[mlx]
 ```
 
-Then point `load_chat_model` at any Hugging Face / MLX model id (you supply your own; cantus does not download weights for you):
+接著把 `load_chat_model` 指向任何一個 Hugging Face / MLX 的 model id（這得你自己提供；cantus 不會幫你下載權重）：
 
 ```python
 from cantus import Message, load_chat_model
@@ -139,17 +139,17 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-> **No tool use in this release.** `MLXChatModel.supports_tool_use` is `False` — mlx-lm has no native structured tool-call output, so passing a non-empty `tools` argument to `chat()` / `stream()` raises `NotImplementedError` rather than silently ignoring it. Use the Ollama path (or a cloud provider) when you need function calling.
+> **這個版本不支援 tool use：** `MLXChatModel.supports_tool_use` 是 `False`。mlx-lm 沒有原生的結構化 tool-call 輸出，所以你一旦把非空的 `tools` 參數傳給 `chat()` / `stream()`，它會直接丟出 `NotImplementedError`，而不是悄悄忽略掉。需要 function calling 時，請改走 Ollama 路徑，或乾脆用雲端供應商。
 
-## Local LLMs via omlx (MLX server)
+## 透過 omlx 跑本機 LLM（MLX 伺服器）
 
-`load_chat_model("omlx/...")` talks to a **local OpenAI-compatible MLX server** that runs as a separate process on Apple Silicon — either [`omlx`](https://omlx.ai) (default `http://localhost:8000/v1`) or [`mlx-omni-server`](https://github.com/madroidmaq/mlx-omni-server) (default `http://localhost:10240/v1`). Unlike the in-process MLX path above, `OmlxChatModel` is a thin `OpenAIChatModel` subclass, so it runs on the openai SDK with **no new dependency** — install (or reuse) the openai extras:
+`load_chat_model("omlx/...")` 會跟一台**本機、OpenAI 相容的 MLX 伺服器**對話，這台伺服器在 Apple Silicon 上以獨立 process 執行——可以是 [`omlx`](https://omlx.ai)（預設 `http://localhost:8000/v1`），也可以是 [`mlx-omni-server`](https://github.com/madroidmaq/mlx-omni-server)（預設 `http://localhost:10240/v1`）。和上面那條 in-process 的 MLX 路徑不同，`OmlxChatModel` 只是 `OpenAIChatModel` 的一層薄薄子類別，所以它直接跑在 openai SDK 上，**不需要任何新的相依套件**——裝（或沿用）openai 的 extras 就好：
 
 ```bash
 pip install cantus[openai]
 ```
 
-Start your server of choice, then point `load_chat_model` at its `/v1` endpoint. **`base_url` is required** — omlx and mlx-omni-server listen on different ports, so there is no single sensible default and you must say which one you mean:
+啟動你選的那台伺服器，再把 `load_chat_model` 指向它的 `/v1` 端點。**`base_url` 是必填的**——omlx 和 mlx-omni-server 監聽的 port 不一樣，沒有哪個單一預設值說得通，所以你得明講是哪一台：
 
 ```python
 from cantus import Message, load_chat_model
@@ -160,11 +160,11 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-> **Function calling works here.** Unlike the in-process MLX path, `OmlxChatModel.supports_tool_use` is `True` — these servers implement OpenAI-style function calling, so you can pass a `tools=` argument to `chat()` / `stream()`. And if the server is not running, `chat()` / `stream()` raise a `ConnectionError` naming the `base_url` instead of a raw httpx stack trace.
+> **這裡 function calling 是能用的：** 和 in-process 的 MLX 路徑不同，`OmlxChatModel.supports_tool_use` 是 `True`。這些伺服器有實作 OpenAI 風格的 function calling，所以你可以把 `tools=` 參數傳給 `chat()` / `stream()`。萬一伺服器沒在跑，`chat()` / `stream()` 會丟出一個點名 `base_url` 的 `ConnectionError`，不會甩你一大串原始的 httpx stack trace。
 
-## Where to go next
+## 接下來往哪走
 
-- [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
-- [`cookbook/`](./cookbook/) — runnable recipes covering workflows, multi-provider routing, retrieval, and the `cantus.serve` FastAPI app.
-- `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus import serve`).
-- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).
+- [`quickstart.md`](./quickstart.md) — Colab 優先的快速上手，透過 Google Drive 快取載入 4-bit Gemma。
+- [`cookbook/`](./cookbook/) — 一系列可直接跑的食譜，涵蓋 workflows、多供應商路由、retrieval，以及 `cantus.serve` 的 FastAPI app。
+- `cantus-agent[serve]` — 把你的 agent 包進一個 FastAPI HTTP 端點背後（`from cantus import serve`）。
+- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — 為什麼這份教學選了 `cloudflared` 而不是 `ngrok`（免費隨機子網域、不會留下 auth token、`Ctrl-C` 收得乾淨俐落）。

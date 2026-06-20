@@ -1,10 +1,10 @@
 # Cookbook：實務小技巧（Tips）
 
-這份文件收集 cantus 上「可有可無，但用了會輕鬆很多」的小技巧。每條都附最小可跑的範例。
+這份文件收集一些 cantus 上「可有可無，但用了之後每天工作會輕鬆很多」的小技巧。每一條都附上最小、可以直接跑的範例。
 
 ## 1. Pydantic 用法：可選參數、預設值、型別 validation
 
-skill 的 args schema 從 function signature 推導，所以 type hint 跟預設值會直接決定 LLM 看到的 schema：
+skill 的 args schema 是從 function signature 推導出來的，所以你寫的 type hint 跟預設值，會直接決定 LLM 看到的 schema 長什麼樣子：
 
 ```python
 from typing import Optional
@@ -24,11 +24,11 @@ print(search_book.spec_for_llm()["args_schema"])
 # lang.anyOf 包含 null
 ```
 
-LLM 傳 `n="3"` 時 Pydantic 會自動 coerce 成 `int(3)`；傳 `n="abc"` 才會 raise。
+當 LLM 傳進 `n="3"`，Pydantic 會自動 coerce 成 `int(3)`；只有傳 `n="abc"` 這種轉不過去的才會 raise。
 
 ## 2. Docstring 寫法（Google style `Args:`）
 
-第一段被當作 description；`Args:` block 被 `parse_args_block` 解析存進 `_args_descriptions`，未來可以餵給 LLM 當 per-arg 說明：
+第一段文字會被當成 description；`Args:` 這個 block 則由 `parse_args_block` 解析、存進 `_args_descriptions`，之後可以餵給 LLM 當作每個參數的逐項說明：
 
 ```python
 @skill
@@ -45,11 +45,11 @@ def search_book(topic: str, n: int = 5) -> str:
     ...
 ```
 
-格式要嚴格：`name: description` 一行一個，name 跟冒號之間可以加 `(type)`。第一個段落（空行前）才是 description。
+格式要求很嚴格：一行只能寫一個 `name: description`，name 跟冒號之間可以選擇性地加上 `(type)`。只有第一個段落（也就是第一個空行之前的部分）會被當成 description。
 
-## 3. 三入口何時用哪一種
+## 3. 三種入口，何時用哪一種
 
-framework 提供三種登錄 protocol 的方式，產出的 `Skill` instance 完全等價：
+註冊一個 skill 有三種寫法，三種寫出來的 `Skill` instance 完全等價：
 
 ```python
 # (A) Decorator —— 90% 場景，最簡。
@@ -67,21 +67,21 @@ class MySkill(Skill):
     def run(self, x: int) -> int: ...
 ```
 
-口訣：「沒狀態用 (A)，第三方用 (B)，有狀態用 (C)」。
+一個好記的口訣：沒有狀態就用 (A)；要包別人寫好的 function 就用 (B)；有狀態就用 (C)。
 
-## 4. Memory 三實作的成本對比
+## 4. 比較三種 Memory 實作
 
-| 實作 | 依賴 | remember | recall | 適合規模 |
+| 實作 | 依賴 | remember | recall | 適合用在 |
 |---|---|---|---|---|
-| `ShortTermMemory(n)` | 無 | O(1) | O(N) 但 N≤n | 對話 < 20 turn |
-| `BM25Memory` | rank-bm25 | O(1)（lazy index） | O(N·tokens) | 對話 100-10000 turn |
+| `ShortTermMemory(n)` | 無 | O(1) | O(N)，但 N≤n | 少於 20 輪的對話 |
+| `BM25Memory` | rank-bm25 | O(1)（lazy index） | O(N·tokens) | 100 到 10,000 輪的對話 |
 | `EmbeddingMemory` | sentence-transformers | O(1)（lazy encode） | O(N·D) + 第一次 encode | 跨語言、語意檢索 |
 
-EmbeddingMemory 第一次 `recall` 會 download model（~80MB），且把整個語料庫 encode 一次；第二次起只 encode query。BM25 完全跑在 CPU，沒有 model 下載成本。
+`EmbeddingMemory.recall` 第一次呼叫時會下載 model（約 80MB），並把整個語料庫 encode 一次；之後再呼叫就只需要 encode query。BM25 則完全跑在 CPU 上，不用下載任何 model。
 
-## 5. `@debug` 開了一個，其他要不要也開
+## 5. 某個 skill 開了 `@debug`，其他的也要開嗎？
 
-不必。`@debug` 是 per-protocol opt-in，只 wrap 你貼的那個：
+不必。`@debug` 是逐個 skill 各自決定要不要開（per-skill opt-in），只會 wrap 你貼上去的那一個：
 
 ```python
 @debug
@@ -92,27 +92,27 @@ def search_book(topic: str): ...   # 有 trace
 def parse_book_list(text: str): ...   # 沒 trace
 ```
 
-建議策略：先全部安靜跑一遍；發現某個 skill 行為不對，**只**對它加 `@debug`，輸出量會少很多、好讀很多。Agent loop 本身永遠安靜（spec 硬要求），不會污染 stdout。
+一個不錯的做法：先讓全部 skill 安靜地跑一遍，等到發現某個 skill 行為怪怪的，再**只**對那一個加上 `@debug`。這樣輸出量會少很多，也好讀很多。至於 agent loop 本身則永遠是安靜的（這是一條硬性的 spec 要求），不會污染 stdout。
 
-## 6. 把 Inspector trace 印到檔案而非 stdout
+## 6. 把 Inspector trace 寫到檔案，而不是印到 stdout
 
-`Inspector.replay` 跟 `summary` 都吃 `out` 參數，預設是 `sys.stdout`。傳一個 file handle 進去就轉向：
+`Inspector.replay` 跟 `Inspector.summary` 都接受一個 `out` 參數，預設值是 `sys.stdout`。只要傳一個 file handle 進去，輸出就會轉向到檔案：
 
 ```python
 from cantus import Inspector
 
-state = agent.run("找 3 本科幻", max_iterations=8)
+state = agent.run("找 3 本科幻小說", max_iterations=8)
 
 with open("/tmp/run_trace.log", "w", encoding="utf-8") as f:
     Inspector(state.stream).replay(out=f)
     Inspector(state.stream).summary(out=f)
 ```
 
-Colab 上常用：開一個 cell 印到檔，再用 `!cat /tmp/run_trace.log | head -50` 看片段；比直接印一大坨到 cell output 好讀。
+在 Colab 上有個常用的做法：先在一個 cell 把 trace 寫到檔案，再用 `!cat /tmp/run_trace.log | head -50` 讀其中一段。這樣比把一大坨 trace 直接倒進 cell output 好讀多了。
 
-## 7. 額外技巧：tests 隔離用 `Registry()` 而非全域
+## 7. 加碼：測試隔離請用自己的 `Registry()`，別用全域那一個
 
-`get_registry()` 回傳 process-wide singleton，跨 test case 會污染。寫測試時直接用 `Registry()` 自己一個：
+`get_registry()` 回傳的是一個 process 範圍的 singleton，狀態會在不同 test case 之間互相污染。寫測試時，請改成自己建一個 `Registry()`：
 
 ```python
 from cantus.core.registry import Registry
@@ -122,4 +122,4 @@ reg.register("skill", my_skill_instance)
 agent = Agent(model=mock, registry=reg)
 ```
 
-`get_registry().clear()` 也可以，但會影響整個 session 的其他 cell。
+用 `get_registry().clear()` 也行，但它會把同一個 session 裡其他 cell 也一起清掉，連帶受影響。

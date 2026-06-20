@@ -1,12 +1,12 @@
 # Cookbook：用 cantus 接 Discord（echo bot + slash command）
 
-這份 walkthrough 帶你從零把一個 Discord application 接到 `cantus serve`，跑通 echo bot（成員在 server 講話 → bot 回訊息）跟一個 `/ping` slash command。Discord 比 LINE / Telegram 多一層複雜度：cantus 同時需要 **Gateway WebSocket**（持續連線收事件）和 **Interactions HTTP**（Ed25519 簽章驗證 slash command / 按鈕回呼）。所有指令都假設你已經跑過 [`docs/quickstart-desktop.md`](./quickstart-desktop.md) 的「Serve via CLI」與「Expose via Cloudflare Tunnel」兩段。
+這份 walkthrough 帶你從零把一個 Discord application 接到 `cantus serve`，跑通 echo bot（成員在 server 講話 → bot 回訊息）跟一個 `/ping` slash command。Discord 比 LINE / Telegram 多一層複雜度：cantus 同時需要 **Gateway WebSocket**（持續連線收事件）和 **Interactions HTTP**（Ed25519 簽章驗證 slash command / 按鈕回呼）。所有指令都假設你已經跑過 [`docs/quickstart-desktop.md`](../quickstart-desktop.md) 的「Serve via CLI」與「Expose via Cloudflare Tunnel」兩段。
 
 ## 0. 你會用到的東西
 
 - 一個 [Discord Developer Portal](https://discord.com/developers/applications) 帳號（你的一般 Discord 帳號就可以登入）。
 - 你自己擁有管理員權限的 Discord 伺服器（測試用，新開一個也行）。
-- 已安裝 `cantus-agent[serve]>=0.4.6` 與 `cloudflared`。
+- 已安裝 `cantus-agent[serve]>=0.5.0` 與 `cloudflared`。
 - 一台筆電，OS 不重要 — `pynacl` 與 `websockets` 在 Linux x86_64 / macOS arm64+x86_64 / Windows AMD64 都有 prebuilt wheel。
 
 ## 1. 在 Discord Developer Portal 開一個 application
@@ -53,7 +53,7 @@ export CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY="<public key hex string from step
 export CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID="<application id from step 1>"
 ```
 
-cantus v0.4.6 仍**不**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己的腳本。
+cantus v0.5.0 仍**不**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己的腳本。
 
 ## 4. 啟動 cantus serve
 
@@ -84,7 +84,7 @@ cloudflared tunnel --url http://127.0.0.1:8765
 1. **Interactions Endpoint URL** 貼上 `https://<slug>.trycloudflare.com/channels/discord/interactions`。
 2. 點 **Save Changes**。Discord 會立刻送一個 type=1 的 Ping interaction 來驗 URL：
    - cantus 看到正確的 `X-Signature-Ed25519` + `X-Signature-Timestamp` 就回 `{"type":1}`（PONG），URL 通過。
-   - 簽章對不上就回 401 `{"detail":"Authentication required"}`，Discord Console 顯示「validation failed」。**90% 的失敗原因是 public key 貼錯，不是 cantus 程式問題**。
+   - 簽章對不上就回 401 `{"detail":"Authentication required"}`，Discord Console 顯示「validation failed」。這裡幾乎每一次驗證失敗，都是貼進去的 public key 跟 application 的對不上，而**不是** cantus 的 bug ── 在懷疑其他原因之前，先回 **General Information** 重新複製一次 Public Key。
 
 ## 7. 手動註冊一個 slash command（cantus 不代註冊）
 
@@ -154,7 +154,7 @@ python scripts/worker.py
 ## 9. 常見坑
 
 - **MESSAGE_CREATE event 的 `content` 是空字串**：你忘了在 Developer Portal **Bot** tab 開 MESSAGE CONTENT INTENT。
-- **Discord Console 顯示「validation failed」**：90% 是 `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY` 貼錯（少了字元、貼到 client secret），10% 是 Cloudflare Tunnel 還沒起來。
+- **Discord Console 顯示「validation failed」**：先檢查 public key ── `CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY` 通常是少了一個字元，或根本是貼到了 client secret。如果 key 沒問題，那大概是 Cloudflare Tunnel 還沒起來。
 - **`ChannelSendError: discord send failed: HTTP 403 Missing Permissions`**：bot 在那個頻道沒有 `Send Messages` 權限，回去 OAuth 重新邀請或在頻道設定加權限。
 - **`ChannelSendError: discord send failed: HTTP 401 Unauthorized`**：bot token 失效（你 reset 了卻沒更新 env var）。
 - **bot 一直 reconnect**：看 cantus log 印的 `last_error`。Discord 對 IDENTIFY 有 1000/24h rate limit，連續 10 次失敗 cantus 會 stop reconnect 而**不**會 crash，但 bot 會掛在 offline。重啟 cantus 前先確認 token 正確。

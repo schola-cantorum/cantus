@@ -1,22 +1,22 @@
 # `@validator` Hook Helper
 
-## What it is + when to use
+## 它是什麼、什麼時候用
 
-Validator 是一個 predicate：吃某支 skill 的回傳值，回傳 `Result(ok, value, feedback)`。它是 agent 跟 LLM 之間「請重做一次」的橋樑 — 當模型呼叫的 skill 語法對但語意錯（ISBN checksum 不通、回答字數超標、某個業務規則沒滿足），validator 把錯誤敘述塞進 `Result.failure(...)` 的 feedback，agent loop 會把它包成 `ValidationErrorObservation(validator_name=..., feedback=...)` 餵回模型，下一輪 turn 才有機會修正。
+Validator 本質上就是一個 predicate（判斷式）：它吃進某支 skill 的回傳值，然後吐回一個 `Result(ok, value, feedback)`。你可以把它想成 agent 對 LLM 說「這次不行，請再試一次」的那座橋。有時候模型呼叫 skill 的語法完全正確，結果卻是錯的：ISBN 的 checksum 過不了、回答超過字數上限、某條業務規則沒有被滿足。遇到這些情況，validator 會把問題用白話寫進 `Result.failure(...)` 的 `feedback` 欄位。Agent loop 再把它包成一個 `ValidationErrorObservation(validator_name=..., feedback=...)` 餵回模型，這樣下一輪 turn 才有機會把錯誤修掉。
 
-v0.3.0 起 Validator **不**註冊到 registry。它是 hook helper，靠 `@skill(post_hook=...)` 綁到某支 skill 上，跑在「skill body 成功 return 之後、`SkillObservation` 寫進 `EventStream` 之前」。常見場景：寫了 `get_summary(topic)` 回字串，掛一個 `non_empty(text)` validator 確保非空；若 `Result.failure("empty")`，agent loop 收到 `ValidationErrorObservation(validator_name="non_empty", feedback="empty")`，模型下一輪 turn 看到 feedback 就會自己重新生成。
+從 v0.3.0 開始，validator **不會**註冊進 registry。它是一個 hook helper：你用 `@skill(post_hook=...)` 把它綁到某支特定的 skill 上，它會在「skill body 成功 return 之後、`SkillObservation` 寫進 `EventStream` 之前」這個時間點執行。舉一個常見的例子：你寫了一支 `get_summary(topic)` 回傳一段字串，然後掛上一個 `non_empty(text)` validator，確保那段字串不是空的。如果它回傳 `Result.failure("empty")`，agent loop 就會收到 `ValidationErrorObservation(validator_name="non_empty", feedback="empty")`，模型在下一輪 turn 看到這段 feedback，就會自己重新生成一份答案。
 
-import 路徑統一從 `cantus.hooks` 拿：
+所有東西都從 `cantus.hooks` import：
 
 ```python
 from cantus.hooks import validator, Validator, Result
 ```
 
-Validator 不負責「整修」資料，只負責「判斷與回饋」。如果你會想在 validator 裡 mutate 輸入，那其實要的是 analyzer 或另一支 skill。
+Validator 不負責修資料。它的工作只有兩件：做判斷、給回饋，沒了。如果你發現自己很想在 validator 裡面直接 mutate 輸入值，那你真正需要的其實是一個 analyzer，或是另外拆一支 skill。
 
 ## 兩種寫法（同一個 `ensure_isbn_valid`）
 
-### 1. Decorator entry（最常用）
+### 1. Decorator entry（最常見的寫法）
 
 ```python
 from cantus import skill
@@ -35,7 +35,7 @@ def fetch_book(title: str) -> Book:
     return _do_fetch(title)
 ```
 
-### 2. Class-first（advanced / canonical）
+### 2. Class-first（進階／標準寫法）
 
 ```python
 from cantus.hooks import Validator, Result
@@ -52,22 +52,22 @@ class EnsureIsbnValid(Validator):
 ensure_isbn_valid = EnsureIsbnValid()
 ```
 
-Class-first 適合需要在 validator 內保留設定（規則版本、tolerance、外部 schema reference）的情境；Decorator 版本最後也是合成一個等價的 subclass。
+當 validator 需要自己帶一些狀態時——例如一個規則版本號、一個容許誤差（tolerance）、或是指向外部 schema 的 reference——class-first 這種寫法就比較合適。其實在底層，decorator 那種寫法最後也是合成出一個等價的 subclass。
 
-> v0.3.0 **不**提供 function-pass entry：沒有 `register_validator(fn)` 這條路。
+> v0.3.0 **沒有**提供 function-pass entry：`cantus.hooks` 的公開介面裡並不存在 `register_validator(fn)` 這條路。
 
 ## `spec_for_llm()` 與 dispatch 行為
 
-- 同 analyzer，Validator 本身**不**直接出現在 LLM 的 system prompt 裡；它附在哪支 Skill 上，那支 Skill 的 spec JSON shape 不變，照樣只有 `{"name", "description", "args_schema"}` 三個 key。
-- post_hook 在 skill body 成功 return 後執行，吃 skill 回傳值當輸入。
-- `Result(ok=True, value=v)` → `SkillObservation(result=v)`；`Result(ok=True)` 沒給 value → 用原 skill 回傳值；`Result(ok=False, feedback=...)` → `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)`，**不**會發 `SkillObservation`。
-- 非 `Result` 的回傳值會被直接當作 skill 的新 `result` 寫進 `SkillObservation`（讓 post_hook 也能做格式整理；想嚴格判斷請固定回 `Result`）。
-- post_hook 拋例外 → `ToolErrorObservation(message="post_hook <ExcType>: <msg>")`。
+- 跟 analyzer 一樣，validator 本身**不會**直接出現在 LLM 的 system prompt 裡。它是掛在某支 skill 上的，而那支 skill 的 spec JSON 形狀完全不變——照樣只有 `{"name", "description", "args_schema"}` 這三個 key。
+- post-hook 會在 skill body 成功 return 之後執行，並把那支 skill 的回傳值當成自己的輸入。
+- `Result(ok=True, value=v)` 會產生 `SkillObservation(result=v)`。`Result(ok=True)` 但沒給 `value` 時，會退回去用 skill 原本的回傳值。`Result(ok=False, feedback=...)` 會產生 `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)`，而且**不會**發出 `SkillObservation`。
+- 如果回傳值不是 `Result`，它會被原封不動寫進 `SkillObservation`，當作這支 skill 的新 `result`。所以 post-hook 也可以順手整理一下格式。不過只要你想要一個嚴格的 pass/fail 判斷，就請固定回傳一個 `Result`。
+- 萬一 post-hook 拋出例外，你會拿到 `ToolErrorObservation(message="post_hook <ExcType>: <msg>")`。
 
 ## 常見錯誤
 
-- **忘了回傳 `Result`**：post_hook 回 `True` / `book` / `None` 都會被當作新 result 直接傳出；想嚴格判斷必須回 `Result.success(...)` 或 `Result.failure(...)`。
-- **feedback 寫得太工程師**：`"AssertionError at line 42"` 對 LLM 沒意義；要寫成模型看得懂的指示，例如 `"ISBN 必須是 13 碼，目前只看到 10 碼，請補齊。"`。
-- **拿 validator 當 fixer**：在 post_hook 裡偷偷修值再 `Result.success(...)` 是反模式；資料整修請拆 analyzer 或新 skill。
-- **試圖 `from cantus import validator`** 或 `register_validator(fn)`：`ImportError`；改用 `from cantus.hooks import validator` 與 `@skill(post_hook=fn)`。
-- **取保留名**：Validator name 不能撞到 `RESERVED_VALIDATOR_NAMES`，否則 `ReservedValidatorNameError`。
+- **忘了回傳 `Result`。** post-hook 如果回傳 `True`、`book` 或 `None`，這些值都會被當成新的 result 直接傳出去。想要一個嚴格的判斷，你就必須回傳 `Result.success(...)` 或 `Result.failure(...)`。
+- **feedback 寫得太工程師。** `"AssertionError at line 42"` 對 LLM 來說毫無意義。你要寫的是模型看得懂、而且能照著做的指示，例如：`"An ISBN must be 13 digits; only 10 are present, so add the missing digits."`
+- **把 validator 當成 fixer 用。** 在 post-hook 裡偷偷把值修好、然後回傳 `Result.success(...)`，這是一種反模式。資料的修補請搬到 analyzer 或一支新的 skill 裡。
+- **試著用 `from cantus import validator` 或 `register_validator(fn)`。** 這兩種寫法都會丟 `ImportError`。請改用 `from cantus.hooks import validator` 搭配 `@skill(post_hook=fn)`。
+- **取了保留名稱。** Validator 的 name 不能撞到 `RESERVED_VALIDATOR_NAMES`，否則會丟 `ReservedValidatorNameError`。
