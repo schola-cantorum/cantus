@@ -7,52 +7,492 @@ window.CANTUS_GRAPH = {
     "pypi_name": "cantus-agent"
   },
   "layers": [
-    { "id": "user", "name": "User code", "blurb": "What a learner writes: @skill functions, Memory subclasses, analyzer/validator hooks, and a SOUL.md identity." },
-    { "id": "protocols", "name": "Protocols & hooks", "blurb": "The two registered protocol kinds (Skill, Memory), the Analyzer/Validator hook helpers, and the cantus.workflows building blocks." },
-    { "id": "runtime", "name": "Core runtime", "blurb": "The bounded agent loop: Agent steps over Actions and Observations, records them in an EventStream, and dispatches through the Registry." },
-    { "id": "substrate", "name": "Substrate", "blurb": "Where the model and the outside world plug in: model handles and providers, the serve HTTP layer, channels, the TUI, and the environment profiles." }
+    {
+      "id": "user",
+      "name": "User code",
+      "blurb": "What a learner writes: @skill functions, Memory subclasses, analyzer/validator hooks, and a SOUL.md identity.",
+      "name_zh": "使用者程式碼",
+      "blurb_zh": "學習者自己寫的東西：@skill 函式、Memory 子類別、analyzer／validator hook，以及一份 SOUL.md 身分檔。"
+    },
+    {
+      "id": "protocols",
+      "name": "Protocols & hooks",
+      "blurb": "The two registered protocol kinds (Skill, Memory), the Analyzer/Validator hook helpers, and the cantus.workflows building blocks.",
+      "name_zh": "Protocol 與 hook",
+      "blurb_zh": "兩個註冊的 protocol kind（Skill、Memory）、Analyzer／Validator hook 輔助，以及 cantus.workflows 組合元件。"
+    },
+    {
+      "id": "runtime",
+      "name": "Core runtime",
+      "blurb": "The bounded agent loop: Agent steps over Actions and Observations, records them in an EventStream, and dispatches through the Registry.",
+      "name_zh": "核心執行期",
+      "blurb_zh": "有界的 agent 迴圈：Agent 在 Action 與 Observation 上逐步推進，記進 EventStream，並透過 Registry 派發呼叫。"
+    },
+    {
+      "id": "substrate",
+      "name": "Substrate",
+      "blurb": "Where the model and the outside world plug in: model handles and providers, the serve HTTP layer, channels, the TUI, and the environment profiles.",
+      "name_zh": "底層基座",
+      "blurb_zh": "模型與外界接上的地方：模型 handle 與 providers、serve HTTP 層、channels、TUI，以及環境設定 profile。"
+    }
   ],
   "nodes": [
-    { "id": "skill", "label": "Skill", "layer": "protocols", "kind": "protocol", "path": "cantus/protocols/skill.py", "symbols": ["@skill", "Skill", "register_skill"], "blurb": "A callable the agent can invoke. Define it three ways: @skill decorator (recommended), register_skill(fn), or subclass Skill (advanced)." },
-    { "id": "memory", "label": "Memory", "layer": "protocols", "kind": "protocol", "path": "cantus/protocols/memory.py", "symbols": ["Memory", "ShortTermMemory", "BM25Memory", "EmbeddingMemory", "AutoMemory"], "blurb": "Stateful retrieval. Class-only — there is no @memory decorator because memory needs to hold state. Ships four implementations plus an AutoMemory wrapper that exposes view/create/str_replace/delete skills." },
-    { "id": "analyzer", "label": "Analyzer (hook)", "layer": "protocols", "kind": "hook", "path": "cantus/protocols/analyzer.py", "symbols": ["@analyzer", "Analyzer", "Result"], "blurb": "A pre-loop hook helper: read the input, return a structured Result before the agent loop starts. Not a protocol kind." },
-    { "id": "validator", "label": "Validator (hook)", "layer": "protocols", "kind": "hook", "path": "cantus/protocols/validator.py", "symbols": ["@validator", "Validator", "Result"], "blurb": "A post-output hook helper: check the agent's answer and trigger a retry when it fails. Not a protocol kind." },
-    { "id": "workflows", "label": "cantus.workflows", "layer": "protocols", "kind": "module", "path": "cantus/workflows/", "symbols": ["PromptChain", "Router", "Parallel", "OrchestratorWorker", "EvaluatorOptimizer"], "blurb": "Composition building blocks that wire skills and hooks into multi-step flows." },
-    { "id": "identity", "label": "Soul (identity)", "layer": "user", "kind": "module", "path": "cantus/identity/", "symbols": ["Soul", "Soul.from_file"], "blurb": "Loads an agent persona from a six-section SOUL.md (name & role, personality, rules, tools, output format, handoffs)." },
-    { "id": "agent", "label": "Agent", "layer": "runtime", "kind": "core", "path": "cantus/core/agent.py", "symbols": ["Agent", "Agent.step", "Agent.run", "max_iterations", "max_retries"], "blurb": "The bounded loop. step() takes one read-act-observe turn; run() loops until a non-empty FinalAnswer or the iteration cap." },
-    { "id": "eventstream", "label": "EventStream", "layer": "runtime", "kind": "core", "path": "cantus/core/event_stream.py", "symbols": ["EventStream", "Action", "Observation", "FinalAnswerAction", "ValidationErrorObservation"], "blurb": "The append-only trace of every Action and Observation. Errors are wrapped as Observations, never raised out of the loop." },
-    { "id": "registry", "label": "Registry", "layer": "runtime", "kind": "core", "path": "cantus/core/registry.py", "symbols": ["Registry", "Registry.KINDS"], "blurb": "Holds the registered Skills and Memories and dispatches calls by name." },
-    { "id": "inspector", "label": "Inspector", "layer": "runtime", "kind": "core", "path": "cantus/inspect.py", "symbols": ["Inspector", "Inspector.replay", "Inspector.summary", "@debug"], "blurb": "Read-only view over an EventStream. Inspector(stream).replay() reconstructs the full run; @debug marks a Skill/hook for tracing." },
-    { "id": "grammar", "label": "Tool-call grammar", "layer": "runtime", "kind": "module", "path": "cantus/grammar/", "symbols": ["build_schema", "minLength"], "blurb": "Constrains the model's tool-call JSON. Adds minLength:1 to final_answer so a constrained decoder cannot emit an empty answer." },
-    { "id": "model", "label": "Model layer", "layer": "substrate", "kind": "module", "path": "cantus/model/", "symbols": ["mount_drive_and_load", "ModelHandle", "load_chat_model", "ChatModel", "ChatModelAsHandle"], "blurb": "Tier 1 loads local Gemma on Colab (mount_drive_and_load -> ModelHandle). Tier 2 loads any provider (load_chat_model -> ChatModel)." },
-    { "id": "providers", "label": "Model providers (8)", "layer": "substrate", "kind": "module", "path": "cantus/model/providers/", "symbols": ["openai", "anthropic", "google", "groq", "nvidia", "ollama", "mlx", "omlx"], "blurb": "Eight prefixes resolved by the factory: openai, anthropic, google, groq, nvidia (OpenAI-compatible), ollama (local), mlx (Apple Silicon, no tool use), omlx (local OpenAI-compatible server)." },
-    { "id": "adapters", "label": "Adapters", "layer": "substrate", "kind": "module", "path": "cantus/adapters/", "symbols": ["expose_as_anthropic_memory_tool", "export_as_mcp_server", "import_mcp_server", "expose_as_langchain_tool", "expose_as_dspy_tool", "expose_as_hf_tool", "expose_as_openhands_action"], "blurb": "Bridges a cantus Skill to/from other SDKs (Anthropic Memory tool, MCP, LangChain, DSPy, HuggingFace, OpenHands). Each SDK is lazily imported." },
-    { "id": "serve", "label": "serve (HTTP)", "layer": "substrate", "kind": "module", "path": "cantus/serve/", "symbols": ["serve", "Settings", "AuthMode", "require_auth", "introspection"], "blurb": "FastAPI app factory that exposes a Registry over HTTP, with auth modes none/bearer/api-key and read-only introspection endpoints." },
-    { "id": "channels", "label": "Channels (4)", "layer": "substrate", "kind": "module", "path": "cantus/serve/channels/", "symbols": ["LineWebhookChannel", "TelegramWebhookChannel", "DiscordRealtimeChannel", "GoogleChatPubSubChannel"], "blurb": "LINE + Telegram over webhooks (HMAC / secret token), Discord over a Gateway WebSocket plus Ed25519 interactions, Google Chat over Cloud Pub/Sub." },
-    { "id": "tui", "label": "cantus tui", "layer": "substrate", "kind": "module", "path": "cantus/tui/", "symbols": ["run_tui"], "blurb": "A Textual terminal dashboard that polls a running serve instance over HTTP — Dashboard, Skills, Permissions, Dataflow, and Inspector panes." },
-    { "id": "env", "label": "Environments", "layer": "substrate", "kind": "module", "path": "cantus/env/", "symbols": ["ColabEnvironment", "LocalEnvironment", "CloudOnlyEnvironment"], "blurb": "Environment profiles that decide how the model loads and where I/O goes (Colab Drive, local disk, cloud-only)." },
-    { "id": "cli", "label": "cantus CLI", "layer": "substrate", "kind": "module", "path": "cantus/cli.py", "symbols": ["cantus serve", "cantus tui"], "blurb": "Two subcommands: serve (start the FastAPI app from a registry import path) and tui (launch the dashboard against a serve URL)." }
+    {
+      "id": "skill",
+      "label": "Skill",
+      "layer": "protocols",
+      "kind": "protocol",
+      "path": "cantus/protocols/skill.py",
+      "symbols": [
+        "@skill",
+        "Skill",
+        "register_skill"
+      ],
+      "blurb": "A callable the agent can invoke. Define it three ways: @skill decorator (recommended), register_skill(fn), or subclass Skill (advanced).",
+      "label_zh": "Skill",
+      "blurb_zh": "agent 可呼叫的行為。三種定義方式：@skill decorator（推薦）、register_skill(fn)，或繼承 Skill（進階）。",
+      "col": 0.07
+    },
+    {
+      "id": "memory",
+      "label": "Memory",
+      "layer": "protocols",
+      "kind": "protocol",
+      "path": "cantus/protocols/memory.py",
+      "symbols": [
+        "Memory",
+        "ShortTermMemory",
+        "BM25Memory",
+        "EmbeddingMemory",
+        "AutoMemory"
+      ],
+      "blurb": "Stateful retrieval. Class-only — there is no @memory decorator because memory needs to hold state. Ships four implementations plus an AutoMemory wrapper that exposes view/create/str_replace/delete skills.",
+      "label_zh": "Memory",
+      "blurb_zh": "有狀態的檢索。只能用類別——沒有 @memory decorator，因為 memory 需要保存狀態。內建四種實作，外加一個 AutoMemory wrapper，對外提供 view／create／str_replace／delete 四個 skill。",
+      "col": 0.3
+    },
+    {
+      "id": "analyzer",
+      "label": "Analyzer (hook)",
+      "layer": "protocols",
+      "kind": "hook",
+      "path": "cantus/protocols/analyzer.py",
+      "symbols": [
+        "@analyzer",
+        "Analyzer",
+        "Result"
+      ],
+      "blurb": "A pre-loop hook helper: read the input, return a structured Result before the agent loop starts. Not a protocol kind.",
+      "label_zh": "Analyzer（hook）",
+      "blurb_zh": "迴圈前的 hook 輔助：讀取輸入、在 agent 迴圈開始前回傳一個結構化 Result。不是 protocol kind。",
+      "col": 0.72
+    },
+    {
+      "id": "validator",
+      "label": "Validator (hook)",
+      "layer": "protocols",
+      "kind": "hook",
+      "path": "cantus/protocols/validator.py",
+      "symbols": [
+        "@validator",
+        "Validator",
+        "Result"
+      ],
+      "blurb": "A post-output hook helper: check the agent's answer and trigger a retry when it fails. Not a protocol kind.",
+      "label_zh": "Validator（hook）",
+      "blurb_zh": "輸出後的 hook 輔助：檢查 agent 的答案，不通過就觸發重試。不是 protocol kind。",
+      "col": 0.93
+    },
+    {
+      "id": "workflows",
+      "label": "cantus.workflows",
+      "layer": "protocols",
+      "kind": "module",
+      "path": "cantus/workflows/",
+      "symbols": [
+        "PromptChain",
+        "Router",
+        "Parallel",
+        "OrchestratorWorker",
+        "EvaluatorOptimizer"
+      ],
+      "blurb": "Composition building blocks that wire skills and hooks into multi-step flows.",
+      "label_zh": "cantus.workflows",
+      "blurb_zh": "把 skill 與 hook 串成多步流程的組合元件。",
+      "col": 0.5
+    },
+    {
+      "id": "identity",
+      "label": "Soul (identity)",
+      "layer": "user",
+      "kind": "module",
+      "path": "cantus/identity/",
+      "symbols": [
+        "Soul",
+        "Soul.from_file"
+      ],
+      "blurb": "Loads an agent persona from a six-section SOUL.md (name & role, personality, rules, tools, output format, handoffs).",
+      "label_zh": "Soul（身分）",
+      "blurb_zh": "從六段式 SOUL.md 載入 agent 人設（名稱與角色、個性、規則、工具、輸出格式、handoff）。",
+      "col": 0.3
+    },
+    {
+      "id": "agent",
+      "label": "Agent",
+      "layer": "runtime",
+      "kind": "core",
+      "path": "cantus/core/agent.py",
+      "symbols": [
+        "Agent",
+        "Agent.step",
+        "Agent.run",
+        "max_iterations",
+        "max_retries"
+      ],
+      "blurb": "The bounded loop. step() takes one read-act-observe turn; run() loops until a non-empty FinalAnswer or the iteration cap.",
+      "label_zh": "Agent",
+      "blurb_zh": "有界的迴圈。step() 走一個 read-act-observe 回合；run() 一直跑到出現非空的 FinalAnswer 或達到迭代上限。",
+      "col": 0.3
+    },
+    {
+      "id": "eventstream",
+      "label": "EventStream",
+      "layer": "runtime",
+      "kind": "core",
+      "path": "cantus/core/event_stream.py",
+      "symbols": [
+        "EventStream",
+        "Action",
+        "Observation",
+        "FinalAnswerAction",
+        "ValidationErrorObservation"
+      ],
+      "blurb": "The append-only trace of every Action and Observation. Errors are wrapped as Observations, never raised out of the loop.",
+      "label_zh": "EventStream",
+      "blurb_zh": "每個 Action 與 Observation 的 append-only 軌跡。錯誤會被包成 Observation，絕不向迴圈外拋出。",
+      "col": 0.71
+    },
+    {
+      "id": "registry",
+      "label": "Registry",
+      "layer": "runtime",
+      "kind": "core",
+      "path": "cantus/core/registry.py",
+      "symbols": [
+        "Registry",
+        "Registry.KINDS"
+      ],
+      "blurb": "Holds the registered Skills and Memories and dispatches calls by name.",
+      "label_zh": "Registry",
+      "blurb_zh": "保存已註冊的 Skill 與 Memory，並依名稱派發呼叫。",
+      "col": 0.52
+    },
+    {
+      "id": "inspector",
+      "label": "Inspector",
+      "layer": "runtime",
+      "kind": "core",
+      "path": "cantus/inspect.py",
+      "symbols": [
+        "Inspector",
+        "Inspector.replay",
+        "Inspector.summary",
+        "@debug"
+      ],
+      "blurb": "Read-only view over an EventStream. Inspector(stream).replay() reconstructs the full run; @debug marks a Skill/hook for tracing.",
+      "label_zh": "Inspector",
+      "blurb_zh": "對 EventStream 的唯讀檢視。Inspector(stream).replay() 重建整段執行；@debug 把某個 Skill／hook 標記為可追蹤。",
+      "col": 0.93
+    },
+    {
+      "id": "grammar",
+      "label": "Tool-call grammar",
+      "layer": "runtime",
+      "kind": "module",
+      "path": "cantus/grammar/",
+      "symbols": [
+        "build_schema",
+        "minLength"
+      ],
+      "blurb": "Constrains the model's tool-call JSON. Adds minLength:1 to final_answer so a constrained decoder cannot emit an empty answer.",
+      "label_zh": "Tool-call 文法",
+      "blurb_zh": "約束模型的 tool-call JSON。對 final_answer 加上 minLength:1，讓受約束的 decoder 不可能吐出空答案。",
+      "col": 0.07
+    },
+    {
+      "id": "model",
+      "label": "Model layer",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/model/",
+      "symbols": [
+        "mount_drive_and_load",
+        "ModelHandle",
+        "load_chat_model",
+        "ChatModel",
+        "ChatModelAsHandle"
+      ],
+      "blurb": "Tier 1 loads local Gemma on Colab (mount_drive_and_load -> ModelHandle). Tier 2 loads any provider (load_chat_model -> ChatModel).",
+      "label_zh": "模型層",
+      "blurb_zh": "Tier 1 在 Colab 載入本機 Gemma（mount_drive_and_load → ModelHandle）。Tier 2 載入任一 provider（load_chat_model → ChatModel）。",
+      "col": 0.3
+    },
+    {
+      "id": "providers",
+      "label": "Model providers (8)",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/model/providers/",
+      "symbols": [
+        "openai",
+        "anthropic",
+        "google",
+        "groq",
+        "nvidia",
+        "ollama",
+        "mlx",
+        "omlx"
+      ],
+      "blurb": "Eight prefixes resolved by the factory: openai, anthropic, google, groq, nvidia (OpenAI-compatible), ollama (local), mlx (Apple Silicon, no tool use), omlx (local OpenAI-compatible server).",
+      "label_zh": "模型 providers（8 種）",
+      "blurb_zh": "工廠解析的八個前綴：openai、anthropic、google、groq、nvidia（OpenAI-compatible）、ollama（本機）、mlx（Apple Silicon、不支援 tool use）、omlx（本機 OpenAI-compatible 伺服器）。",
+      "col": 0.16
+    },
+    {
+      "id": "adapters",
+      "label": "Adapters",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/adapters/",
+      "symbols": [
+        "expose_as_anthropic_memory_tool",
+        "export_as_mcp_server",
+        "import_mcp_server",
+        "expose_as_langchain_tool",
+        "expose_as_dspy_tool",
+        "expose_as_hf_tool",
+        "expose_as_openhands_action"
+      ],
+      "blurb": "Bridges a cantus Skill to/from other SDKs (Anthropic Memory tool, MCP, LangChain, DSPy, HuggingFace, OpenHands). Each SDK is lazily imported.",
+      "label_zh": "Adapters",
+      "blurb_zh": "把 cantus Skill 與其他 SDK 互相橋接（Anthropic Memory tool、MCP、LangChain、DSPy、HuggingFace、OpenHands）。每個 SDK 都是 lazy import。",
+      "col": 0.43
+    },
+    {
+      "id": "serve",
+      "label": "serve (HTTP)",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/serve/",
+      "symbols": [
+        "serve",
+        "Settings",
+        "AuthMode",
+        "require_auth",
+        "introspection"
+      ],
+      "blurb": "FastAPI app factory that exposes a Registry over HTTP, with auth modes none/bearer/api-key and read-only introspection endpoints.",
+      "label_zh": "serve（HTTP）",
+      "blurb_zh": "把 Registry 以 HTTP 對外暴露的 FastAPI app 工廠，支援 none／bearer／api-key 三種 auth 模式與唯讀的 introspection 端點。",
+      "col": 0.57
+    },
+    {
+      "id": "channels",
+      "label": "Channels (4)",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/serve/channels/",
+      "symbols": [
+        "LineWebhookChannel",
+        "TelegramWebhookChannel",
+        "DiscordRealtimeChannel",
+        "GoogleChatPubSubChannel"
+      ],
+      "blurb": "LINE + Telegram over webhooks (HMAC / secret token), Discord over a Gateway WebSocket plus Ed25519 interactions, Google Chat over Cloud Pub/Sub.",
+      "label_zh": "Channels（4 種）",
+      "blurb_zh": "LINE＋Telegram 走 webhook（HMAC／secret token）、Discord 走 Gateway WebSocket 加 Ed25519 interactions、Google Chat 走 Cloud Pub/Sub。",
+      "col": 0.83
+    },
+    {
+      "id": "tui",
+      "label": "cantus tui",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/tui/",
+      "symbols": [
+        "run_tui"
+      ],
+      "blurb": "A Textual terminal dashboard that polls a running serve instance over HTTP — Dashboard, Skills, Permissions, Dataflow, and Inspector panes.",
+      "label_zh": "cantus tui",
+      "blurb_zh": "用 Textual 寫的終端機儀表板，透過 HTTP 輪詢執行中的 serve——Dashboard、Skills、Permissions、Dataflow、Inspector 五個分頁。",
+      "col": 0.96
+    },
+    {
+      "id": "env",
+      "label": "Environments",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/env/",
+      "symbols": [
+        "ColabEnvironment",
+        "LocalEnvironment",
+        "CloudOnlyEnvironment"
+      ],
+      "blurb": "Environment profiles that decide how the model loads and where I/O goes (Colab Drive, local disk, cloud-only).",
+      "label_zh": "環境設定",
+      "blurb_zh": "決定模型怎麼載入、I/O 去哪的環境 profile（Colab Drive、本機磁碟、cloud-only）。",
+      "col": 0.03
+    },
+    {
+      "id": "cli",
+      "label": "cantus CLI",
+      "layer": "substrate",
+      "kind": "module",
+      "path": "cantus/cli.py",
+      "symbols": [
+        "cantus serve",
+        "cantus tui"
+      ],
+      "blurb": "Two subcommands: serve (start the FastAPI app from a registry import path) and tui (launch the dashboard against a serve URL).",
+      "label_zh": "cantus CLI",
+      "blurb_zh": "兩個子指令：serve（從 registry import 路徑啟動 FastAPI app）與 tui（對某個 serve URL 啟動儀表板）。",
+      "col": 0.7
+    }
   ],
   "edges": [
-    { "from": "skill", "to": "registry", "kind": "registers", "label": "registered in" },
-    { "from": "memory", "to": "registry", "kind": "registers", "label": "registered in" },
-    { "from": "agent", "to": "registry", "kind": "dispatches", "label": "dispatches via" },
-    { "from": "agent", "to": "eventstream", "kind": "writes", "label": "records into" },
-    { "from": "agent", "to": "grammar", "kind": "uses", "label": "constrains tool calls with" },
-    { "from": "agent", "to": "model", "kind": "uses", "label": "generates with" },
-    { "from": "analyzer", "to": "agent", "kind": "hooks", "label": "runs before" },
-    { "from": "validator", "to": "agent", "kind": "hooks", "label": "checks output of" },
-    { "from": "workflows", "to": "skill", "kind": "composes", "label": "composes" },
-    { "from": "inspector", "to": "eventstream", "kind": "reads", "label": "replays" },
-    { "from": "model", "to": "providers", "kind": "contains", "label": "Tier 2 providers" },
-    { "from": "agent", "to": "identity", "kind": "uses", "label": "persona from" },
-    { "from": "serve", "to": "registry", "kind": "exposes", "label": "exposes over HTTP" },
-    { "from": "serve", "to": "channels", "kind": "mounts", "label": "mounts" },
-    { "from": "tui", "to": "serve", "kind": "polls", "label": "polls" },
-    { "from": "channels", "to": "agent", "kind": "drives", "label": "delivers messages to" },
-    { "from": "adapters", "to": "skill", "kind": "bridges", "label": "bridges" },
-    { "from": "cli", "to": "serve", "kind": "starts", "label": "starts" },
-    { "from": "cli", "to": "tui", "kind": "starts", "label": "starts" }
+    {
+      "from": "skill",
+      "to": "registry",
+      "kind": "registers",
+      "label": "registered in",
+      "label_zh": "註冊於"
+    },
+    {
+      "from": "memory",
+      "to": "registry",
+      "kind": "registers",
+      "label": "registered in",
+      "label_zh": "註冊於"
+    },
+    {
+      "from": "agent",
+      "to": "registry",
+      "kind": "dispatches",
+      "label": "dispatches via",
+      "label_zh": "經由其派發"
+    },
+    {
+      "from": "agent",
+      "to": "eventstream",
+      "kind": "writes",
+      "label": "records into",
+      "label_zh": "記錄進"
+    },
+    {
+      "from": "agent",
+      "to": "grammar",
+      "kind": "uses",
+      "label": "constrains tool calls with",
+      "label_zh": "用其約束 tool call"
+    },
+    {
+      "from": "agent",
+      "to": "model",
+      "kind": "uses",
+      "label": "generates with",
+      "label_zh": "用其生成"
+    },
+    {
+      "from": "analyzer",
+      "to": "agent",
+      "kind": "hooks",
+      "label": "runs before",
+      "label_zh": "在其之前執行"
+    },
+    {
+      "from": "validator",
+      "to": "agent",
+      "kind": "hooks",
+      "label": "checks output of",
+      "label_zh": "檢查其輸出"
+    },
+    {
+      "from": "workflows",
+      "to": "skill",
+      "kind": "composes",
+      "label": "composes",
+      "label_zh": "組合"
+    },
+    {
+      "from": "inspector",
+      "to": "eventstream",
+      "kind": "reads",
+      "label": "replays",
+      "label_zh": "重播"
+    },
+    {
+      "from": "model",
+      "to": "providers",
+      "kind": "contains",
+      "label": "Tier 2 providers",
+      "label_zh": "Tier 2 providers"
+    },
+    {
+      "from": "agent",
+      "to": "identity",
+      "kind": "uses",
+      "label": "persona from",
+      "label_zh": "人設來自"
+    },
+    {
+      "from": "serve",
+      "to": "registry",
+      "kind": "exposes",
+      "label": "exposes over HTTP",
+      "label_zh": "以 HTTP 暴露"
+    },
+    {
+      "from": "serve",
+      "to": "channels",
+      "kind": "mounts",
+      "label": "mounts",
+      "label_zh": "掛載"
+    },
+    {
+      "from": "tui",
+      "to": "serve",
+      "kind": "polls",
+      "label": "polls",
+      "label_zh": "輪詢"
+    },
+    {
+      "from": "channels",
+      "to": "agent",
+      "kind": "drives",
+      "label": "delivers messages to",
+      "label_zh": "把訊息送進"
+    },
+    {
+      "from": "adapters",
+      "to": "skill",
+      "kind": "bridges",
+      "label": "bridges",
+      "label_zh": "橋接"
+    },
+    {
+      "from": "cli",
+      "to": "serve",
+      "kind": "starts",
+      "label": "starts",
+      "label_zh": "啟動"
+    },
+    {
+      "from": "cli",
+      "to": "tui",
+      "kind": "starts",
+      "label": "starts",
+      "label_zh": "啟動"
+    }
   ],
   "scenarios": [
     {
@@ -60,48 +500,131 @@ window.CANTUS_GRAPH = {
       "title": "Colab agent loop (local Gemma)",
       "blurb": "A student runs an agent inside a notebook against 4-bit Gemma.",
       "steps": [
-        { "node": "model", "action": "mount_drive_and_load(variant='E4B') returns a ModelHandle." },
-        { "node": "skill", "action": "Student-written @skill functions are registered." },
-        { "node": "agent", "action": "Agent(model=handle).run(query) starts the bounded loop." },
-        { "node": "grammar", "action": "Each turn the model emits a tool call constrained by the schema (final_answer minLength:1)." },
-        { "node": "eventstream", "action": "Every Action/Observation is appended, including any ValidationErrorObservation retries." },
-        { "node": "inspector", "action": "Inspector(state.stream).replay() shows the full trace." }
-      ]
+        {
+          "node": "model",
+          "action": "mount_drive_and_load(variant='E4B') returns a ModelHandle.",
+          "action_zh": "mount_drive_and_load(variant='E4B') 回傳一個 ModelHandle。"
+        },
+        {
+          "node": "skill",
+          "action": "Student-written @skill functions are registered.",
+          "action_zh": "學生寫的 @skill 函式被註冊起來。"
+        },
+        {
+          "node": "agent",
+          "action": "Agent(model=handle).run(query) starts the bounded loop.",
+          "action_zh": "Agent(model=handle).run(query) 啟動有界迴圈。"
+        },
+        {
+          "node": "grammar",
+          "action": "Each turn the model emits a tool call constrained by the schema (final_answer minLength:1).",
+          "action_zh": "每個回合，模型吐出受 schema 約束的 tool call（final_answer minLength:1）。"
+        },
+        {
+          "node": "eventstream",
+          "action": "Every Action/Observation is appended, including any ValidationErrorObservation retries.",
+          "action_zh": "每個 Action／Observation 都被附加，包含任何 ValidationErrorObservation 重試。"
+        },
+        {
+          "node": "inspector",
+          "action": "Inspector(state.stream).replay() shows the full trace.",
+          "action_zh": "Inspector(state.stream).replay() 顯示完整軌跡。"
+        }
+      ],
+      "title_zh": "Colab agent 迴圈（本機 Gemma）",
+      "blurb_zh": "學生在 notebook 裡對 4-bit Gemma 跑一個 agent。"
     },
     {
       "id": "cloud",
       "title": "Multi-provider cloud model",
       "blurb": "The same agent code points at a cloud provider instead of local Gemma.",
       "steps": [
-        { "node": "model", "action": "load_chat_model('anthropic/claude-sonnet-4-6') returns a ChatModel." },
-        { "node": "providers", "action": "The prefix selects the provider adapter; its SDK is lazily imported." },
-        { "node": "model", "action": "ChatModelAsHandle wraps the ChatModel so the Agent's Tier 1 protocol still applies." },
-        { "node": "agent", "action": "Agent(model=handle).run(query) — the loop is identical to the Colab path." }
-      ]
+        {
+          "node": "model",
+          "action": "load_chat_model('anthropic/claude-sonnet-4-6') returns a ChatModel.",
+          "action_zh": "load_chat_model('anthropic/claude-sonnet-4-6') 回傳一個 ChatModel。"
+        },
+        {
+          "node": "providers",
+          "action": "The prefix selects the provider adapter; its SDK is lazily imported.",
+          "action_zh": "前綴選出 provider adapter；它的 SDK 才 lazy import。"
+        },
+        {
+          "node": "model",
+          "action": "ChatModelAsHandle wraps the ChatModel so the Agent's Tier 1 protocol still applies.",
+          "action_zh": "ChatModelAsHandle 把 ChatModel 包起來，讓 Agent 的 Tier 1 protocol 照樣適用。"
+        },
+        {
+          "node": "agent",
+          "action": "Agent(model=handle).run(query) — the loop is identical to the Colab path.",
+          "action_zh": "Agent(model=handle).run(query)——迴圈跟 Colab 路徑完全一樣。"
+        }
+      ],
+      "title_zh": "多 provider 雲端模型",
+      "blurb_zh": "同一份 agent 程式碼改指向雲端 provider，而非本機 Gemma。"
     },
     {
       "id": "channel",
       "title": "Serve + channel inbound (LINE)",
       "blurb": "A LINE message reaches a deployed agent and a reply goes back.",
       "steps": [
-        { "node": "cli", "action": "cantus serve --registry-import app:registry --channels ... starts the app." },
-        { "node": "serve", "action": "The FastAPI app mounts the LINE webhook route and validates the HMAC-SHA256 signature." },
-        { "node": "channels", "action": "LineWebhookChannel parses the inbound message." },
-        { "node": "agent", "action": "The registered agent processes the message and produces an answer." },
-        { "node": "channels", "action": "The channel sends the reply back via the LINE reply API." }
-      ]
+        {
+          "node": "cli",
+          "action": "cantus serve --registry-import app:registry --channels ... starts the app.",
+          "action_zh": "cantus serve --registry-import app:registry --channels ... 啟動 app。"
+        },
+        {
+          "node": "serve",
+          "action": "The FastAPI app mounts the LINE webhook route and validates the HMAC-SHA256 signature.",
+          "action_zh": "FastAPI app 掛上 LINE webhook 路由，並驗證 HMAC-SHA256 簽章。"
+        },
+        {
+          "node": "channels",
+          "action": "LineWebhookChannel parses the inbound message.",
+          "action_zh": "LineWebhookChannel 解析進站訊息。"
+        },
+        {
+          "node": "agent",
+          "action": "The registered agent processes the message and produces an answer.",
+          "action_zh": "註冊的 agent 處理訊息、產生答案。"
+        },
+        {
+          "node": "channels",
+          "action": "The channel sends the reply back via the LINE reply API.",
+          "action_zh": "channel 透過 LINE reply API 把回覆送回去。"
+        }
+      ],
+      "title_zh": "serve＋channel 進站（LINE）",
+      "blurb_zh": "一則 LINE 訊息抵達部署好的 agent，回覆再送回去。"
     },
     {
       "id": "observe",
       "title": "Live observation (TUI)",
       "blurb": "An operator watches a running server from the terminal.",
       "steps": [
-        { "node": "cli", "action": "cantus tui --url http://127.0.0.1:8765 launches the dashboard." },
-        { "node": "tui", "action": "The TUI polls the serve introspection endpoints on an interval." },
-        { "node": "serve", "action": "Read-only endpoints return skills, sessions, permissions, queues, and desensitized workflow traces." },
-        { "node": "tui", "action": "The Dashboard / Skills / Permissions / Dataflow / Inspector panes render the live state." }
-      ]
+        {
+          "node": "cli",
+          "action": "cantus tui --url http://127.0.0.1:8765 launches the dashboard.",
+          "action_zh": "cantus tui --url http://127.0.0.1:8765 啟動儀表板。"
+        },
+        {
+          "node": "tui",
+          "action": "The TUI polls the serve introspection endpoints on an interval.",
+          "action_zh": "TUI 依間隔輪詢 serve 的 introspection 端點。"
+        },
+        {
+          "node": "serve",
+          "action": "Read-only endpoints return skills, sessions, permissions, queues, and desensitized workflow traces.",
+          "action_zh": "唯讀端點回傳 skills、sessions、permissions、queues，以及去敏化的 workflow 軌跡。"
+        },
+        {
+          "node": "tui",
+          "action": "The Dashboard / Skills / Permissions / Dataflow / Inspector panes render the live state.",
+          "action_zh": "Dashboard／Skills／Permissions／Dataflow／Inspector 分頁渲染即時狀態。"
+        }
+      ],
+      "title_zh": "即時觀測（TUI）",
+      "blurb_zh": "維運者從終端機看著執行中的伺服器。"
     }
   ]
-}
-;
+};
