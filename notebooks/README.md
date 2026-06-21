@@ -2,6 +2,8 @@
 
 This directory ships ready-to-run Colab notebooks so you can experience the Cantus framework end-to-end without leaving the repo. Click the Open-in-Colab badges below to launch each notebook directly from the `v0.1.4` tag.
 
+> **Looking for the NotebookLM corpus?** These are Colab *execution* notebooks, not NotebookLM sources. The NotebookLM corpus is the generated Markdown tree under [`docs/api/`](../docs/api/) — see [`docs/llms-txt.md`](../docs/llms-txt.md) for what to upload.
+
 | Notebook | Audience | Purpose | Open in Colab |
 | --- | --- | --- | --- |
 | `task_template.ipynb` | End user (any first-time framework user) | Build your first agent in five cells: mount Drive → pick variant + install Cantus → write protocols → run agent → inspect EventStream. Pre-wired to `cantus_version="v0.1.4"`. | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.4/notebooks/task_template.ipynb) |

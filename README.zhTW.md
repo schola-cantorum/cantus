@@ -184,13 +184,9 @@ Workflows building block：
 
 文件以 **VitePress 站台**發布（原始檔在 [`docs/site/`](./docs/site/)，English + 繁體中文）——本機用 `npm run docs:build` 建置，部署到 Cloudflare Pages。給 NotebookLM 的語料產生在 [`docs/api/`](./docs/api/)，互動式手冊則是 [`cantus-manual.html`](./cantus-manual.html)。
 
-原始 Markdown 也保留在 [`docs/`](./docs/)：
+站台是 overview、quickstart、protocol 指南與 cookbook 的正本。另有兩份資源放在站台之外：
 
-- [Overview](./docs/overview.md) —— 架構與設計哲學
-- [Quickstart](./docs/quickstart.md) —— 10 分鐘從零打造第一個 agent
-- [Protocols](./docs/protocols/) —— 兩個 protocol kind 與 Analyzer ／ Validator hook helper 的設計與使用方式（流程編排請見 `cantus.workflows`）
-- [Cookbook](./docs/cookbook/) —— 模式、錯誤處理、教學提示
-- [llms.txt](./llms.txt) —— 給外部 LLM 的 priming 文件
+- [llms.txt](./llms.txt) —— 給外部 LLM 的單檔 priming 文件
 - [開發者 LLM Wiki](./docs/llm_wiki/index.md) —— cantus 內部貢獻者知識庫（研究、coding style、架構、未來工作）
 
 ### 升版指南
