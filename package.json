@@ -5,10 +5,13 @@
   "type": "module",
   "description": "Documentation site toolchain for the cantus framework (VitePress). Not published to npm.",
   "scripts": {
+    "predocs:dev": "node scripts/sync_interactive.mjs",
     "docs:dev": "vitepress dev docs/site",
+    "predocs:build": "node scripts/sync_interactive.mjs",
     "docs:build": "vitepress build docs/site",
     "docs:preview": "vitepress preview docs/site",
-    "docs:api": "node scripts/gen_docs_api.mjs"
+    "docs:api": "node scripts/gen_docs_api.mjs",
+    "sync:interactive": "node scripts/sync_interactive.mjs"
   },
   "devDependencies": {
     "vitepress": "^1.6.3"
