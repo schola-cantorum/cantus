@@ -184,13 +184,9 @@ Workflows building block:
 
 The docs are published as a **VitePress site** in English and 繁體中文, with the source under [`docs/site/`](./docs/site/). Run `npm run docs:build` to build it locally; the published site lives on Cloudflare Pages. Two other artifacts round it out: a NotebookLM-ready corpus under [`docs/api/`](./docs/api/), and an interactive manual at [`cantus-manual.html`](./cantus-manual.html).
 
-The raw Markdown also lives in [`docs/`](./docs/) — see the [docs index](./docs/README.md) for a complete table of contents:
+The site is the canonical home for the overview, quickstart, protocol guides, and cookbook. Two references live outside it:
 
-- [Overview](./docs/overview.md) — architecture and design philosophy
-- [Quickstart](./docs/quickstart.md) — from zero to first agent in 10 minutes
-- [Protocols](./docs/protocols/) — design and usage of the two protocol kinds and the Analyzer / Validator hook helpers (workflow composition lives under `cantus.workflows`)
-- [Cookbook](./docs/cookbook/) — patterns, error recipes, teaching tips
-- [llms.txt](./llms.txt) — priming document for external LLMs
+- [llms.txt](./llms.txt) — single-file priming document for external LLMs
 - [Developer LLM Wiki](./docs/llm_wiki/index.md) — internal contributor knowledge base (research, coding style, architecture, future work)
 
 ### Upgrade Guides
