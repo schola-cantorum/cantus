@@ -15,6 +15,8 @@ hero:
     - theme: alt
       text: Interactive manual
       link: /interactive/
+      target: _blank
+      rel: noopener
 
 features:
   - title: Two protocols, one loop

@@ -66,7 +66,7 @@ function nav(base: string) {
     { text: 'Overview', link: `${base}/overview` },
     { text: 'Quickstart', link: `${base}/quickstart` },
     { text: 'Protocols', link: `${base}/protocols/skill` },
-    { text: 'Interactive manual', link: '/interactive/' },
+    { text: 'Interactive manual', link: '/interactive/', target: '_blank', rel: 'noopener' },
     {
       text: 'Links',
       items: [
