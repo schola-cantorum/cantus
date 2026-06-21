@@ -1,0 +1,170 @@
+# Cantus Desktop Quickstart (Windows / macOS / Linux)
+
+Five minutes from a clean `pip` to your first `Agent.run(...)` reply, using an API-key-backed chat model. This is the recommended entry point for first-time cantus users running on a desktop or laptop (i.e. anywhere outside Google Colab).
+
+If you are running in Colab and want to load 4-bit Gemma from Google Drive, see [`quickstart.md`](./quickstart.md) instead.
+
+## Requirements
+
+- Python 3.10 or newer
+- [`uv`](https://docs.astral.sh/uv/) installed — `brew install uv` on macOS, `pipx install uv` on most systems, or the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
+- An API key from a Chat Completions provider. This walkthrough uses OpenAI; Anthropic, Google, and Groq work the same way through `load_chat_model("<provider>/<model>")`.
+
+## Five-minute walkthrough
+
+### 1. Install cantus
+
+```bash
+uv pip install cantus-agent
+```
+
+`cantus-agent` publishes wheels for Linux, macOS, and Windows. The default install pulls a single runtime dependency (`pydantic`). It does not pull `bitsandbytes` — that package is gated behind `sys_platform == 'linux'` because its 4-bit quantization kernels target CUDA and are non-functional outside Linux + CUDA.
+
+### 2. Provide an API key
+
+```bash
+# macOS / Linux
+export OPENAI_API_KEY="sk-..."
+
+# Windows PowerShell
+$env:OPENAI_API_KEY = "sk-..."
+
+# Windows cmd
+set OPENAI_API_KEY=sk-...
+```
+
+### 3. Define a skill
+
+```python
+from cantus import skill, Agent, load_chat_model
+
+@skill
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+```
+
+### 4. Load a chat model
+
+```python
+model = load_chat_model("openai/gpt-4o-mini")
+agent = Agent(model=model)
+```
+
+`load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`).
+
+### 5. Run the agent
+
+```python
+state = agent.run("What is 17 plus 25?")
+final = state.stream[-1]
+print(getattr(final, "answer", final))
+```
+
+You should see the agent invoke the `add` skill and print `42`.
+
+## Serve via CLI
+
+Once your `Registry` is exposed as a top-level binding in a module, you can start the FastAPI server from the shell — no need to write `import uvicorn` yourself:
+
+```bash
+pip install cantus-agent[serve]
+cantus serve --host 0.0.0.0 --port 8765 --registry-import myskills.app:registry
+```
+
+The CLI accepts overrides for `--host`, `--port`, `--auth-mode {none,bearer,api-key}`, `--dashboard` / `--no-dashboard`, and one or more `--channels DOTTED_PATH`. Unset flags fall through to `CANTUS_SERVE_*` env vars and finally to `Settings` defaults; press `Ctrl-C` for a graceful uvicorn shutdown.
+
+## Expose via Cloudflare Tunnel
+
+Once `cantus serve` is running on `127.0.0.1`, a single `cloudflared` invocation gives you a public HTTPS URL you can hand to a webhook (LINE, Discord, Telegram, Google Chat) without opening any inbound firewall port. Install `cloudflared` from the [official Cloudflare downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then in a second shell:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8765
+```
+
+`cloudflared` prints a randomly-assigned `https://<slug>.trycloudflare.com` URL. Press `Ctrl-C` to tear the tunnel down — the URL stops resolving immediately.
+
+**Security note.** The quick-tunnel mode shown above is unauthenticated. Anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The read-only `/introspection` endpoints are enabled by default and are just as reachable over the tunnel. `--auth-mode bearer` protects them alongside `/skills`; with `auth_mode=none`, the server prints a startup warning that `/introspection` is open. The quick-tunnel mode writes no token to disk. If you later upgrade to a named tunnel, do not commit the resulting `cert.pem` to version control — it is the long-lived credential for your tunnel namespace.
+
+## Inspect with `cantus tui`
+
+`cantus tui` is a read-only terminal dashboard over a running server's `/introspection` and `/health` endpoints. Install the `tui` extra and point it at the same server (local or tunnelled):
+
+```bash
+pip install cantus-agent[tui]
+cantus tui --url http://127.0.0.1:8765
+```
+
+It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`. Press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server. With `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment; with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY`. Treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
+
+## Local LLMs via Ollama
+
+`load_chat_model("ollama/...")` runs against a local [Ollama](https://ollama.com/download) daemon and works on macOS, Linux, and Windows without CUDA or `bitsandbytes`. The Linux-only 4-bit Gemma path (`LocalEnvironment.prepare_model`) is still available where supported, but Ollama is the recommended cross-platform local-LLM option.
+
+After installing the daemon from [https://ollama.com/download](https://ollama.com/download), pull a model:
+
+```bash
+ollama pull gemma3:4b
+```
+
+Then use it from Python exactly like any other provider:
+
+```python
+from cantus import Agent, Message, load_chat_model
+
+chat = load_chat_model("ollama/gemma3:4b")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@skill` before relying on it.
+
+## Local LLMs via MLX (Apple Silicon)
+
+`load_chat_model("mlx/...")` runs a model **in-process** through Apple's [`mlx-lm`](https://github.com/ml-explore/mlx-lm), the native inference framework for M-series chips — no separate daemon or server, faster load times, and lower memory use than the llama.cpp backend Ollama uses on a Mac. Unlike the Ollama path, `MLXChatModel` is not OpenAI-compatible; it loads weights with `mlx_lm.load` and generates with `mlx_lm.generate` / `mlx_lm.stream_generate`.
+
+> **Apple Silicon only.** This provider is supported **only on Apple Silicon (macOS arm64)**. On any other platform the `mlx` extras group resolves to empty and importing the adapter raises an `ImportError` telling you MLX needs Apple Silicon. Install it with:
+
+```bash
+pip install cantus[mlx]
+```
+
+Then point `load_chat_model` at any Hugging Face / MLX model id (you supply your own; cantus does not download weights for you):
+
+```python
+from cantus import Message, load_chat_model
+
+chat = load_chat_model("mlx/mlx-community/Mistral-7B-Instruct-v0.3-4bit")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+> **No tool use in this release.** `MLXChatModel.supports_tool_use` is `False` — mlx-lm has no native structured tool-call output, so passing a non-empty `tools` argument to `chat()` / `stream()` raises `NotImplementedError` rather than silently ignoring it. Use the Ollama path (or a cloud provider) when you need function calling.
+
+## Local LLMs via omlx (MLX server)
+
+`load_chat_model("omlx/...")` talks to a **local OpenAI-compatible MLX server** that runs as a separate process on Apple Silicon — either [`omlx`](https://omlx.ai) (default `http://localhost:8000/v1`) or [`mlx-omni-server`](https://github.com/madroidmaq/mlx-omni-server) (default `http://localhost:10240/v1`). Unlike the in-process MLX path above, `OmlxChatModel` is a thin `OpenAIChatModel` subclass, so it runs on the openai SDK with **no new dependency** — install (or reuse) the openai extras:
+
+```bash
+pip install cantus[openai]
+```
+
+Start your server of choice, then point `load_chat_model` at its `/v1` endpoint. **`base_url` is required** — omlx and mlx-omni-server listen on different ports, so there is no single sensible default and you must say which one you mean:
+
+```python
+from cantus import Message, load_chat_model
+
+# omlx defaults to :8000/v1; pass http://localhost:10240/v1 for mlx-omni-server
+chat = load_chat_model("omlx/qwen2.5-coder-7b", base_url="http://localhost:8000/v1")
+response = chat.chat([Message(role="user", content="hi")])
+print(response.message.content)
+```
+
+> **Function calling works here.** Unlike the in-process MLX path, `OmlxChatModel.supports_tool_use` is `True` — these servers implement OpenAI-style function calling, so you can pass a `tools=` argument to `chat()` / `stream()`. And if the server is not running, `chat()` / `stream()` raise a `ConnectionError` naming the `base_url` instead of a raw httpx stack trace.
+
+## Where to go next
+
+- [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
+- [`cookbook/`](./cookbook/) — runnable recipes covering workflows, multi-provider routing, retrieval, and the `cantus.serve` FastAPI app.
+- `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus import serve`).
+- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).

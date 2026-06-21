@@ -182,7 +182,9 @@ Workflows building block：
 
 ## Documentation
 
-完整文件位於 [`docs/`](./docs/)：
+文件以 **VitePress 站台**發布（原始檔在 [`docs/site/`](./docs/site/)，English + 繁體中文）——本機用 `npm run docs:build` 建置，部署到 Cloudflare Pages。給 NotebookLM 的語料產生在 [`docs/api/`](./docs/api/)，互動式手冊則是 [`cantus-manual.html`](./cantus-manual.html)。
+
+原始 Markdown 也保留在 [`docs/`](./docs/)：
 
 - [Overview](./docs/overview.md) —— 架構與設計哲學
 - [Quickstart](./docs/quickstart.md) —— 10 分鐘從零打造第一個 agent

@@ -10,7 +10,7 @@
 
 <div align="center">
 
-[Traditional Chinese](README.zhTW.md)
+[繁體中文](README.zhTW.md)
 
 </div>
 
@@ -182,7 +182,9 @@ Workflows building block:
 
 ## Documentation
 
-Full docs live in [`docs/`](./docs/) — see the [docs index](./docs/README.md) for a complete table of contents:
+The docs are published as a **VitePress site** in English and 繁體中文, with the source under [`docs/site/`](./docs/site/). Run `npm run docs:build` to build it locally; the published site lives on Cloudflare Pages. Two other artifacts round it out: a NotebookLM-ready corpus under [`docs/api/`](./docs/api/), and an interactive manual at [`cantus-manual.html`](./cantus-manual.html).
+
+The raw Markdown also lives in [`docs/`](./docs/) — see the [docs index](./docs/README.md) for a complete table of contents:
 
 - [Overview](./docs/overview.md) — architecture and design philosophy
 - [Quickstart](./docs/quickstart.md) — from zero to first agent in 10 minutes

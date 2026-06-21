@@ -1,0 +1,26 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build site + verify NotebookLM corpus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Install toolchain
+        run: npm ci
+      - name: Build the documentation site (both locales)
+        run: npm run docs:build
+      - name: Regenerate the NotebookLM corpus
+        run: npm run docs:api
+      - name: Verify the committed docs/api corpus is in sync
+        run: git diff --exit-code docs/api/
