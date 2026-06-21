@@ -15,6 +15,8 @@ hero:
     - theme: alt
       text: 互動式手冊
       link: /interactive/
+      target: _blank
+      rel: noopener
 
 features:
   - title: 兩個 protocol、一個迴圈
