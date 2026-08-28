@@ -3,7 +3,7 @@ name: v0-2-to-v0-5-roadmap
 description: Ordered roadmap from cantus v0.2.0 through v0.5.0 — 9 planned changes with target version, scope summary, and trigger condition
 topic: future_work
 sources:
-  - path: openspec/discussions/cantus-framework-shift.md
+  - external: schola-cantorum/colab-llm-agent → openspec/discussions/cantus-framework-shift.md
     title: cantus-framework-shift discussion (§ 完整切分提案 v0.2.0 ~ v0.5.0 — authoritative ordering)
 ---
 
@@ -53,7 +53,7 @@ Total engineering estimate (per discussion doc): v0.2 → v0.4 ≈ 12-16 enginee
 
 ## Cross-reference note
 
-This file's ordering and version targets are derived from `openspec/discussions/cantus-framework-shift.md` § 完整切分提案 (v0.2.0 ~ v0.5.0). If you find a mismatch between this file and that section, the **discussion document is authoritative** — update this file via a wiki-validator-passing edit, do not silently re-order.
+This file's ordering and version targets are derived from `cantus-framework-shift.md` (in the colab-llm-agent repo; not present here) § 完整切分提案 (v0.2.0 ~ v0.5.0). If you find a mismatch between this file and that section, the **discussion document is authoritative** — update this file via a wiki-validator-passing edit, do not silently re-order.
 
 ## How additions to this file work
 

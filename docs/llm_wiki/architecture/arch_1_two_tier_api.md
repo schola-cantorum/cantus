@@ -3,8 +3,8 @@ name: arch-1-two-tier-api
 description: Cantus framework principle ARCH-1 — two-tier API design where Tier 1 (lower) is explicit and teaching-transparent, Tier 2 (upper) aligns with industry abstractions
 topic: architecture
 sources:
-  - path: openspec/discussions/cantus-framework-shift.md
-    title: cantus-framework-shift discussion (authoritative source)
+  - external: schola-cantorum/colab-llm-agent → openspec/discussions/cantus-framework-shift.md
+    title: cantus-framework-shift discussion. NOT present in this repo — it lives in the colab-llm-agent repository.
   - url: https://huggingface.co/docs/transformers
     title: HuggingFace Transformers — pipeline (Tier 2) vs Auto* classes (Tier 1)
   - url: https://docs.dspy.ai/
@@ -19,7 +19,7 @@ sources:
 > - **高階 API** 必須對齊業界範式、提供 production-ready abstraction
 > - 兩者透過 backend 注入或 composition 連接（高階 API 用底層 API 實作）
 
-— `openspec/discussions/cantus-framework-shift.md` § ARCH-1
+— `cantus-framework-shift.md` § ARCH-1 (in the colab-llm-agent repo; not present here)
 
 This file is the **authoritative definition** of ARCH-1 inside the cantus wiki. Every subsequent cantus change proposal (v0.2 onwards) MUST link to this file rather than redefining the principle inline.
 
@@ -69,6 +69,6 @@ The two-tier rule guarantees both audiences are first-class.
 
 ## Where to read more
 
-- `openspec/discussions/cantus-framework-shift.md` — full discussion context, including the 12 design decisions that derived from this principle
+- `cantus-framework-shift.md` in the colab-llm-agent repo — full discussion context, including the 12 design decisions that derived from this principle (not available in this checkout)
 - `architecture/arch_2_integration_audit.md` — the audit checklist that enforces ARCH-1 boundaries
 - `research/anthropic_building_effective_agents.md` and `research/openhands_software_agent_sdk.md` — industry references that informed the principle

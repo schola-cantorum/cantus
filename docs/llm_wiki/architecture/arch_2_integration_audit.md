@@ -1,10 +1,10 @@
 ---
 name: arch-2-integration-audit
-description: Cantus framework principle ARCH-2 — every capability's spec MUST include a cross-capability integration smoke-test section covering 10 observable conditions
+description: Cantus framework principle ARCH-2 — 10 observable cross-capability integration conditions, enforced by the test suite and the Gate A/B/C release audit
 topic: architecture
 sources:
-  - path: openspec/discussions/cantus-framework-shift.md
-    title: cantus-framework-shift discussion (authoritative source — § ARCH-2 and § ARCH-2 跨 capability Audit 要求清單)
+  - external: schola-cantorum/colab-llm-agent → openspec/discussions/cantus-framework-shift.md
+    title: cantus-framework-shift discussion (§ ARCH-2 and § ARCH-2 跨 capability Audit 要求清單). NOT present in this repo — it lives in the colab-llm-agent repository.
   - url: https://docs.pydantic.dev/latest/concepts/types/#secret-types
     title: Pydantic SecretStr — non-leakage guarantees
 ---
@@ -20,13 +20,13 @@ sources:
 >
 > 這是回應「組合後容易產生難解 bug」風險的防線。
 
-— `openspec/discussions/cantus-framework-shift.md` § ARCH-2
+— `cantus-framework-shift.md` § ARCH-2 (in the colab-llm-agent repo; not present here)
 
-This file is the **authoritative checklist** for ARCH-2 inside the cantus wiki. Every subsequent cantus change proposal (v0.2 onwards) that introduces a new capability MUST include an "integration audit" section in its spec referencing this file's 10 items.
+This file is the **authoritative checklist** for ARCH-2 inside the cantus wiki.
 
 ## The 10-item audit checklist
 
-Every capability spec MUST include a section demonstrating these 10 observable conditions hold when the capability is combined with the others already in cantus. "Observable" means: a CI test, a CLI invocation, or a code-review-grep can decide pass/fail without judgement.
+These 10 conditions MUST hold when a capability is combined with the others already in cantus. "Observable" means: a CI test, a CLI invocation, or a code-review-grep can decide pass/fail without judgement. Where each one is actually checked is listed under *Where compliance actually lives* below.
 
 1. **多 capability 啟動測試** — Spinning up `cantus.serve()` with multiple channels + memory backends + agents simultaneously does not crash, does not collide on filesystem paths, and does not double-bind ports.
 2. **Secret 隔離測試** — A secret configured for channel A does not appear in channel B's log output, error trace, or HTTP response body.
@@ -43,13 +43,27 @@ Every capability spec MUST include a section demonstrating these 10 observable c
 
 Most cross-capability bugs in agent frameworks come from **emergent combinations**, not individual capabilities. A channel adapter that works in isolation may log a secret when it crashes; an authenticator that passes its unit tests may default-allow when its config is empty. The 10 items above are each anchored to a class of past incident (per discussion doc § ARCH-2): #2 echoes "secret leakage via error log" incidents in production Slack bots; #7 anchors to the LiteLLM March 2026 supply-chain attack (see `research/litellm_supply_chain_attack.md`); #8 prevents the `cantus.serve` →  `cantus.core.ModelHandle` circular pattern that would force every install to pull FastAPI.
 
-## How a change spec demonstrates compliance
+## Where compliance actually lives
 
-In `openspec/changes/<change-name>/specs/<capability>/spec.md`, add a `### Requirement: ARCH-2 integration audit` section with one Scenario per applicable item. For items that don't apply (e.g., a pure data-structure change has no `SecretStr` to test), the spec MUST explicitly state "not applicable — <reason>" rather than silently omit the item. The `spectra analyze` tool will eventually grow a checker for this; until then, code review is the enforcement.
+**Superseded convention.** This file used to require a `### Requirement: ARCH-2 integration audit` section in every change's spec delta. That convention was never adopted in practice — 0 of 56 archived spec deltas carry it — and the `spectra analyze` checker it depended on was never written. Do **not** reinstate it, and do not treat its absence from a spec delta as a finding.
+
+ARCH-2 is now enforced where it can actually fail: in the test suite.
+
+| Item | Enforced by |
+| --- | --- |
+| #8 雙層 API 不滲透, #9 Adapter 不入 core | `tests/test_integration_smoke.py` (titled "ARCH-2 integration smoke tests") |
+| #5 `SecretStr` 不 log | `tests/serve/test_security.py`, `tests/serve/channels/test_signing.py`, `tests/serve/test_config.py` |
+| #6 Auth bypass 不可發生 | `tests/test_public_api.py` and the serve auth tests |
+| #1–#4, #10 | Covered in part by the serve channel tests and the release-time tri-platform smoke matrix |
+| **#7 Supply chain check** | **NOT IMPLEMENTED — open gap.** No dependency-version scan exists anywhere in `cantus/`. |
+
+**Open gap: item #7.** It is the only item with no implementation and the only one whose subject is an *external* dependency rather than cantus's own behaviour, which is why it may belong to an existing tool (`pip-audit`, Dependabot) rather than to `cantus.config` at startup. Settle that — including who maintains the compromised-version list and whether a hit should warn or fail — during framework design, not by patching this file.
+
+Release-time enforcement for everything above is the Gate A/B/C double-gate audit, which is where the integration-level checking this principle asks for actually happens.
 
 ## Where to read more
 
-- `openspec/discussions/cantus-framework-shift.md` — full incident motivations behind each audit item
+- `cantus-framework-shift.md` in the colab-llm-agent repo — full incident motivations behind each audit item (not available in this checkout)
 - `research/litellm_supply_chain_attack.md` — anchors item #7
 - `research/fastapi_pydantic_openapi.md` — anchors items #5 and #6
 - `architecture/arch_1_two_tier_api.md` — anchors items #8 and #9
