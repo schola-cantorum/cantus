@@ -34,9 +34,17 @@ now describes this control.
   release published mid-week is caught by the next scheduled run rather than by
   the next `import cantus`.
 - The audit must cover three install groups, because the project declares
-  mutually exclusive extras and no single dependency export spans them. The
-  group carrying `litellm` — the dependency this item was written about — is the
-  one that conflicts with every provider extra, so a single-combination audit
-  would have missed the motivating case entirely.
+  mutually exclusive extras and no single dependency export spans them.
+- The first successful run corrected an assumption behind that grouping.
+  `litellm` was expected to arrive only through the agent-runtime extra; it in
+  fact arrives through `dspy` as well, and the vulnerable copy was the one in
+  the general group. The agent-runtime group resolved a newer, clean `litellm`.
+  The three-group design still holds — for coverage — but not for the reason
+  first given.
 - A third-party advisory can now turn the build red without any change to this
   repository. That is intended.
+- The first successful run found 19 advisories across five packages, all of them
+  reached through the heavy optional extras (`dspy`, `langchain`, `runtime`).
+  They are acknowledged by ID in the workflow, with the remediation tracked
+  separately: detection and remediation are separate decisions, and shipping the
+  detector was the decision recorded here.
