@@ -37,4 +37,4 @@ aborted hard during prototyping.
 - [x] A finding fails the workflow; the ignore path is documented in the workflow itself
 - [x] The audit inspects the already-installed environment, not a resolved requirements file
 - [x] A repository-configuration test asserts the workflow's existence, its three groups, and both triggers
-- [ ] The workflow is green on the current dependency set  <!-- only verifiable after a push: the `main` group installs [all,...], a resolution path CI has never exercised -->
+- [x] The workflow is green on the current dependency set  <!-- verified on PR #28: all three pip-audit jobs green against main's content. Green by way of an enumerated 19-item acknowledgement list, not an empty finding set; remediation is tracked in pending/supply-chain-backlog/01 -->
