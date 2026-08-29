@@ -336,6 +336,15 @@ conflicts = [
     [{ extra = "mlx" }, { extra = "huggingface" }],
 ]
 
+# The rule set is declared, not inherited. Ruff's *default* selection has
+# widened across releases — 0.16 turned on isort, pyupgrade and several RUF
+# rules that 0.15 left off — so a `ruff>=0.5` install makes the lint verdict
+# depend on which version happened to resolve. A check whose answer moves with
+# its tool version is not a guardrail. These four are the set this codebase has
+# been checked against for its whole life (ruff's default through 0.15).
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
 [tool.ruff.lint.per-file-ignores]
 # Colab notebooks interleave `%pip install` magics with imports (E402) and
 # pre-load names that Cell 3 student templates uncomment later (F401).

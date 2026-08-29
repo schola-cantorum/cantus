@@ -26,7 +26,7 @@ For "the framework is behaving oddly" reports, first confirm that the Cantus ver
 
 ## Code Style
 
-- **Python** — `ruff` default rules. CI runs `ruff check` over the repository as a separate lint job on every pull request, and PRs must pass it. Formatting is not enforced by any tool; match the surrounding code.
+- **Python** — `ruff`, with the rule set declared explicitly under `[tool.ruff.lint]` in `pyproject.toml` rather than left to ruff's default, which widens between releases. CI runs `ruff check` over the repository as a separate lint job on every pull request, and PRs must pass it. Formatting is not enforced by any tool; match the surrounding code.
 - **Type hints** — every public API must carry complete type hints. Internal helpers may carry partial hints when appropriate.
 - **Docstrings** — every public function and class uses a Google-style docstring with at least a summary, `Args`, and `Returns`.
 - **Naming** — protocol classes stay unprefixed (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`, `Agent`). Do not add a `Cantus` prefix.

@@ -45,6 +45,10 @@ _PYPROJECT = _ROOT / "pyproject.toml"
 # obligation this invariant exists to remove.
 _NOT_TOOLS = frozenset({"cantus", "python"})
 
+# Backticked filenames are not tool claims. Excluded by suffix rather than by
+# name so that naming a new config file never needs this module updated.
+_FILENAME_SUFFIXES = (".toml", ".md", ".py", ".yml", ".yaml", ".json", ".cfg", ".ini", ".txt")
+
 
 def _load_workflow(name: str) -> dict:
     path = _WORKFLOWS / name
@@ -91,12 +95,13 @@ def _tools_named_in(section: str) -> set[str]:
     Returns:
         Every backticked lowercase token that is not a known non-tool. The
         default is to treat a token as a tool claim, so a tool this module has
-        never heard of is still caught; CapWords tokens (protocol names,
-        exception types) are excluded structurally.
+        never heard of is still caught. Two structural exclusions: CapWords
+        tokens (protocol names, exception types) and filenames.
     """
     tokens = set(re.findall(r"`([A-Za-z][\w.-]*)`", section))
     lowercase = {t for t in tokens if re.fullmatch(r"[a-z][a-z0-9_.-]*", t)}
-    return lowercase - _NOT_TOOLS
+    named = {t for t in lowercase if not t.endswith(_FILENAME_SUFFIXES)}
+    return named - _NOT_TOOLS
 
 
 # --- The lint guardrail ---------------------------------------------------
@@ -149,6 +154,26 @@ def test_lint_job_does_not_enforce_formatting() -> None:
         )
 
 
+def test_the_lint_rule_set_is_declared_not_inherited() -> None:
+    """A check whose verdict moves with its tool version is not a guardrail.
+
+    Ruff's *default* selection widens between releases — 0.16 turned on isort,
+    pyupgrade and several RUF rules that 0.15 left off. With an unpinned
+    ``ruff>=...`` requirement that made the lint verdict depend on which version
+    happened to resolve: clean locally, 146 findings in CI. Declaring the set
+    fixes the answer regardless of which ruff runs.
+    """
+    with _PYPROJECT.open("rb") as fh:
+        cfg = tomllib.load(fh)
+
+    select = cfg.get("tool", {}).get("ruff", {}).get("lint", {}).get("select")
+
+    assert select, (
+        "[tool.ruff.lint].select is not declared, so the lint job checks "
+        "whatever rule set the installed ruff happens to default to"
+    )
+
+
 # --- The invariant that catches the next stale tool reference -------------
 
 
@@ -191,6 +216,13 @@ def test_the_invariant_catches_a_tool_it_was_never_taught_about() -> None:
     synthetic = "- **Python** — `refurb` for lint hints, `docformatter` for docstrings.\n"
 
     assert _tools_named_in(synthetic) == {"refurb", "docformatter"}
+
+
+def test_the_invariant_ignores_backticked_filenames() -> None:
+    """A config file named in prose is not a claim that a tool is installed."""
+    synthetic = "- **Python** — rule set declared in `pyproject.toml`, run by `ruff`.\n"
+
+    assert _tools_named_in(synthetic) == {"ruff"}
 
 
 def test_the_invariant_ignores_backticked_non_tools() -> None:
