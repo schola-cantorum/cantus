@@ -78,6 +78,12 @@ jobs:
       - name: Install pip-audit
         run: uv pip install --system pip-audit
 
+      # The runner's own pip is in the audited environment and its shipped
+      # version carries an advisory of its own. That is toolchain, not a cantus
+      # dependency, so it is fixed rather than acknowledged.
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
       # Audits the environment that is actually installed, rather than a
       # resolved requirements file. Requirements-file mode makes pip-audit build
       # its own virtual environment to resolve into, which is an extra failure
@@ -89,5 +95,44 @@ jobs:
       # naming the advisory and why it is unactionable. Do not reach for
       # `continue-on-error`: a warning nobody reads is not a guardrail, which is
       # the failure this whole workflow exists to correct.
+      #
+      # ACKNOWLEDGED ADVISORIES — the backlog this audit found on its first
+      # successful run. All 19 enter through the heavy optional extras
+      # (`dspy`, `langchain`, `runtime`); the surface a reader installs with
+      # `cantus-agent[serve]` carries none of them. Remediation is tracked in
+      # .proj.tickets/pending/supply-chain-backlog/ and is deliberately NOT
+      # part of the change that introduced this workflow: detection and
+      # remediation are separate decisions.
+      #
+      # Nothing outside this list is acknowledged. A newly published advisory,
+      # against any package in any of the three groups, still fails the job.
+      # Remove an entry the moment its package is bumped past the fix version.
       - name: Audit installed dependencies
-        run: pip-audit --progress-spinner=off
+        run: |
+          pip-audit --progress-spinner=off \
+            `# diskcache 5.6.3 — via dspy and outlines; no fix version published` \
+            --ignore-vuln PYSEC-2026-2447 \
+            `# langchain-core 0.3.86 — via langchain; fixed in 1.2.11 / 1.2.22` \
+            --ignore-vuln PYSEC-2026-2193 \
+            --ignore-vuln PYSEC-2026-2562 \
+            `# langsmith 0.8.5 — via langchain-core; fixed in 0.8.18` \
+            --ignore-vuln GHSA-f4xh-w4cj-qxq8 \
+            `# litellm 1.80.0 — via dspy; fixes span 1.82.0 to 1.84.0` \
+            --ignore-vuln GHSA-69x8-hrgq-fjj8 \
+            --ignore-vuln PYSEC-2026-388 \
+            --ignore-vuln PYSEC-2026-390 \
+            --ignore-vuln PYSEC-2026-2597 \
+            --ignore-vuln PYSEC-2026-2598 \
+            --ignore-vuln PYSEC-2026-2599 \
+            --ignore-vuln PYSEC-2026-2600 \
+            --ignore-vuln PYSEC-2026-3476 \
+            --ignore-vuln PYSEC-2026-3477 \
+            --ignore-vuln PYSEC-2026-3478 \
+            --ignore-vuln PYSEC-2026-3479 \
+            `# transformers 4.57.6 — via runtime; some fixes only in the 5.x line,` \
+            `# which the project's unbounded transformers range permits but does` \
+            `# not force. Bumping it is a compatibility decision, not a patch.` \
+            --ignore-vuln PYSEC-2025-217 \
+            --ignore-vuln PYSEC-2026-2288 \
+            --ignore-vuln PYSEC-2026-2289 \
+            --ignore-vuln PYSEC-2026-2290

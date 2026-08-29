@@ -157,8 +157,22 @@ the same thing described the same way.
   mutually exclusive extras, so no single dependency export can cover the whole
   surface: the agent-runtime extra conflicts with every provider extra and is
   restricted to one Python minor version, and the two local-model extras
-  conflict with each other. A single-combination scan would omit exactly the
-  transitive dependency the ARCH-2 item was written about.
+  conflict with each other.
+- The audit's first successful run corrected the assumption behind that
+  grouping. The motivating transitive dependency was expected to arrive only
+  through the agent-runtime extra; it arrives through a second optional extra as
+  well, and it was that copy — not the agent-runtime one — that was vulnerable.
+  Three groups remain right for coverage; the specific reason first given for
+  them was wrong.
+- Resolution uses the project's own resolver rather than pip. pip cannot solve
+  the largest group's dependency graph at all: it backtracks through hundreds of
+  versions and aborts. Auditing what the project's resolver installs is also
+  closer to what a user actually receives.
+- The audit's first run found 19 advisories across five packages, all reached
+  through the heavy optional extras. They are acknowledged by identifier in the
+  workflow, each with the package, the extra it enters through, and its fix
+  version. Nothing outside that enumerated list is acknowledged. Remediation is
+  tracked separately — see Out of Scope.
 
 ### Test dependencies
 
