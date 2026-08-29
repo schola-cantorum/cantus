@@ -22,7 +22,7 @@ The two terms:
 
 ## Acceptance criteria
 
-- [ ] A glossary file exists at the repository root
-- [ ] It defines both terms
-- [ ] It contains no implementation detail and no decision records
-- [ ] It does not restate vocabulary already defined in a capability specification
+- [x] A glossary file exists at the repository root
+- [x] It defines both terms
+- [x] It contains no implementation detail and no decision records
+- [x] It does not restate vocabulary already defined in a capability specification

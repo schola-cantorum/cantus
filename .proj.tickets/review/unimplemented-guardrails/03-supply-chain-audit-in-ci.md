@@ -31,10 +31,10 @@ aborted hard during prototyping.
 
 ## Acceptance criteria
 
-- [ ] A dedicated supply-chain workflow exists, separate from the test workflow
-- [ ] It is triggered by pull requests and by a weekly schedule
-- [ ] It covers all three mutually exclusive install groups
-- [ ] A finding fails the workflow; the ignore path is documented in the workflow itself
-- [ ] The audit inspects the already-installed environment, not a resolved requirements file
-- [ ] A repository-configuration test asserts the workflow's existence, its three groups, and both triggers
-- [ ] The workflow is green on the current dependency set
+- [x] A dedicated supply-chain workflow exists, separate from the test workflow
+- [x] It is triggered by pull requests and by a weekly schedule
+- [x] It covers all three mutually exclusive install groups
+- [x] A finding fails the workflow; the ignore path is documented in the workflow itself
+- [x] The audit inspects the already-installed environment, not a resolved requirements file
+- [x] A repository-configuration test asserts the workflow's existence, its three groups, and both triggers
+- [ ] The workflow is green on the current dependency set  <!-- only verifiable after a push: the `main` group installs [all,...], a resolution path CI has never exercised -->

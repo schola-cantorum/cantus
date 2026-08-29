@@ -35,11 +35,11 @@ must appear in the development dependency group. That is what catches the
 
 ## Acceptance criteria
 
-- [ ] The test workflow declares a lint job distinct from the test job
-- [ ] The lint job runs on a single operating system and a single Python version
-- [ ] The lint job runs the linter's check mode only, with no formatter check
-- [ ] The Code Style section names no tool that is absent from the dependency groups
-- [ ] The Code Style section's description of CI matches what the job does
-- [ ] A repository-configuration test asserts the lint job exists and invokes the linter
-- [ ] A repository-configuration test asserts the invariant, and names the offending tool when it fails
-- [ ] The lint job is green
+- [x] The test workflow declares a lint job distinct from the test job
+- [x] The lint job runs on a single operating system and a single Python version
+- [x] The lint job runs the linter's check mode only, with no formatter check
+- [x] The Code Style section names no tool that is absent from the dependency groups
+- [x] The Code Style section's description of CI matches what the job does
+- [x] A repository-configuration test asserts the lint job exists and invokes the linter
+- [x] A repository-configuration test asserts the invariant, and names the offending tool when it fails
+- [x] The lint job is green

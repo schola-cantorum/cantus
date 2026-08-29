@@ -19,6 +19,6 @@ ignore entry for notebooks is unrelated and stays as it is.
 
 ## Acceptance criteria
 
-- [ ] The linter reports zero findings across the repository
-- [ ] No new per-file-ignore entry was added to satisfy this
-- [ ] The full test suite still passes
+- [x] The linter reports zero findings across the repository
+- [x] No new per-file-ignore entry was added to satisfy this
+- [x] The full test suite still passes

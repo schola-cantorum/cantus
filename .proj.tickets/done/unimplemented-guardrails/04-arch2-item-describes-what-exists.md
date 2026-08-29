@@ -31,9 +31,9 @@ exact failure this feature exists to remove.
 
 ## Acceptance criteria
 
-- [ ] The checklist's supply-chain item describes the CI-side audit, not a framework-runtime scan
-- [ ] It names where the compromised-version list lives and who maintains it
-- [ ] The compliance table no longer records the item as an open gap
-- [ ] An architecture decision record captures the decision and the rejected alternative
-- [ ] The checklist and the decision record do not contradict each other
-- [ ] A repository-configuration test asserts the item no longer claims a runtime scan and is no longer an open gap
+- [x] The checklist's supply-chain item describes the CI-side audit, not a framework-runtime scan
+- [x] It names where the compromised-version list lives and who maintains it
+- [x] The compliance table no longer records the item as an open gap
+- [x] An architecture decision record captures the decision and the rejected alternative
+- [x] The checklist and the decision record do not contradict each other
+- [x] A repository-configuration test asserts the item no longer claims a runtime scan and is no longer an open gap
