@@ -110,3 +110,6 @@ node_modules/
 docs/site/.vitepress/dist/
 docs/site/.vitepress/cache/
 .understand-anything/
+
+# Handoff 文件：本機工作交接用，不進版控
+.proj.handoffs/

@@ -1,26 +1,35 @@
 # Issue tracker: `.proj.tickets/` (state-directory markdown)
 
-Issues, tickets and specs for this repo live as version-controlled markdown under two
-sibling top-level directories. There is no remote tracker; `gh issue` / `glab issue`
-are **not** used for this workflow.
+Issues, tickets and specs for this repo live as markdown under sibling top-level
+`.proj.*` directories. There is no remote tracker; `gh issue` / `glab issue` are
+**not** used for this workflow.
 
-- `.proj.tickets/` — implementation tickets, state expressed as directory
-- `.proj.spec/` — specs (the `to-spec` output), one file per feature
-
-Both are tracked in git.
+- `.proj.tickets/` — implementation tickets, state expressed as directory. Tracked.
+- `.proj.spec/` — specs (the `to-spec` output), one file per feature. Tracked.
+- `.proj.handoffs/` — session handoff documents. **Not** tracked; see below.
 
 ## Layout
 
 ```
-.proj.tickets/
+.proj.tickets/                 ← tracked
   todo/        processing/   review/
   done/        block/        pending/
     └── <feature-slug>/<NN>-<slug>.md
 
-.proj.spec/
+.proj.spec/                    ← tracked
   <feature-slug>.md            ← current
   _shipped/<feature-slug>.md   ← delivered
+
+.proj.handoffs/                ← NOT tracked (gitignored)
+  <YYYY-MM-DD>-<slug>.md       ← session handoff documents
 ```
+
+**Why `.proj.handoffs/` is the odd one out.** Tickets and specs are shared, durable
+project state, so they belong in git. A handoff is a transit document about one
+session's work in flight: it is dead once that work lands, it duplicates what the
+commits and specs already record, and keeping it would accumulate stale summaries
+that later sessions might read as current. It lives in the repo (so it survives a
+reboot, unlike the OS temp directory) but stays out of version control.
 
 `<NN>` is numbered from `01` **per feature**, in dependency order (blockers first).
 Because numbering is feature-scoped, **always reference a ticket as
