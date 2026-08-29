@@ -85,6 +85,14 @@ class _AccessTokenCache:
             try:
                 await asyncio.to_thread(self._credentials.refresh, Request())
             except BaseException:
+                # cleanup-then-reraise — the form the cantus base-exception
+                # policy permits for catching BaseException. The signal is
+                # NOT swallowed: the `raise` below re-raises it so
+                # CancelledError / KeyboardInterrupt / SystemExit keep
+                # propagating. Catching the base tier (rather than
+                # Exception) is deliberate here, so a cancellation mid-
+                # refresh still drops the half-refreshed credentials.
+                #
                 # Drop the credentials so the next call re-reads the SA
                 # file (covers on-disk rotation) and re-attempts refresh
                 # rather than retaining a broken object.

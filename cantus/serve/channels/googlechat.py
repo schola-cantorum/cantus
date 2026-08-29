@@ -219,11 +219,17 @@ class GoogleChatPubSubChannel:
         appended to the channel's internal ``deque``, then acked. Malformed
         JSON is nacked and the callback returns without raising so the
         ``SubscriberClient`` can keep running. When the underlying
-        streaming-pull future raises, ``connect()`` waits ``min(60, 2**n)``
-        seconds and reopens; after 10 consecutive failures with no
-        intervening successful delivery the method sets ``self.last_error``
-        and returns cleanly without raising — so the FastAPI lifespan
-        task does not crash.
+        streaming-pull future raises an ordinary ``Exception``,
+        ``connect()`` waits ``min(60, 2**n)`` seconds and reopens; after 10
+        consecutive failures with no intervening successful delivery the
+        method sets ``self.last_error`` and returns cleanly — so the
+        FastAPI lifespan task does not crash.
+
+        Base-tier signals are NOT absorbed by that retry loop. A
+        ``CancelledError`` raised because ``disconnect()`` cancelled the
+        pull returns cleanly; a cancellation from anywhere else, and any
+        ``KeyboardInterrupt`` / ``SystemExit``, propagates out of
+        ``connect()`` rather than being counted as a delivery failure.
         """
         attempts = 0
         while not self._disconnected:
@@ -242,7 +248,17 @@ class GoogleChatPubSubChannel:
                 attempts = 0
                 if self._disconnected:
                     return
-            except BaseException as exc:
+            except asyncio.CancelledError:
+                # disconnect() stops the pull by cancelling the streaming-pull
+                # future, which surfaces here as CancelledError. That is a
+                # shutdown, not a delivery failure, so it must not enter the
+                # backoff schedule. A cancellation that did NOT come from
+                # disconnect() is an externally-injected signal and is
+                # re-raised so it keeps propagating.
+                if self._disconnected:
+                    return
+                raise
+            except Exception as exc:
                 self.last_error = exc
                 # Gate B M4 — reset the consecutive-failure counter if any
                 # successful delivery acked since the last failure. Consumes
@@ -270,7 +286,10 @@ class GoogleChatPubSubChannel:
                 if self._subscriber is not None:
                     try:
                         self._subscriber.close()
-                    except BaseException:  # noqa: BLE001 — defensive
+                    except Exception:  # noqa: BLE001 — defensive
+                        # Ordinary close failures are tolerated; base-tier
+                        # signals (CancelledError / KeyboardInterrupt /
+                        # SystemExit) propagate by design.
                         pass
                     self._subscriber = None
 
@@ -279,7 +298,12 @@ class GoogleChatPubSubChannel:
 
         Idempotent: calling before ``connect()`` returns silently, and
         repeated calls are a no-op so the FastAPI lifespan can shut down
-        defensively without raising.
+        defensively.
+
+        Cleanup is best-effort for ordinary errors only: an ``Exception``
+        from ``cancel()`` or ``close()`` is swallowed, but a base-tier
+        signal (``CancelledError`` / ``KeyboardInterrupt`` / ``SystemExit``)
+        raised by either propagates out of ``disconnect()``.
         """
         if self._disconnected:
             return
@@ -287,12 +311,16 @@ class GoogleChatPubSubChannel:
         if self._pull_future is not None:
             try:
                 self._pull_future.cancel()
-            except BaseException:  # noqa: BLE001 — defensive
+            except Exception:  # noqa: BLE001 — defensive
+                # Ordinary cancel failures are tolerated; base-tier signals
+                # propagate by design.
                 pass
         if self._subscriber is not None:
             try:
                 self._subscriber.close()
-            except BaseException:  # noqa: BLE001 — defensive
+            except Exception:  # noqa: BLE001 — defensive
+                # Ordinary close failures are tolerated; base-tier signals
+                # propagate by design.
                 pass
             self._subscriber = None
 
@@ -340,7 +368,10 @@ class GoogleChatPubSubChannel:
             return
         try:
             self._queue.append(payload)
-        except BaseException:  # noqa: BLE001 — defensive: nack on enqueue failure
+        except Exception:  # noqa: BLE001 — defensive: nack on enqueue failure
+            # Only ordinary enqueue failures become a nack. Base-tier
+            # signals propagate so a shutdown is not mistaken for a
+            # delivery failure.
             message.nack()
             return
         message.ack()

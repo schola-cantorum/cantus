@@ -19,6 +19,7 @@ even before that phase lands.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from enum import IntEnum
@@ -314,9 +315,20 @@ class GatewayClient:
             finally:
                 if heartbeat_task is not None and not heartbeat_task.done():
                     heartbeat_task.cancel()
+                    # Narrow child-cancellation absorb — the form the
+                    # base-exception policy permits: this code just called
+                    # heartbeat_task.cancel(), so the CancelledError from
+                    # awaiting it is expected and is absorbed.
+                    #
+                    # Caveat: suppress() cannot tell that cancellation apart
+                    # from one injected into THIS task while it awaits, so a
+                    # concurrent cancel of the enclosing task is absorbed
+                    # here too. KeyboardInterrupt and SystemExit are not
+                    # caught by either clause and still propagate.
                     try:
-                        await heartbeat_task
-                    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await heartbeat_task
+                    except Exception:  # noqa: BLE001 — best-effort cleanup
                         pass
                 self._ws = None
 
