@@ -225,11 +225,13 @@ class GoogleChatPubSubChannel:
         method sets ``self.last_error`` and returns cleanly — so the
         FastAPI lifespan task does not crash.
 
-        Base-tier signals are NOT absorbed by that retry loop. A
-        ``CancelledError`` raised because ``disconnect()`` cancelled the
-        pull returns cleanly; a cancellation from anywhere else, and any
-        ``KeyboardInterrupt`` / ``SystemExit``, propagates out of
-        ``connect()`` rather than being counted as a delivery failure.
+        Base-tier signals are NOT absorbed by that retry loop. ``disconnect()``
+        stops the pull by cancelling the client library's streaming-pull
+        future, which resolves with a result rather than raising, so the stop
+        is seen by checking the disconnected flag once the wait returns. A
+        cancellation of the task running ``connect()``, and any
+        ``KeyboardInterrupt`` / ``SystemExit``, propagates out rather than
+        being counted as a delivery failure.
         """
         attempts = 0
         while not self._disconnected:
@@ -239,25 +241,20 @@ class GoogleChatPubSubChannel:
                     self._subscription,
                     callback=self._on_message,
                 )
-                # _pull_future.result() blocks until cancellation or error.
-                # We await it via to_thread so cancellation from
-                # disconnect() can take effect.
+                # _pull_future.result() blocks until the pull stops or
+                # errors. Awaiting it through to_thread keeps the event loop
+                # free, so disconnect() can cancel the future while this
+                # coroutine is waiting.
                 await asyncio.to_thread(self._pull_future.result)
-                # Clean exit (cancellation): reset for any further restart
-                # attempts a caller might trigger.
+                # The stop is observed here, not in an exception handler: the
+                # client library's future resolves with a result when it is
+                # cancelled, so the wait returns normally and the disconnected
+                # flag is what distinguishes a shutdown from a stream that
+                # ended on its own. Reset the count for any restart a caller
+                # might trigger.
                 attempts = 0
                 if self._disconnected:
                     return
-            except asyncio.CancelledError:
-                # disconnect() stops the pull by cancelling the streaming-pull
-                # future, which surfaces here as CancelledError. That is a
-                # shutdown, not a delivery failure, so it must not enter the
-                # backoff schedule. A cancellation that did NOT come from
-                # disconnect() is an externally-injected signal and is
-                # re-raised so it keeps propagating.
-                if self._disconnected:
-                    return
-                raise
             except Exception as exc:
                 self.last_error = exc
                 # Gate B M4 — reset the consecutive-failure counter if any
@@ -275,23 +272,15 @@ class GoogleChatPubSubChannel:
                 # third → 4s; …; after the 10th failure we exit without
                 # another sleep so the ceiling is exactly 10 attempts.
                 delay = min(_MAX_BACKOFF_SECONDS, 2 ** (attempts - 1))
-                try:
-                    await asyncio.sleep(delay)
-                except asyncio.CancelledError:
-                    return
+                # A cancellation during the backoff wait propagates out of
+                # connect(). It is a shutdown signal, not a delivery failure,
+                # so it neither lands in last_error nor advances the schedule.
+                await asyncio.sleep(delay)
             finally:
                 # Close the per-attempt subscriber so the next iteration
                 # creates a fresh one. The real SubscriberClient supports
                 # close() idempotently.
-                if self._subscriber is not None:
-                    try:
-                        self._subscriber.close()
-                    except Exception:  # noqa: BLE001 — defensive
-                        # Ordinary close failures are tolerated; base-tier
-                        # signals (CancelledError / KeyboardInterrupt /
-                        # SystemExit) propagate by design.
-                        pass
-                    self._subscriber = None
+                self._close_subscriber()
 
     async def disconnect(self) -> None:
         """Cancel the streaming pull and close the SubscriberClient.
@@ -315,16 +304,27 @@ class GoogleChatPubSubChannel:
                 # Ordinary cancel failures are tolerated; base-tier signals
                 # propagate by design.
                 pass
-        if self._subscriber is not None:
-            try:
-                self._subscriber.close()
-            except Exception:  # noqa: BLE001 — defensive
-                # Ordinary close failures are tolerated; base-tier signals
-                # propagate by design.
-                pass
-            self._subscriber = None
+        self._close_subscriber()
 
     # ----- Internal helpers -----------------------------------------------
+
+    def _close_subscriber(self) -> None:
+        """Close the current subscriber, then drop the reference.
+
+        Best-effort for ordinary errors only: an ``Exception`` from
+        ``close()`` is swallowed and the reference is still cleared, while a
+        base-tier signal (``CancelledError`` / ``KeyboardInterrupt`` /
+        ``SystemExit``) propagates out before the clear runs — the same
+        tolerance the two call sites had when they each carried their own
+        copy of this block.
+        """
+        if self._subscriber is None:
+            return
+        try:
+            self._subscriber.close()
+        except Exception:  # noqa: BLE001 — defensive
+            pass
+        self._subscriber = None
 
     def _build_subscriber(self) -> SubscriberClient:
         """Construct a real SubscriberClient bound to the SA credentials.
