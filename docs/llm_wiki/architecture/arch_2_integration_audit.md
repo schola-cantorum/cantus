@@ -1,6 +1,6 @@
 ---
 name: arch-2-integration-audit
-description: Cantus framework principle ARCH-2 — 10 observable cross-capability integration conditions, enforced by the test suite and the Gate A/B/C release audit
+description: Cantus framework principle ARCH-2 — 10 observable cross-capability integration conditions, enforced by the test suite, the supply-chain workflow, and the Gate A/B/C release audit
 topic: architecture
 sources:
   - external: schola-cantorum/colab-llm-agent → openspec/discussions/cantus-framework-shift.md
@@ -34,7 +34,7 @@ These 10 conditions MUST hold when a capability is combined with the others alre
 4. **Tunnel detection 測試** — When a tunnel helper (Cloudflare Tunnel or ngrok) is enabled, the public URL is correctly surfaced to logs and the dashboard endpoint, not silently dropped.
 5. **`SecretStr` 不 log 測試** — Every Pydantic `SecretStr` field appears as `**********` in `repr()` output, log records, and HTTP API responses; raw secret bytes never escape the type boundary.
 6. **Auth bypass 不可發生** — HTTP API endpoints default to requiring a bearer token; a request with no `Authorization` header receives `401 Unauthorized`, never an authenticated default-user response.
-7. **Supply chain check** — At startup, `cantus.config` scans installed dependency versions; presence of any known-compromised version (e.g., `litellm` in the 1.82.7 — 1.82.8 range from the March 2026 incident) produces a fatal warning visible to the operator before the framework accepts any request.
+7. **Supply chain check** — CI audits the dependency versions actually installed and fails on any release carrying a published advisory (for example `litellm` in the 1.82.7 — 1.82.8 range from the March 2026 incident). The compromised-version list is `pip-audit`'s advisory database, maintained upstream, not a list this project keeps. The audit runs on pull requests and on a weekly schedule, across the three install groups the project's mutually exclusive extras require. See `docs/adr/0001-supply-chain-audit-runs-in-ci.md` for why this control lives in CI rather than in `cantus.config`.
 8. **雙層 API 不滲透** — Lower-tier APIs (e.g., `ModelHandle`, `Memory`, `Authenticator`) do not import from upper-tier modules (e.g., `ChatModel`, `AutoMemory`); a `grep -r "from cantus.chat_model import" cantus/core/` returns nothing.
 9. **Adapter 不入 core** — Core modules (`cantus.core.*`, lower-tier protocols) do not import `cantus.adapters`, `cantus.serve`, or `cantus.gateways`; a `grep -r "from cantus.adapters import" cantus/core/` returns nothing.
 10. **Migration smoke test** — Example code from the previous minor version (e.g., a v0.1.x notebook), after applying the change's migration guide, still runs to completion against the new minor version. This is mandatory for any change that renames, removes, or restructures a public API.
@@ -47,7 +47,7 @@ Most cross-capability bugs in agent frameworks come from **emergent combinations
 
 **Superseded convention.** This file used to require a `### Requirement: ARCH-2 integration audit` section in every change's spec delta. That convention was never adopted in practice — 0 of 56 archived spec deltas carry it — and the `spectra analyze` checker it depended on was never written. Do **not** reinstate it, and do not treat its absence from a spec delta as a finding.
 
-ARCH-2 is now enforced where it can actually fail: in the test suite.
+ARCH-2 is now enforced where it can actually fail. Nine of the ten items are checked by the test suite; item 7, whose subject is an external dependency rather than cantus's own behaviour, is checked by a CI workflow.
 
 | Item | Enforced by |
 | --- | --- |
@@ -55,9 +55,9 @@ ARCH-2 is now enforced where it can actually fail: in the test suite.
 | #5 `SecretStr` 不 log | `tests/serve/test_security.py`, `tests/serve/channels/test_signing.py`, `tests/serve/test_config.py` |
 | #6 Auth bypass 不可發生 | `tests/test_public_api.py` and the serve auth tests |
 | #1–#4, #10 | Covered in part by the serve channel tests and the release-time tri-platform smoke matrix |
-| **#7 Supply chain check** | **NOT IMPLEMENTED — open gap.** No dependency-version scan exists anywhere in `cantus/`. |
+| **#7 Supply chain check** | `.github/workflows/supply-chain.yml` — `pip-audit` over the installed environment, three install groups, pull requests + weekly |
 
-**Open gap: item #7.** It is the only item with no implementation and the only one whose subject is an *external* dependency rather than cantus's own behaviour, which is why it may belong to an existing tool (`pip-audit`, Dependabot) rather than to `cantus.config` at startup. Settle that — including who maintains the compromised-version list and whether a hit should warn or fail — during framework design, not by patching this file.
+**Item #7 is the one item whose subject is an *external* dependency** rather than cantus's own behaviour, which is why it is the one item enforced by a third-party tool. Its compromised-version list is maintained upstream by `pip-audit`, and a finding fails the build rather than warning; an advisory that genuinely cannot be acted on is acknowledged in the workflow with `--ignore-vuln` and a comment naming it. The reasoning, and the alternatives that were rejected, are in `docs/adr/0001-supply-chain-audit-runs-in-ci.md`.
 
 Release-time enforcement for everything above is the Gate A/B/C double-gate audit, which is where the integration-level checking this principle asks for actually happens.
 

@@ -215,6 +215,9 @@ dev = [
     "respx>=0.21",
     "mypy>=1.10",
     "ruff>=0.5",
+    # Read by tests/test_guardrail_config.py, which parses the CI
+    # workflows to assert the guardrails those workflows claim to run.
+    "pyyaml>=6",
 ]
 all = ["cantus-agent[runtime,memory,providers,dev]"]
 

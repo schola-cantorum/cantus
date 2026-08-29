@@ -1,0 +1,85 @@
+name: supply-chain
+
+# Implements ARCH-2 audit item 7 (dependency supply-chain check).
+#
+# This lives in its own workflow rather than as a step in `test.yml` so that a
+# supply-chain red and a test red are distinguishable at a glance: they are
+# different findings and they are acted on differently.
+#
+# The schedule matters as much as the pull-request trigger. An advisory
+# published after the last merge would otherwise never be noticed — nothing
+# about this repository changes when a CVE lands against one of its transitive
+# dependencies.
+
+on:
+  pull_request:
+  schedule:
+    # Mondays, 04:17 UTC. Off the hour so the run is not queued behind the
+    # thundering herd of :00 cron jobs.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    # `pyproject.toml` declares mutually exclusive extras — the agent-runtime
+    # extra conflicts with every provider extra, and the two local-model extras
+    # conflict with each other — so no single install covers the whole surface
+    # and `uv export --all-extras` refuses outright. These three groups between
+    # them do cover it. Dropping one silently narrows the audit, which is why
+    # tests/test_guardrail_config.py asserts all three are present.
+    name: pip-audit (${{ matrix.group }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Everything except the two conflicting groups below.
+          - group: main
+            extras: "all,serve,tui,mcp,langchain,dspy,huggingface"
+            os: ubuntu-latest
+            python: "3.12"
+          # Pinned to 3.12 by its own environment marker. This is the group
+          # that carries litellm — the dependency the ARCH-2 item was written
+          # about — so an audit that skipped it would miss its own motivating
+          # case.
+          - group: openhands
+            extras: "openhands"
+            os: ubuntu-latest
+            python: "3.12"
+          # Its environment marker restricts it to darwin/arm64, so on a Linux
+          # runner this group would install nothing and audit nothing.
+          - group: mlx
+            extras: "mlx"
+            os: macos-latest
+            python: "3.12"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install cantus with the ${{ matrix.group }} extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[${{ matrix.extras }}]"
+
+      - name: Install pip-audit
+        run: python -m pip install pip-audit
+
+      # Audits the environment that is actually installed, rather than a
+      # resolved requirements file. Requirements-file mode makes pip-audit build
+      # its own virtual environment to resolve into, which is an extra failure
+      # surface — it aborted hard during prototyping — and it would audit what
+      # the project declares rather than what a user ends up with.
+      #
+      # A finding fails this job by design. To acknowledge an advisory that
+      # cannot be acted on, append `--ignore-vuln <ID>` below WITH a comment
+      # naming the advisory and why it is unactionable. Do not reach for
+      # `continue-on-error`: a warning nobody reads is not a guardrail, which is
+      # the failure this whole workflow exists to correct.
+      - name: Audit installed dependencies
+        run: pip-audit --progress-spinner=off
