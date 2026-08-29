@@ -359,14 +359,19 @@ class GatewayClient:
             logger.exception("Discord Gateway on_event callback raised")
 
     async def _heartbeat_loop(self, ws: ClientConnection) -> None:
-        """Send op 1 every heartbeat_interval ms; close with 1011 on ACK miss."""
+        """Send op 1 every heartbeat_interval ms; close with 1011 on ACK miss.
+
+        Cancellation is not handled here — it propagates out of the task so
+        the session that issued the cancel is the one that absorbs it.
+        """
 
         interval_seconds = self._heartbeat_interval_ms / 1000.0
         while not self._stop_event.is_set():
-            try:
-                await asyncio.sleep(interval_seconds)
-            except asyncio.CancelledError:
-                return
+            # A cancellation during the interval wait propagates out of this
+            # task. The session that started the heartbeat is the one that
+            # cancels it, and it absorbs the signal around the awaited task —
+            # the only narrow absorb the base-exception policy permits.
+            await asyncio.sleep(interval_seconds)
             if self._stop_event.is_set():
                 return
             if not self._heartbeat_acked:
@@ -382,10 +387,9 @@ class GatewayClient:
             self._heartbeat_acked = False
             try:
                 await _send_frame(ws, {"op": Opcode.HEARTBEAT, "d": self._seq})
-            except (
-                websockets.exceptions.ConnectionClosed,
-                asyncio.CancelledError,
-            ):
+            except websockets.exceptions.ConnectionClosed:
+                # A closed socket ends the heartbeat; a cancellation does not
+                # belong in this clause and propagates instead.
                 return
 
 
