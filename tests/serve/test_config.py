@@ -10,7 +10,6 @@ from __future__ import annotations
 import importlib
 from typing import Any
 from collections.abc import Iterator
-from unittest import mock
 
 import pytest
 
@@ -98,7 +97,6 @@ def test_env_overrides_compose_without_clobbering_unset_fields(
 def test_dotenv_file_is_not_read(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
     """v0.4.0 intentionally does NOT enable env_file. A .env in cwd must
     not influence Settings (deferred to cantus-serve-security)."""
-    import os
 
     dotenv = tmp_path / ".env"
     dotenv.write_text("CANTUS_SERVE_PORT=12345\n")

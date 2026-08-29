@@ -20,7 +20,8 @@ Protocol-level, not platform-level.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 
 import pytest
 
@@ -185,10 +186,6 @@ async def test_discord_realtime_channel_isinstance_both_protocols() -> None:
 
 
 # --- helpers ------------------------------------------------------------
-
-
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 
 @asynccontextmanager

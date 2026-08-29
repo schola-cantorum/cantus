@@ -22,7 +22,6 @@ import copy
 import time
 from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
 
 from cantus.core.agent import Agent
