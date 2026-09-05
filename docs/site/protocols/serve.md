@@ -36,7 +36,7 @@ curl http://localhost:8765/health
 Expected response:
 
 ```json
-{"status":"ok","cantus_version":"0.5.0"}
+{"status":"ok","cantus_version":"0.6.0"}
 ```
 
 Every Skill registered in the registry is automatically mounted at `POST /skills/{spec_for_llm.name}`. Arguments go in the JSON body, and the response shape is `{"result": <jsonable>}`. The Swagger UI is mounted at `/docs` by default, the OpenAPI JSON at `/openapi.json`, and ReDoc at `/redoc`. Each Skill's `args_schema` is projected straight into the `requestBody.application/json.schema` of its endpoint, so a student can open the Swagger UI and see exactly how to call any Skill.
@@ -201,7 +201,7 @@ curl http://localhost:8765/skills
 A liveness probe; the response is always a two-key dict:
 
 ```json
-{"status": "ok", "cantus_version": "0.5.0"}
+{"status": "ok", "cantus_version": "0.6.0"}
 ```
 
 `cantus_version` is the runtime-resolved `cantus.__version__`. CI and monitoring can use this string to confirm which cantus version is deployed.

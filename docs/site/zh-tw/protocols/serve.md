@@ -36,7 +36,7 @@ curl http://localhost:8765/health
 預期會回：
 
 ```json
-{"status":"ok","cantus_version":"0.5.0"}
+{"status":"ok","cantus_version":"0.6.0"}
 ```
 
 每個註冊到 registry 的 Skill 都會自動掛在 `POST /skills/{spec_for_llm.name}`。引數放在 JSON body 裡，回傳的形狀是 `{"result": <jsonable>}`。Swagger UI 預設掛在 `/docs`、OpenAPI JSON 在 `/openapi.json`、ReDoc 在 `/redoc`。每個 Skill 的 `args_schema` 會直接投影到該 endpoint 的 `requestBody.application/json.schema`，所以學生只要打開 Swagger UI，就能一眼看出每個 Skill 該怎麼呼叫。
@@ -201,7 +201,7 @@ curl http://localhost:8765/skills
 一個 liveness probe；回傳永遠是固定的兩鍵 dict：
 
 ```json
-{"status": "ok", "cantus_version": "0.5.0"}
+{"status": "ok", "cantus_version": "0.6.0"}
 ```
 
 `cantus_version` 是執行期解析出來的 `cantus.__version__`。CI 跟 monitoring 可以用這個字串確認部署的是哪個 cantus 版本。

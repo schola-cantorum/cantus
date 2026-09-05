@@ -14,7 +14,7 @@ covered.
 
 | Version | Supported |
 | ------- | --------- |
-| latest released minor (currently 0.5.x) | ✅ |
+| latest released minor (currently 0.6.x) | ✅ |
 | any earlier version | ❌ — upgrade to the latest release |
 
 Because cantus versions are immutable Git tags, a fix always ships as a new tag,

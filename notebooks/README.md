@@ -1,13 +1,13 @@
 # Cantus bundled notebooks
 
-This directory ships ready-to-run Colab notebooks so you can experience the Cantus framework end-to-end without leaving the repo. Click the Open-in-Colab badges below to launch each notebook directly from the `v0.5.0` tag.
+This directory ships ready-to-run Colab notebooks so you can experience the Cantus framework end-to-end without leaving the repo. Click the Open-in-Colab badges below to launch each notebook directly from the `v0.6.0` tag.
 
 > **Looking for the NotebookLM corpus?** These are Colab *execution* notebooks, not NotebookLM sources. The NotebookLM corpus is the generated Markdown tree under [`docs/api/`](../docs/api/) — see [`docs/llms-txt.md`](../docs/llms-txt.md) for what to upload.
 
 | Notebook | Audience | Purpose | Open in Colab |
 | --- | --- | --- | --- |
-| `task_template.ipynb` | End user (any first-time framework user) | Build your first agent in five cells: mount Drive → pick variant + install Cantus → write protocols → run agent → inspect EventStream. Pre-wired to `cantus_version="v0.5.0"`. | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb) |
-| `admin_setup.ipynb` | Administrator (operator who prepares shared resources) | One-time setup: mirror `google/gemma-4-E2B-it` and `google/gemma-4-E4B-it` to a Drive directory, verify the downloads, optional GPU smoke test. Run once before downstream users open `task_template.ipynb`. | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/admin_setup.ipynb) |
+| `task_template.ipynb` | End user (any first-time framework user) | Build your first agent in five cells: mount Drive → pick variant + install Cantus → write protocols → run agent → inspect EventStream. Pre-wired to `cantus_version="v0.6.0"`. | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/task_template.ipynb) |
+| `admin_setup.ipynb` | Administrator (operator who prepares shared resources) | One-time setup: mirror `google/gemma-4-E2B-it` and `google/gemma-4-E4B-it` to a Drive directory, verify the downloads, optional GPU smoke test. Run once before downstream users open `task_template.ipynb`. | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/admin_setup.ipynb) |
 
 ## Recommended order
 
@@ -29,7 +29,7 @@ Both assert `cantus >= 0.5` and use the current framework API; run them by hand,
 
 For embedding elsewhere:
 
-- Task template: `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb`
-- Administrator setup: `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/admin_setup.ipynb`
+- Task template: `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/task_template.ipynb`
+- Administrator setup: `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/admin_setup.ipynb`
 
-Replace `v0.5.0` with `main` to track the latest commit, or with any released tag to pin to a specific version.
+Replace `v0.6.0` with `main` to track the latest commit, or with any released tag to pin to a specific version.
