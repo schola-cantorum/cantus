@@ -298,6 +298,19 @@ module = [
 ]
 ignore_missing_imports = true
 
+# `transformers` ships py.typed only from the 5.x line and is present only with
+# the `runtime` / `huggingface` extras. The `# type: ignore` comments in these
+# two modules are needed when transformers is installed (untyped calls /
+# attributes inside a typed package) and unused when it is absent (the
+# override above turns the whole module into Any). Neither state is wrong, so
+# the unused-ignore warning is disabled for exactly these two modules.
+[[tool.mypy.overrides]]
+module = [
+    "cantus.model.loader",
+    "cantus.adapters.huggingface",
+]
+warn_unused_ignores = false
+
 # v0.4.0 — uv-specific extras conflict declaration. The `cantus[google]`
 # extras pulls google-genai (transitive `websockets>=13.0,<15.0.dev0`),
 # while `cantus[openhands]` pulls openhands → openhands-sdk → fastmcp
