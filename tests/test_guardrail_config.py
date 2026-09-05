@@ -392,3 +392,34 @@ def test_supply_chain_decision_is_recorded_and_cross_referenced() -> None:
         "the ARCH-2 checklist does not link to the decision record, so the two "
         "can drift apart unnoticed"
     )
+
+
+# --- Gate D audit M6: every workflow pins the token it hands third-party code --
+
+
+def _workflow_files() -> list[str]:
+    return sorted(p.name for p in _WORKFLOWS.glob("*.yml"))
+
+
+def test_every_workflow_declares_a_permissions_block() -> None:
+    """A workflow with no ``permissions:`` receives the repository default
+    token scope. Every workflow here runs third-party code (``npm ci``,
+    ``pip install``, actions), so each one states its scope explicitly."""
+    missing = []
+    for name in _workflow_files():
+        wf = _load_workflow(name)
+        at_top = "permissions" in wf
+        on_every_job = all("permissions" in job for job in wf.get("jobs", {}).values())
+        if not (at_top or on_every_job):
+            missing.append(name)
+    assert missing == [], f"workflows without a permissions block: {missing}"
+
+
+def test_workflows_that_only_verify_get_read_only_contents() -> None:
+    """Only the release workflow needs more than ``contents: read`` (it uploads
+    to PyPI via OIDC). Everything else verifies and must not be able to write."""
+    for name in _workflow_files():
+        if name == "release.yml":
+            continue
+        perms = _load_workflow(name)["permissions"]
+        assert perms == {"contents": "read"}, f"{name}: permissions = {perms!r}"

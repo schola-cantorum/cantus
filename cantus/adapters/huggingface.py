@@ -31,6 +31,7 @@ the imported Skill's spec.
 
 from __future__ import annotations
 
+import inspect
 import keyword
 from typing import Any
 
@@ -69,24 +70,31 @@ def _smolagents_type(json_type: Any) -> str:
 
 
 def _build_forward(param_names: list[str]) -> Any:
-    """Generate ``forward(self, <a>, <b>, ...)`` with one named parameter per input.
+    """Build ``forward(self, <a>, <b>, ...)`` with one named parameter per input.
 
     smolagents validates that the parameter names of ``forward`` equal the keys
     of ``inputs`` and rejects ``*args`` / ``**kwargs``, so the signature has to
-    be spelled out. Every name has already been checked to be a plain Python
-    identifier (not a keyword, not ``self``) by :func:`_validated_input_names`,
-    so the generated source contains nothing user-controlled beyond those
-    identifiers.
+    be spelled out. The check reads ``inspect.signature``, which honours a
+    ``__signature__`` attribute, so a plain closure with a synthesised
+    signature satisfies it without generating source code. No user-controlled
+    string is ever compiled, and no name in the signature can shadow anything
+    the body relies on (a property called ``type`` or ``print`` is fine).
     """
-    signature = ", ".join(param_names)
-    forwarded = ", ".join(f"{name}={name}" for name in param_names)
-    source = (
-        f"def forward(self, {signature}):\n"
-        f"    return type(self)._cantus_skill({forwarded})\n"
-    )
-    namespace: dict[str, Any] = {}
-    exec(source, namespace)  # noqa: S102 — identifiers validated above
-    return namespace["forward"]
+    parameters = [inspect.Parameter("self", inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+    parameters += [
+        inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for name in param_names
+    ]
+    signature = inspect.Signature(parameters)
+
+    def forward(self: Any, *args: Any, **kwargs: Any) -> Any:
+        bound = signature.bind(self, *args, **kwargs)
+        arguments = dict(bound.arguments)
+        arguments.pop("self")
+        return type(self)._cantus_skill(**arguments)
+
+    forward.__signature__ = signature  # type: ignore[attr-defined]
+    return forward
 
 
 def _validated_input_names(properties: dict[str, Any]) -> list[str]:

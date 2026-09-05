@@ -49,6 +49,9 @@ class MLXChatModel:
     def __init__(self, model_id: str, **kwargs: Any) -> None:
         self.model_id = model_id
         self.supports_tool_use = False
+        # Forwarded verbatim to `mlx_lm.load` (adapter_path, tokenizer_config,
+        # ...); accepting an option and then ignoring it is the one behaviour
+        # that must not ship (Gate D audit M3).
         self._kwargs = kwargs
         self._model: Any = None
         self._tokenizer: Any = None
@@ -58,7 +61,7 @@ class MLXChatModel:
             # mlx_lm.load returns (model, tokenizer) by default and a 3-tuple
             # only with return_config=True; index instead of unpacking so the
             # Union return type checks under strict mypy.
-            loaded = mlx_lm.load(self.model_id)
+            loaded = mlx_lm.load(self.model_id, **self._kwargs)
             self._model, self._tokenizer = loaded[0], loaded[1]
 
     def _build_prompt(self, messages: list[Message]) -> Any:
@@ -89,10 +92,17 @@ class MLXChatModel:
         tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
     ) -> Iterator[str]:
+        # Not a generator function on purpose: a `yield` here would defer the
+        # `tools` rejection to the first iteration, so a caller that builds
+        # the stream and abandons it would never learn its tools were dropped
+        # (Gate D audit M4). Validate eagerly, then hand back the generator.
         if tools:
             raise NotImplementedError(_NO_TOOL_USE)
         self._ensure_loaded()
         prompt = self._build_prompt(messages)
+        return self._stream_impl(prompt, **kwargs)
+
+    def _stream_impl(self, prompt: Any, **kwargs: Any) -> Iterator[str]:
         for chunk in mlx_lm.stream_generate(
             self._model, self._tokenizer, prompt, **kwargs
         ):

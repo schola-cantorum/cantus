@@ -190,3 +190,14 @@ def test_round_trip_skill_to_tool_to_skill(adapter):
     assert back.spec_for_llm()["name"] == "shout"
     assert back.spec_for_llm()["args_schema"]["required"] == ["text"]
     assert back(text="hi") == "HI"
+
+
+def test_exported_tool_with_property_named_type_passes_real_validation(adapter):
+    """Gate D audit M2: ``type`` as an input name must survive smolagents'
+    signature check and dispatch correctly."""
+    hf_tool = adapter.expose_as_hf_tool(
+        _SpecSkill({"type": {"type": "string"}, "a": {"type": "integer"}})
+    )
+    assert isinstance(hf_tool, smolagents.Tool)
+    assert hf_tool(type="node", a=1) == {"type": "node", "a": 1}
+    assert hf_tool("node", 2) == {"type": "node", "a": 2}
