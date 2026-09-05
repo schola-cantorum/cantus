@@ -84,9 +84,11 @@ mcp = [
 # `langchain-core` (not the `langchain` aggregator) — the BaseTool surface
 # moved to langchain-core in 0.1.x and is the minimal pin for `cantus[langchain]`.
 # `dspy-ai` is the canonical PyPI name for the DSPy framework.
-# `transformers>=4.40` is the first release with a stable `transformers.Tool`
-# interface; cantus[runtime] already pins a higher floor (>=4.53), so pip
-# unification at install time keeps a single resolved version.
+# `smolagents` is the HuggingFace agents package that succeeded
+# `transformers.agents`: `transformers.Tool` was removed in transformers 4.53,
+# so `cantus.adapters.huggingface` targets `smolagents.Tool` and this group
+# must NOT depend on `transformers` (cantus-hf-adapter-smolagents). smolagents
+# ships pure-Python wheels and does not pull transformers or torch.
 # `openhands` (umbrella package, not `openhands-sdk`) bundles the
 # `openhands.events.Action` types cantus targets.
 langchain = [
@@ -96,7 +98,7 @@ dspy = [
     "dspy-ai>=2.5,<3",
 ]
 huggingface = [
-    "transformers>=4.40,<5",
+    "smolagents>=1.26,<2",
 ]
 openhands = [
     # openhands>=1.16.0 only publishes wheels for python >=3.12,<3.13. The
@@ -295,6 +297,9 @@ module = [
     # post-v0.5.0 (unreleased) cantus-local-llm-mlx-path — mlx-lm ships no py.typed marker, so
     # strict mypy treats `import mlx_lm` as untyped without this override.
     "mlx_lm.*",
+    # cantus-hf-adapter-smolagents — smolagents ships no py.typed marker, so
+    # strict mypy treats `from smolagents import Tool` as untyped without this.
+    "smolagents.*",
 ]
 ignore_missing_imports = true
 
@@ -345,12 +350,10 @@ conflicts = [
     # the same transitive openai>=1.50,<2 pin and the same incompatibility with
     # `openhands`. Mirrors the `ollama`↔`openhands` entry above.
     [{ extra = "omlx" }, { extra = "openhands" }],
-    # post-v0.5.0 (unreleased) cantus-local-llm-mlx-path — mlx-lm>=0.31.1 pulls transformers>=5,
-    # while `cantus[huggingface]` pins transformers>=4.40,<5. Both can be
-    # requested on the same arm64/darwin split, so the platform marker alone
-    # does NOT isolate them; this conflict entry lets `uv sync` universal
-    # resolution succeed (pip is unaffected — it ignores [tool.uv]).
-    [{ extra = "mlx" }, { extra = "huggingface" }],
+    # No entry names `mlx`: since `cantus[huggingface]` depends on smolagents
+    # rather than on a transformers<5 pin, nothing conflicts with the
+    # transformers>=5 floor that mlx-lm>=0.31.1 requires
+    # (cantus-hf-adapter-smolagents).
 ]
 
 # The rule set is declared, not inherited. Ruff's *default* selection has

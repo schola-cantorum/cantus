@@ -44,3 +44,11 @@ The five packages, and why each is a decision rather than a bump:
   it was acknowledged in the workflow under the transformers block. The
   acknowledged list is now 20 entries; nothing here changes the decision this
   ticket is waiting on.
+- 2026-09-05 (later): the five transformers acknowledgements (PYSEC-2025-217,
+  PYSEC-2026-2288, PYSEC-2026-2289, PYSEC-2026-2290, CVE-2026-9856) are
+  resolved by `cantus-hf-adapter-smolagents`: the `huggingface` extra now
+  depends on `smolagents` instead of pinning `transformers<5`, so the audit
+  job resolves transformers from the `runtime` extra (5.x, no open advisory)
+  and the entries were removed from the workflow. The acknowledged list is
+  now 15 entries, all reached through `dspy` / `langchain` / `openhands`; the
+  decision this ticket waits on is unchanged for those.

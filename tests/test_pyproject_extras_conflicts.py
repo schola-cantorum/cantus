@@ -184,21 +184,45 @@ def test_mlx_extras_declares_only_platform_scoped_mlx_lm() -> None:
     )
 
 
-def test_mlx_conflicts_only_with_huggingface() -> None:
-    """`mlx-lm>=0.31.1` pulls `transformers>=5` while `cantus[huggingface]`
-    pins `transformers>=4.40,<5`, so a single `mlx`↔`huggingface` conflict pair
-    is required for uv universal resolution. No OTHER conflict pair may name
-    `mlx` (the platform marker isolates it from every group except the
-    transformers-pinned huggingface extras)."""
+def test_mlx_has_no_conflicts_entry() -> None:
+    """Since `cantus[huggingface]` depends on `smolagents` (not on a
+    `transformers<5` pin), nothing conflicts with the `transformers>=5` floor
+    that `mlx-lm>=0.31.1` requires, so no `[tool.uv] conflicts` cluster may
+    name `mlx` (cantus-hf-adapter-smolagents MODIFIED Requirement
+    `mlx is a platform-scoped extras group for Apple Silicon`)."""
     cfg = _load_pyproject()
-    conflicts = cfg["tool"]["uv"]["conflicts"]
-    mlx_pairs = [
+    conflicts = cfg.get("tool", {}).get("uv", {}).get("conflicts", [])
+    mlx_clusters = [
         {entry.get("extra") for entry in cluster}
         for cluster in conflicts
         if any(entry.get("extra") == "mlx" for entry in cluster)
     ]
-    assert mlx_pairs == [{"mlx", "huggingface"}], (
-        f"mlx must conflict with exactly huggingface; got: {mlx_pairs!r}"
+    assert mlx_clusters == [], (
+        f"no conflict cluster may name mlx; got: {mlx_clusters!r}"
+    )
+
+
+# --- MODIFIED Requirement: huggingface extras depend on smolagents
+#     (cantus-hf-adapter-smolagents)
+
+
+def test_huggingface_extras_depends_on_smolagents_only() -> None:
+    """`[project.optional-dependencies].huggingface` holds exactly one
+    requirement, for the `smolagents` distribution with a lower and an upper
+    bound, and never names `transformers` (whose `Tool` class was removed in
+    4.53; the adapter now targets `smolagents.Tool`)."""
+    cfg = _load_pyproject()
+    hf = cfg["project"]["optional-dependencies"]["huggingface"]
+    assert len(hf) == 1, f"huggingface extras must hold exactly one entry; got: {hf!r}"
+    entry = hf[0]
+    assert re.match(r"^smolagents\s*>=\s*1\.\d+", entry), (
+        f"huggingface extras must depend on smolagents with a >=1.x floor; got: {entry!r}"
+    )
+    assert "<2" in entry.replace(" ", ""), (
+        f"huggingface extras must pin an upper bound below 2; got: {entry!r}"
+    )
+    assert "transformers" not in entry, (
+        f"huggingface extras must not depend on transformers; got: {entry!r}"
     )
 
 

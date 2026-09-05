@@ -150,7 +150,7 @@ v0.3.2 只出貨三件 MVP：MCP 的雙向加上 Anthropic Memory tool。v0.3.3 
 
 - `cantus[langchain]` extras，加上一個雙向的 LangChain `Tool` / `Runnable` adapter
 - `cantus[dspy]` extras，加上一個 DSPy `Tool` adapter
-- `cantus[huggingface]` extras，加上一個 HuggingFace `transformers.tool` adapter
+- `cantus[huggingface]` extras，加上一個 HuggingFace tool adapter（最初對準 `transformers.Tool`，現在改對準 `smolagents.Tool`，見下方範例的說明）
 - `cantus[openhands]` extras，加上一個 OpenHands action adapter
 
 每一個都遵守上面「錯誤命名慣例」一節定義的 `<adapter>_handshake_failed` / `<adapter>_remote_error` 規則，這一頁也會持續長出對應的章節。
@@ -174,7 +174,7 @@ v0.3.2 只出貨三件 MVP：MCP 的雙向加上 Anthropic Memory tool。v0.3.3 
 | `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus[langchain]` |
 | `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus[dspy]` |
 | `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace（僅 export） | `pip install cantus[huggingface]` |
+| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool`（v0.3.3 僅 export；v0.3.4 補上 import） | `pip install cantus[huggingface]` |
 | `expose_as_openhands_action(skill)` | cantus → OpenHands（僅 export） | `pip install cantus[openhands]` |
 
 設計原則延續 v0.3.2 的 `adapters.md`：純包裝層、`Skill.spec_for_llm()` 形狀不變、`Registry.KINDS` 不變、不引入 `Adapter` ABC。錯誤命名沿用 `<framework>_handshake_failed` / `<framework>_remote_error` 的慣例。
@@ -235,10 +235,12 @@ def translate(text: str, target: str) -> str:
     """Translate text into target language."""
     return text
 
-hf_tool = expose_as_hf_tool(translate)  # 餵給 transformers.agents.HfAgent(tools=[hf_tool])
+hf_tool = expose_as_hf_tool(translate)  # 餵給 smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**HF 的 import 方向延到 v0.3.4**：在 transformers 介面裡，一個 HuggingFace `Tool` 比較偏向「一個 stateless callable 加一份 JSON schema dict」，並沒有對等於 LangChain `BaseTool` 的執行單元。常見的情境是 cantus → HF（把一個 Skill export 出去給 `HfAgent` 呼叫），所以反向的 import 就留給 v0.3.4 batch3 評估時再說。
+**是 smolagents，不是 transformers。** `transformers.Tool` 在 transformers 4.53 已被移除，所以 `cantus[huggingface]` 現在安裝的是 [`smolagents`](https://github.com/huggingface/smolagents)（HuggingFace 官方接手 agents 的套件），`expose_as_hf_tool` 回傳的是 `smolagents.Tool` 實例：一個動態建立的子類，`forward` 逐一具名列出 Skill 的每個參數，`output_type` 固定為 `"any"`。JSON Schema 型別不在 `string / integer / number / boolean / array / object` 之內的一律匯出成 `any`。**已知限制：**匯出的工具沒有原始碼，所以 `tool.to_dict()`、`tool.save()`、`tool.push_to_hub()` 會拋例外；`CodeAgent`／`ToolCallingAgent` 的 `run()` 路徑用不到它們。
+
+**HF 的 import 方向延到 v0.3.4**（v0.3.3 時期的說明，當時對準的是 transformers 介面）：在 transformers 介面裡，一個 HuggingFace `Tool` 比較偏向「一個 stateless callable 加一份 JSON schema dict」，並沒有對等於 LangChain `BaseTool` 的執行單元。常見的情境是 cantus → HF（把一個 Skill export 出去給 `HfAgent` 呼叫），所以反向的 import 就留給 v0.3.4 batch3 評估時再說。
 
 ## `expose_as_openhands_action` 五行範例
 
@@ -347,13 +349,13 @@ hf_tool.inputs = {
 }
 ```
 
-**把每個欄位都當成 required** 是刻意的選擇：`transformers.Tool` API 沒有「optional input」這個概念，把 `inputs` 列出的每個欄位都標成必填，最貼近 HF 的慣例。如果 HF 之後加進 optional flag，再開一個 follow-up change 來調整。
+**把每個欄位都當成 required** 是刻意的選擇：`smolagents.Tool` API（和先前的 `transformers.Tool` 一樣）沒有「optional input」這個概念，把 `inputs` 列出的每個欄位都標成必填，最貼近 HF 的慣例。如果 HF 之後加進 optional flag，再開一個 follow-up change 來調整。
 
 ### dispatch 與錯誤包裝
 
 `_HuggingFaceRemoteSkill.run(**kwargs)` 直接呼叫 `self._tool(**kwargs)`（HF Tool 本身是 callable）。當底層的呼叫丟出例外時，它會被包成 `RuntimeError("huggingface_remote_error: ...")`，接著由 cantus Agent dispatcher 轉成 `ToolErrorObservation`（沿用 v0.3.2 `agent-protocols` 裡那條「cantus.adapters error naming convention」Requirement）。
 
-handshake 失敗（`inputs` 不是 dict，或某個 entry 不是 dict 形狀）會丟 `RuntimeError("huggingface_handshake_failed: ...")`；型別不符則丟 `TypeError("import_hf_tool expects transformers.Tool")`。兩者都對齊 batch2 的命名慣例。
+handshake 失敗（`inputs` 不是 dict，或某個 entry 不是 dict 形狀）會丟 `RuntimeError("huggingface_handshake_failed: ...")`；型別不符則丟 `TypeError("import_hf_tool expects smolagents.Tool")`。兩者都對齊 batch2 的命名慣例。
 
 ## OpenHands 的 import 為什麼不做
 
@@ -375,7 +377,7 @@ action = expose_as_openhands_action(my_cantus_skill)
 
 ## SDK gate
 
-`import_hf_tool` 用的是既有的 `cantus[huggingface]` extras（`transformers>=4.40,<5`），**不引入任何新依賴**。沒裝 transformers 時，匯入 `cantus.adapters.huggingface` 會丟 `ImportError("pip install cantus[huggingface]")`；至於 `cantus.adapters` 套件本身（不帶 extras）仍然可以正常匯入，那個 lazy stub 只會在第一次呼叫時才解析。
+`import_hf_tool` 用的是既有的 `cantus[huggingface]` extras（現在是 `smolagents>=1.26,<2`；這個 group 不再依賴 transformers），除此之外**不引入任何新依賴**。沒裝 smolagents 時，匯入 `cantus.adapters.huggingface` 會丟 `ImportError("pip install cantus[huggingface]")`；至於 `cantus.adapters` 套件本身（不帶 extras）仍然可以正常匯入，那個 lazy stub 只會在第一次呼叫時才解析。
 
 ## 與 batch2 一節的關係
 

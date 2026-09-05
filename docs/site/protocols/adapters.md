@@ -150,7 +150,7 @@ v0.3.2 ships only the three MVP pieces: MCP in both directions plus the Anthropi
 
 - `cantus[langchain]` extras plus a bidirectional LangChain `Tool` / `Runnable` adapter
 - `cantus[dspy]` extras plus a DSPy `Tool` adapter
-- `cantus[huggingface]` extras plus a HuggingFace `transformers.tool` adapter
+- `cantus[huggingface]` extras plus a HuggingFace tool adapter (originally `transformers.Tool`; now targets `smolagents.Tool`, see the note under the example below)
 - `cantus[openhands]` extras plus an OpenHands action adapter
 
 Each one follows the `<adapter>_handshake_failed` / `<adapter>_remote_error` naming rules defined in the "Error naming convention" section above, and this page will keep growing the matching sections.
@@ -174,7 +174,7 @@ On top of the three v0.3.2 MVP pieces (MCP server, MCP client, Anthropic Memory)
 | `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus[langchain]` |
 | `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus[dspy]` |
 | `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace (export only) | `pip install cantus[huggingface]` |
+| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool` (export only in v0.3.3; import added in v0.3.4) | `pip install cantus[huggingface]` |
 | `expose_as_openhands_action(skill)` | cantus → OpenHands (export only) | `pip install cantus[openhands]` |
 
 The design principles carry over from the v0.3.2 `adapters.md`: pure wrapper layer, `Skill.spec_for_llm()` shape unchanged, `Registry.KINDS` unchanged, and no `Adapter` ABC. Error naming reuses the `<framework>_handshake_failed` / `<framework>_remote_error` convention.
@@ -235,10 +235,12 @@ def translate(text: str, target: str) -> str:
     """Translate text into target language."""
     return text
 
-hf_tool = expose_as_hf_tool(translate)  # feed to transformers.agents.HfAgent(tools=[hf_tool])
+hf_tool = expose_as_hf_tool(translate)  # feed to smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**HF import direction deferred to v0.3.4**: a HuggingFace `Tool` in the transformers interface leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Skill for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
+**smolagents, not transformers.** `transformers.Tool` was removed in transformers 4.53, so `cantus[huggingface]` now installs [`smolagents`](https://github.com/huggingface/smolagents) (HuggingFace's successor package for agents) and `expose_as_hf_tool` returns a `smolagents.Tool` instance: a dynamically created subclass whose `forward` names each Skill argument explicitly and whose `output_type` is `"any"`. JSON Schema types outside `string / integer / number / boolean / array / object` are exported as `any`. **Known limitation:** the exported tool has no source code, so `tool.to_dict()`, `tool.save()` and `tool.push_to_hub()` raise; `CodeAgent` / `ToolCallingAgent` `run()` paths do not need them.
+
+**HF import direction deferred to v0.3.4** (v0.3.3-era note, written against the transformers interface): a HuggingFace `Tool` leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Skill for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
 
 ## `expose_as_openhands_action` five-line example
 
@@ -347,13 +349,13 @@ Build the v0.3.0 JSON Schema dict directly, without routing through an intermedi
 }
 ```
 
-**Treating every field as required** is a deliberate choice: the `transformers.Tool` API has no concept of an "optional input," so marking every field listed in `inputs` as required matches HF convention most closely. If HF later adds an optional flag, open a follow-up change to adjust this.
+**Treating every field as required** is a deliberate choice: the `smolagents.Tool` API (like `transformers.Tool` before it) has no concept of an "optional input," so marking every field listed in `inputs` as required matches HF convention most closely. If HF later adds an optional flag, open a follow-up change to adjust this.
 
 ### Dispatch and error wrapping
 
 `_HuggingFaceRemoteSkill.run(**kwargs)` calls `self._tool(**kwargs)` directly (a HF Tool is callable). When the underlying call raises, it is wrapped as `RuntimeError("huggingface_remote_error: ...")`, which the cantus Agent dispatcher then turns into a `ToolErrorObservation` (reusing the "cantus.adapters error naming convention" Requirement from the v0.3.2 `agent-protocols`).
 
-A handshake failure (`inputs` is not a dict, or an entry is not dict-shaped) raises `RuntimeError("huggingface_handshake_failed: ...")`; a type mismatch raises `TypeError("import_hf_tool expects transformers.Tool")`. Both align with the batch2 naming convention.
+A handshake failure (`inputs` is not a dict, or an entry is not dict-shaped) raises `RuntimeError("huggingface_handshake_failed: ...")`; a type mismatch raises `TypeError("import_hf_tool expects smolagents.Tool")`. Both align with the batch2 naming convention.
 
 ## Why the OpenHands import is not built
 
@@ -375,7 +377,7 @@ action = expose_as_openhands_action(my_cantus_skill)
 
 ## SDK gate
 
-`import_hf_tool` uses the existing `cantus[huggingface]` extras (`transformers>=4.40,<5`) and introduces **no new dependency**. Without transformers installed, importing `cantus.adapters.huggingface` raises `ImportError("pip install cantus[huggingface]")`; the `cantus.adapters` package itself (no extras) still imports fine, and the lazy stub only resolves on the first call.
+`import_hf_tool` uses the existing `cantus[huggingface]` extras (now `smolagents>=1.26,<2`; transformers is no longer a dependency of this group) and introduces **no new dependency** beyond that group. Without smolagents installed, importing `cantus.adapters.huggingface` raises `ImportError("pip install cantus[huggingface]")`; the `cantus.adapters` package itself (no extras) still imports fine, and the lazy stub only resolves on the first call.
 
 ## Relationship to the batch2 section
 

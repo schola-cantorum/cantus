@@ -737,7 +737,7 @@ The cantus distribution SHALL declare the following optional dependency groups i
 - `mcp`: depends on `mcp>=0.1,<2`
 - `langchain`: depends on `langchain-core>=0.3,<1`
 - `dspy`: depends on `dspy-ai>=2.5,<3`
-- `huggingface`: depends on `transformers>=4.40,<5`
+- `huggingface`: depends on `smolagents>=1.26,<2` (the HuggingFace agents package that succeeded `transformers.agents`; this group SHALL NOT depend on `transformers`)
 - `openhands`: depends on `openhands>=1.16,<2`
 
 Each group SHALL pin an upper bound on its primary dependency to insulate cantus from breaking minor SDK releases between cantus releases. The `dev` extras group SHALL additionally depend on `pytest-recording>=0.13` to support cassette-based contract testing for provider adapters.
@@ -756,7 +756,7 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 
 - **WHEN** a user runs `pip install cantus[openai]`
 - **THEN** the `openai` package is installed at a version satisfying `>=1.50,<2`
-- **AND** no `anthropic`, `google-genai`, `groq`, `mcp`, `langchain-core`, `dspy-ai`, `transformers`, or `openhands` package is installed by this command
+- **AND** no `anthropic`, `google-genai`, `groq`, `mcp`, `langchain-core`, `dspy-ai`, `smolagents`, or `openhands` package is installed by this command
 
 #### Scenario: google extras install google-genai and not google-generativeai
 
@@ -776,13 +776,13 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 - **THEN** `openai` (`>=1.50,<2`), `anthropic` (`>=0.40,<1`), `google-genai` (`>=0.3,<1`), and `groq` (`>=0.11,<1`) packages are all installed
 - **AND** no `litellm` package is installed
 - **AND** no `google-generativeai` package is installed
-- **AND** no `mcp`, `langchain-core`, `dspy-ai`, `transformers`, or `openhands` package is installed by this aggregator (each requires its own extras)
+- **AND** no `mcp`, `langchain-core`, `dspy-ai`, `smolagents`, or `openhands` package is installed by this aggregator (each requires its own extras)
 
 #### Scenario: mcp extras install pinned SDK
 
 - **WHEN** a user runs `pip install cantus[mcp]`
 - **THEN** the `mcp` package is installed at a version satisfying `>=0.1,<2`
-- **AND** no other provider SDK (`openai`, `anthropic`, `google-genai`, `groq`) and no cross-framework adapter SDK (`langchain-core`, `dspy-ai`, `transformers`, `openhands`) is installed by this command
+- **AND** no other provider SDK (`openai`, `anthropic`, `google-genai`, `groq`) and no cross-framework adapter SDK (`langchain-core`, `dspy-ai`, `smolagents`, `openhands`) is installed by this command
 
 #### Scenario: langchain extras install langchain-core only
 
@@ -797,10 +797,11 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 - **THEN** the `dspy-ai` package is installed at a version satisfying `>=2.5,<3`
 - **AND** no other provider, MCP, or cross-framework adapter SDK is installed by this command
 
-#### Scenario: huggingface extras install transformers
+#### Scenario: huggingface extras install smolagents
 
 - **WHEN** a user runs `pip install cantus[huggingface]`
-- **THEN** the `transformers` package is installed at a version satisfying `>=4.40,<5`
+- **THEN** the `smolagents` package is installed at a version satisfying `>=1.26,<2`
+- **AND** the `transformers` package is NOT installed by this command
 - **AND** no other provider, MCP, or cross-framework adapter SDK is installed by this command
 
 #### Scenario: openhands extras install pinned SDK
@@ -825,7 +826,7 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 #### Scenario: Core install does not pull provider, MCP, or cross-framework adapter SDKs
 
 - **WHEN** a user runs `pip install cantus` with no extras
-- **THEN** none of `openai`, `anthropic`, `google-genai`, `groq`, `google-generativeai`, `litellm`, `mcp`, `langchain-core`, `dspy-ai`, `transformers`, or `openhands` is installed
+- **THEN** none of `openai`, `anthropic`, `google-genai`, `groq`, `google-generativeai`, `litellm`, `mcp`, `langchain-core`, `dspy-ai`, `smolagents`, or `openhands` is installed
 - **AND** `import cantus` succeeds in the resulting environment
 - **AND** `import cantus.adapters` succeeds (the package surface itself does not import any framework SDK at import time)
 - **AND** `from cantus.adapters import expose_as_anthropic_memory_tool` succeeds (pure-Python, no SDK)
@@ -835,9 +836,9 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 - **AND** `from cantus.adapters.huggingface import expose_as_hf_tool` raises `ImportError` whose message contains `"pip install cantus[huggingface]"`
 - **AND** `from cantus.adapters.openhands import expose_as_openhands_action` raises `ImportError` whose message contains `"pip install cantus[openhands]"`
 
-##### Example: extras matrix (v0.3.3)
+##### Example: extras matrix (huggingface group on smolagents)
 
-| extras       | openai | anthropic | google-genai | groq | mcp | langchain-core | dspy-ai | transformers | openhands | pytest-recording |
+| extras       | openai | anthropic | google-genai | groq | mcp | langchain-core | dspy-ai | smolagents   | openhands | pytest-recording |
 | ------------ | ------ | --------- | ------------ | ---- | --- | -------------- | ------- | ------------ | --------- | ---------------- |
 | (none)       | no     | no        | no           | no   | no  | no             | no      | no           | no        | no               |
 | openai       | yes    | no        | no           | no   | no  | no             | no      | no           | no        | no               |
@@ -852,11 +853,24 @@ The framework SHALL NOT require any of the four batch2 extras for the v0.3.2 cal
 | openhands    | no     | no        | no           | no   | no  | no             | no      | no           | yes       | no               |
 | dev          | no     | no        | no           | no   | no  | no             | no      | no           | no        | yes              |
 
+
 <!-- @trace
-source: cantus-adapter-layer-batch2
-updated: 2026-05-18
+source: cantus-hf-adapter-smolagents
+updated: 2026-09-05
 code:
-  - libs/cantus
+  - .github/workflows/test.yml
+  - docs/site/protocols/adapters.md
+  - .proj.tickets/pending/supply-chain-backlog/01-remediate-acknowledged-advisories.md
+  - cantus/adapters/huggingface.py
+  - .github/workflows/supply-chain.yml
+  - pyproject.toml
+  - cantus/adapters/__init__.py
+  - docs/site/zh-tw/protocols/adapters.md
+tests:
+  - tests/adapters/test_huggingface_real_sdk.py
+  - tests/adapters/test_huggingface.py
+  - tests/test_public_api.py
+  - tests/test_pyproject_extras_conflicts.py
 -->
 
 ---
