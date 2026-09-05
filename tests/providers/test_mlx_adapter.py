@@ -50,8 +50,8 @@ def _make_fake_mlx_lm() -> types.ModuleType:
         "tokenizer": _FakeTokenizer(),
     }
 
-    def load(model_id: str) -> tuple[str, _FakeTokenizer]:
-        state["load_calls"].append(model_id)
+    def load(model_id: str, **kwargs: Any) -> tuple[str, _FakeTokenizer]:
+        state["load_calls"].append((model_id, kwargs) if kwargs else model_id)
         return ("FAKE_MODEL", state["tokenizer"])
 
     def generate(model: Any, tokenizer: Any, prompt: Any, **kwargs: Any) -> str:
@@ -187,3 +187,32 @@ def test_non_apple_silicon_platform_message_names_the_constraint(
     assert "pip install cantus[mlx]" in message
     assert "Apple Silicon" in message
     assert "arm64" in message
+
+
+# --- Gate D audit M3 / M4: constructor kwargs reach mlx_lm.load, and stream()
+# rejects tools before the caller pulls the first item -----------------------
+
+
+def test_constructor_kwargs_are_forwarded_to_mlx_lm_load(
+    mlx_env: types.SimpleNamespace,
+) -> None:
+    """Options accepted at construction must not be silently discarded."""
+    model = mlx_env.module.MLXChatModel(
+        model_id="m", adapter_path="/tmp/lora", tokenizer_config={"eos_token": "<end>"}
+    )
+    model.chat([Message(role="user", content="hi")])
+    assert mlx_env.state["load_calls"] == [
+        ("m", {"adapter_path": "/tmp/lora", "tokenizer_config": {"eos_token": "<end>"}})
+    ]
+
+
+def test_stream_with_tools_raises_at_call_time_not_first_iteration(
+    mlx_env: types.SimpleNamespace,
+) -> None:
+    """``stream`` must not be a generator function: the ``tools`` rejection
+    has to fire when ``stream(...)`` is called, not when it is first iterated."""
+    model = mlx_env.module.MLXChatModel(model_id="m")
+    with pytest.raises(NotImplementedError) as exc:
+        model.stream([Message(role="user", content="hi")], tools=_TOOLS)
+    assert _NO_TOOLS in str(exc.value)
+    assert mlx_env.state["load_calls"] == []

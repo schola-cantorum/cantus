@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Gate D audit M6: state the token scope explicitly; this workflow only verifies.
+permissions:
+  contents: read
+
 jobs:
   # Lint results do not vary by platform or Python version, so this job pins a
   # single runner instead of repeating the test job's matrix. It runs `ruff

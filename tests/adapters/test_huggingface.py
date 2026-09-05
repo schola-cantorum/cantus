@@ -387,3 +387,32 @@ def test_import_rejects_non_hf_tool(fake_smolagents):
             match="import_hf_tool expects smolagents.Tool",
         ):
             import_hf_tool(bad)  # type: ignore[arg-type]
+
+
+# --- Gate D audit M1/M2: forward() is built without exec and tolerates any
+# identifier, including names of builtins the old generated body relied on ----
+
+
+def test_expose_accepts_property_named_type(fake_smolagents):
+    """A JSON-Schema property called ``type`` used to shadow ``type(self)`` in
+    the generated ``forward`` body and fail at call time; the closure-based
+    forward has no such namespace to shadow."""
+    from cantus.adapters.huggingface import expose_as_hf_tool
+
+    hf_tool = expose_as_hf_tool(
+        _SpecSkill(
+            {"type": {"type": "string"}, "print": {"type": "integer"}},
+            lambda **kw: kw,
+        )
+    )
+    assert set(hf_tool.inputs) == {"type", "print"}
+    assert hf_tool(type="x", print=1) == {"type": "x", "print": 1}
+    assert hf_tool("y", 2) == {"type": "y", "print": 2}
+
+
+def test_forward_is_not_generated_with_exec(fake_smolagents):
+    import inspect as _inspect
+
+    import cantus.adapters.huggingface as module
+
+    assert "exec(" not in _inspect.getsource(module)

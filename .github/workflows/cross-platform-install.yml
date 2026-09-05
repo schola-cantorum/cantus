@@ -10,6 +10,10 @@ on:
       - "scripts/smoke_install.sh"
       - ".github/workflows/cross-platform-install.yml"
 
+# Gate D audit M6: state the token scope explicitly; this workflow only verifies.
+permissions:
+  contents: read
+
 jobs:
   install-smoke:
     name: install smoke on ${{ matrix.os }}
