@@ -135,4 +135,8 @@ jobs:
             --ignore-vuln PYSEC-2025-217 \
             --ignore-vuln PYSEC-2026-2288 \
             --ignore-vuln PYSEC-2026-2289 \
-            --ignore-vuln PYSEC-2026-2290
+            --ignore-vuln PYSEC-2026-2290 \
+            `# CVE-2026-9856 — transformers 4.57.6, fixed only in 5.10.0; this job` \
+            `# installs the huggingface extra (transformers<5), so the fix is` \
+            `# unreachable here. Tracked in supply-chain-backlog/01.` \
+            --ignore-vuln CVE-2026-9856

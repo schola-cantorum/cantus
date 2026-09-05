@@ -34,3 +34,13 @@ The five packages, and why each is a decision rather than a bump:
 - [ ] The audit workflow's ignore list shrinks to only what remains unresolvable
 - [ ] The audit is green with no acknowledged advisory that has an available fix
 - [ ] The compatibility impact of every raised floor is stated
+
+## Log
+
+- 2026-09-05: the `pip-audit (main)` job went red on PR #32 with a newly
+  published advisory, CVE-2026-9856 (transformers 4.57.6, fixed in 5.10.0).
+  Same shape as the existing transformers entries — the fix lives only in the
+  5.x line and the job installs the `huggingface` extra (`transformers<5`), so
+  it was acknowledged in the workflow under the transformers block. The
+  acknowledged list is now 20 entries; nothing here changes the decision this
+  ticket is waiting on.
