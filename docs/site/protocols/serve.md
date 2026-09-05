@@ -221,6 +221,16 @@ curl 'http://localhost:8765/events?limit=20&offset=0'
 
 If the EventStream is not configured or no events have been recorded yet, the endpoint returns an empty list `[]` with HTTP `200` (**not** `404`).
 
+`serve()` does not wire a persistence layer for you. Attach one to the app after building it, otherwise the endpoint always answers `[]`:
+
+```python
+from cantus import JsonLinesPersistence
+from cantus.serve import serve
+
+app = serve(registry)
+app.state.event_persistence = JsonLinesPersistence("events.jsonl")
+```
+
 ### Turning the dashboard off
 
 Pass `Settings(dashboard=False)` and all three endpoints become `404`, while every Skill invoke endpoint (`POST /skills/<name>`) is **unaffected**:

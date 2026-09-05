@@ -64,7 +64,7 @@ pip install 'cantus-agent[serve]==0.5.0'
 用一個新的 `Registry` 在 `127.0.0.1:8765` 啟動內建的 FastAPI app：
 
 ```python
-from cantus import serve
+from cantus.serve import serve
 from cantus.core.registry import Registry
 import uvicorn
 app = serve(Registry())
@@ -96,7 +96,8 @@ model_handle = mount_drive_and_load(variant="E4B")
 agent = Agent(model=model_handle)
 
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 ## 多 provider 快速上手（v0.2.1）
@@ -111,7 +112,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("openai/gpt-4o-mini")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Anthropic（`pip install 'cantus-agent[anthropic]'`，並設定 `ANTHROPIC_API_KEY`）：
@@ -122,7 +124,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("anthropic/claude-sonnet-4-6")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Google Gemini（`pip install 'cantus-agent[google]'`，並設定 `GOOGLE_API_KEY`；使用 `google-genai`，**非**舊版 `google-generativeai`）：
@@ -133,7 +136,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("google/gemini-2.0-flash")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Groq（`pip install 'cantus-agent[groq]'`，並設定 `GROQ_API_KEY`）：
@@ -144,7 +148,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("groq/llama-3.3-70b-versatile")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 NVIDIA NIM（`pip install 'cantus-agent[openai]'` — NIM 走 OpenAI SDK，因此**不**另開 `cantus-agent[nvidia]` extras；設定 `NVIDIA_API_KEY`）：
@@ -155,7 +160,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 `cantus-agent[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus-agent[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
@@ -169,7 +175,7 @@ print(result.final_answer)
 兩個 protocol kind（cantus 正式註冊與 dispatch 的對象）：
 
 - **Skill** —— agent 可以呼叫的函式（tool use）。以 `@skill` 裝飾或繼承 `Skill` 類別。
-- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`。
+- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`、`MarkdownMemory`，以及把任一 backend 以四個 Skill 開放給 LLM 操作的 `AutoMemory` 包裝。
 
 Hook helper（pre- ／ post-loop 工具，不屬於 protocol kind）：
 
@@ -182,7 +188,7 @@ Workflows building block：
 
 ## Documentation
 
-文件以 **VitePress 站台**發布（原始檔在 [`docs/site/`](./docs/site/)，English + 繁體中文）——本機用 `npm run docs:build` 建置，部署到 Cloudflare Pages。給 NotebookLM 的語料產生在 [`docs/api/`](./docs/api/)，互動式手冊則是 [`cantus-manual.html`](./cantus-manual.html)。
+文件以 **VitePress 站台**發布（原始檔在 [`docs/site/`](./docs/site/)，English + 繁體中文）——本機用 `npm run docs:build` 建置；`docs.yml` workflow 會在每次 push 與 pull request 建置兩種語系，發佈到 Cloudflare Pages 的設定不在本 repo 內（這裡沒有 deploy 步驟）。給 NotebookLM 的語料產生在 [`docs/api/`](./docs/api/)，互動式手冊則是 [`cantus-manual.html`](./cantus-manual.html)。
 
 站台是 overview、quickstart、protocol 指南與 cookbook 的正本。另有兩份資源放在站台之外：
 

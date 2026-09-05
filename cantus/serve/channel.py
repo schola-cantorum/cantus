@@ -1,9 +1,10 @@
 """cantus.serve.channel — Channel Protocol + LocalMockReceiver.
 
 The `Channel` Protocol defines a bidirectional message-passing contract that
-external platform adapters (LINE / Telegram / Discord / Google Chat) will
-implement in v0.4.2 / v0.4.3. cantus-serve-core ships exactly one concrete
-implementation, `LocalMockReceiver`, used only as the ARCH-2 cross-capability
+external platform adapters implement. The concrete channels live in
+`cantus.serve.channels`: LINE + Telegram (`WebhookChannel`), Discord
+(`RealtimeChannel` + `WebhookChannel`) and Google Chat (`RealtimeChannel`). This module itself ships one in-process implementation,
+`LocalMockReceiver`, used only as the ARCH-2 cross-capability
 smoke-test load-bearer — it is in-process, in-memory, and intentionally not
 suitable for any production transport.
 """
@@ -39,8 +40,8 @@ class Channel(Protocol):
 
     A class conforms to this Protocol if it exposes both methods with the
     signatures below. cantus does not impose transport or platform semantics;
-    concrete LINE / Telegram / Discord / Google Chat channels are scheduled
-    for v0.4.2 / v0.4.3.
+    concrete LINE / Telegram / Discord / Google Chat channels ship in
+    `cantus.serve.channels`.
     """
 
     def receive(self) -> dict[str, Any]:

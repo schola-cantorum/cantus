@@ -8,9 +8,10 @@ on:
 jobs:
   # Lint results do not vary by platform or Python version, so this job pins a
   # single runner instead of repeating the test job's matrix. It runs `ruff
-  # check` only — formatting is deliberately not enforced (see CONTRIBUTING).
+  # check` plus `mypy cantus` (the strict baseline declared in pyproject);
+  # formatting is deliberately not enforced (see CONTRIBUTING).
   lint:
-    name: ruff
+    name: ruff + mypy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
@@ -21,13 +22,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install cantus with dev extras
+      - name: Install cantus with dev + serve + providers + tui extras
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,serve,providers,tui]"
 
       - name: Run ruff
         run: ruff check .
+
+      - name: Run mypy (strict baseline, cantus package)
+        run: mypy cantus
 
   test:
     name: pytest on Python ${{ matrix.python-version }}

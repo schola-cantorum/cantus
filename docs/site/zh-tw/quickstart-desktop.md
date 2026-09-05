@@ -36,7 +36,7 @@ set OPENAI_API_KEY=sk-...
 ### 3. 定義一個 skill
 
 ```python
-from cantus import skill, Agent, load_chat_model
+from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
 
 @skill
 def add(a: int, b: int) -> int:
@@ -47,11 +47,11 @@ def add(a: int, b: int) -> int:
 ### 4. 載入 chat model
 
 ```python
-model = load_chat_model("openai/gpt-4o-mini")
-agent = Agent(model=model)
+chat = load_chat_model("openai/gpt-4o-mini")
+agent = Agent(model=ChatModelAsHandle(chat))
 ```
 
-`load_chat_model("openai/gpt-4o-mini")` 會從環境變數讀取 `OPENAI_API_KEY`，再走 OpenAI Chat Completions API。同一個 factory 也吃 `"anthropic/claude-..."`、`"google/gemini-..."`、`"groq/..."`，前提是你裝好對應的 extras（`uv pip install "cantus-agent[anthropic,google,groq]"`）。
+`load_chat_model("openai/gpt-4o-mini")` 會從環境變數讀取 `OPENAI_API_KEY`，再走 OpenAI Chat Completions API。同一個 factory 也吃 `"anthropic/claude-..."`、`"google/gemini-..."`、`"groq/..."`，前提是你裝好對應的 extras（`uv pip install "cantus-agent[anthropic,google,groq]"`）。`Agent` 只認 Tier 1 的 `.generate(prompt) -> str` 介面，所以 `ChatModel` 一定要先用 `ChatModelAsHandle` 包起來再交給它。
 
 ### 5. 跑這個 agent
 
@@ -166,5 +166,5 @@ print(response.message.content)
 
 - [`quickstart.md`](./quickstart.md) — Colab 優先的快速上手，透過 Google Drive 快取載入 4-bit Gemma。
 - [`cookbook/`](./cookbook/) — 一系列可直接跑的食譜，涵蓋 workflows、多供應商路由、retrieval，以及 `cantus.serve` 的 FastAPI app。
-- `cantus-agent[serve]` — 把你的 agent 包進一個 FastAPI HTTP 端點背後（`from cantus import serve`）。
+- `cantus-agent[serve]` — 把你的 agent 包進一個 FastAPI HTTP 端點背後（`from cantus.serve import serve`）。
 - [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — 為什麼這份教學選了 `cloudflared` 而不是 `ngrok`（免費隨機子網域、不會留下 auth token、`Ctrl-C` 收得乾淨俐落）。

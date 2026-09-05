@@ -6,8 +6,8 @@
 
 ```
 +-----------------------------------------------------+
-|  User Code        @skill / @memory + analyzer /     |  <- decorator-first
-|                   validator hook helpers            |
+|  User Code        @skill + Memory subclass + hook   |  <- decorator-first
+|                   helpers (analyzer / validator)    |
 +-----------------------------------------------------+
 |  Protocols        skill | memory (two protocol      |  <- two kinds + hook
 |                   kinds) + analyzer / validator     |     helpers + workflows
@@ -27,13 +27,12 @@ You write the top layer: plain Python functions registered as protocols through 
 | Category                  | Role                                                                              | Return type        |
 | ------------------------- | --------------------------------------------------------------------------------- | ------------------ |
 | `skill` (protocol kind)   | A single atomic capability, such as a table lookup or an API call                 | Any value          |
-| `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, and so on) | The relevant memory interface |
+| `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, plus the AutoMemory wrapper) | The relevant memory interface |
 | `analyzer` (hook helper)  | Reads the input before the agent loop starts and produces a structured insight    | dataclass / dict   |
 | `validator` (hook helper) | Checks whether the agent output is acceptable, and can trigger a retry            | `Result(ok, ...)`  |
 | `cantus.workflows`        | A namespace of building blocks for composing skills and hooks into a flow         | Any value          |
-| `tool`                    | A function-call schema wrapper exposed to the LLM                                 | Any value          |
 
-cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they run around the agent loop instead of being dispatched inside it. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. `tool` remains the outward-facing interface for LLM function calling.
+cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they run around the agent loop instead of being dispatched inside it. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Skill's `spec_for_llm()`; there is no separate `tool` category.
 
 ## Model Providers
 

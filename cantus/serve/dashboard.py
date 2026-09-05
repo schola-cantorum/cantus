@@ -5,7 +5,8 @@ Provides the constants and the route-registration helper used by
 
 * ``GET /skills``  — list each Skill's ``spec_for_llm()`` projection.
 * ``GET /health``  — liveness + cantus version.
-* ``GET /events``  — last N persisted EventStream entries.
+* ``GET /events``  — last N entries from the host-attached
+  ``app.state.event_persistence`` (``[]`` when nothing is attached).
 
 When ``Settings.dashboard`` is False, the entire router is omitted and the
 three paths return 404 (FastAPI default behaviour for unregistered routes);

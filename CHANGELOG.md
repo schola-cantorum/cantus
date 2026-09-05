@@ -10,7 +10,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### ✨ 新增 (Added)
 
-- **唯讀 runtime introspection API**：新增 `/introspection` 端點群（`skills` / `sessions` / `permissions` / `queues` / `workflows/{run_id}` / `dataflow`，外加 roll-up `GET /introspection`），含 6 個 Pydantic 唯讀 read-model、從現有 runtime 物件投影 snapshot 的 collector，以及輕量唯讀 `SessionTracker`（每處理一次 skill 端點呼叫 / channel 訊息記一筆）。`cantus.config.Settings` 新增 `introspection` 與 `introspection_requires_auth` 兩個旗標，鏡像既有的 `dashboard` / `dashboard_requires_auth` 閘門。全部唯讀（無 POST/PUT/DELETE），不改 agent 執行流程。([#13])
+- **唯讀 runtime introspection API**：新增 `/introspection` 端點群（`skills` / `sessions` / `permissions` / `queues` / `workflows/{run_id}` / `dataflow`，外加 roll-up `GET /introspection`），含 6 個 Pydantic 唯讀 read-model、從現有 runtime 物件投影 snapshot 的 collector，以及輕量唯讀 `SessionTracker`（每處理一次 skill 端點呼叫記一筆）。`cantus.config.Settings` 新增 `introspection` 與 `introspection_requires_auth` 兩個旗標，鏡像既有的 `dashboard` / `dashboard_requires_auth` 閘門。全部唯讀（無 POST/PUT/DELETE），不改 agent 執行流程。([#13])
 - **`cantus tui` 終端機儀表板**：新增 `cantus tui` CLI 子指令——獨立的 Textual client，連到另一個 process 執行中的 serve、依固定間隔輪詢唯讀 introspection 端點並繪製儀表板；auth header 由環境變數帶入且絕不外洩 token、server 不可達時優雅降級而非崩潰、且只發出 GET 請求（唯讀）。([#14])
 - **`cantus tui` 五分頁介面**：將 TUI 重構為 Textual `TabbedContent` 五分頁（Dashboard / Skills / Permissions / Dataflow / Inspector），數字鍵 1–5 切頁、保留 `r` / `p` / `q`。新增 Skills 面板（列出註冊技能 name / description / args 並標記目前有 running session 的技能）、Permissions 面板（顯示 `auth_mode`、`dashboard_requires_auth`、`introspection_requires_auth`、`gated_routes`，絕不顯示 token）、Dataflow 面板（元件拓樸鄰接清單），並把 run drill-down 升級為 Inspector 面板呈現完整時間軸 trace。([#15])
 - **新增 `tui` optional-dependency extra**（`textual`，含 Rich；`httpx` 自帶以支援僅安裝 client 的情境）：`pip install 'cantus-agent[tui]'`。([#14])

@@ -221,6 +221,16 @@ curl 'http://localhost:8765/events?limit=20&offset=0'
 
 如果 EventStream 還沒配置，或是還沒有任何事件被記錄下來，這個 endpoint 會回一個空 list `[]`，HTTP 狀態是 `200`（**不是** `404`）。
 
+`serve()` 不會替你接上持久化層。建好 app 之後自己掛上去，否則這個 endpoint 永遠回 `[]`：
+
+```python
+from cantus import JsonLinesPersistence
+from cantus.serve import serve
+
+app = serve(registry)
+app.state.event_persistence = JsonLinesPersistence("events.jsonl")
+```
+
 ### 關掉 dashboard
 
 傳 `Settings(dashboard=False)` 進去，上面三個 endpoint 全部變成 `404`，而每個 Skill 的 invoke endpoint（`POST /skills/<name>`）**完全不受影響**：

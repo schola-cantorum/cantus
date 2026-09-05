@@ -13,7 +13,7 @@ Cantus 是一套教學框架，主要為了在 Google Colab 上教學生組裝 L
 3. **預期 vs 實際**：你預期看到什麼？實際看到什麼（含完整 traceback）？
 4. **已嘗試**：你已經試過哪些排查（避免重複建議）
 
-對於「框架行為怪異」的 bug，請優先確認你 install 的 Cantus 版本（`pip show cantus`）與你引用的 source code 版本一致 —— 框架最近的歷史就是被「Drive snapshot 與本機不同步」這類問題咬過。
+對於「框架行為怪異」的 bug，請優先確認你 install 的 Cantus 版本（`pip show cantus-agent`）與你引用的 source code 版本一致 —— 框架最近的歷史就是被「Drive snapshot 與本機不同步」這類問題咬過。
 
 ## Pull Request 流程
 

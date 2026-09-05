@@ -36,7 +36,7 @@ set OPENAI_API_KEY=sk-...
 ### 3. Define a skill
 
 ```python
-from cantus import skill, Agent, load_chat_model
+from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
 
 @skill
 def add(a: int, b: int) -> int:
@@ -47,11 +47,11 @@ def add(a: int, b: int) -> int:
 ### 4. Load a chat model
 
 ```python
-model = load_chat_model("openai/gpt-4o-mini")
-agent = Agent(model=model)
+chat = load_chat_model("openai/gpt-4o-mini")
+agent = Agent(model=ChatModelAsHandle(chat))
 ```
 
-`load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`).
+`load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`). `Agent` only speaks the Tier 1 `.generate(prompt) -> str` protocol, so a `ChatModel` must be wrapped in `ChatModelAsHandle` before it is passed in.
 
 ### 5. Run the agent
 
@@ -166,5 +166,5 @@ print(response.message.content)
 
 - [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
 - [`cookbook/`](./cookbook/) — runnable recipes covering workflows, multi-provider routing, retrieval, and the `cantus.serve` FastAPI app.
-- `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus import serve`).
+- `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus.serve import serve`).
 - [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).
