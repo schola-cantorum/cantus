@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cantus-agent"
-version = "0.5.0"
+version = "0.6.0"
 description = "Cantus — A polyphonic framework for composing LLM agent harnesses (教學用)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -167,7 +167,7 @@ security = [
 ollama = [
     "cantus-agent[openai]",
 ]
-# post-v0.5.0 (unreleased) cantus-local-llm-omlx-server — documentary alias for the local
+# v0.6.0 cantus-local-llm-omlx-server — documentary alias for the local
 # OpenAI-compatible MLX server path (omlx / mlx-omni-server). `OmlxChatModel`
 # is a thin `OpenAIChatModel` subclass pointing at a localhost server, so it
 # runs on the openai SDK (same pattern as `OllamaChatModel` / `NvidiaChatModel`).
@@ -195,7 +195,7 @@ tui = [
     "textual>=8,<9",
     "httpx>=0.27,<1",
 ]
-# post-v0.5.0 (unreleased) cantus-local-llm-mlx-path — in-process local LLM via Apple's mlx-lm.
+# v0.6.0 cantus-local-llm-mlx-path — in-process local LLM via Apple's mlx-lm.
 # `MLXChatModel` (provider prefix `mlx`) loads weights with mlx_lm.load and
 # generates with mlx_lm.generate / stream_generate; it is NOT OpenAI-compatible
 # and carries its own extras closure (unlike the ollama/nvidia documentary
@@ -294,7 +294,7 @@ module = [
     "fastapi.*",
     "uvicorn.*",
     "pydantic_settings.*",
-    # post-v0.5.0 (unreleased) cantus-local-llm-mlx-path — mlx-lm ships no py.typed marker, so
+    # v0.6.0 cantus-local-llm-mlx-path — mlx-lm ships no py.typed marker, so
     # strict mypy treats `import mlx_lm` as untyped without this override.
     "mlx_lm.*",
     # cantus-hf-adapter-smolagents — smolagents ships no py.typed marker, so
@@ -345,7 +345,7 @@ conflicts = [
     # uv does not auto-propagate alias-target conflicts, so this entry is
     # required for `uv sync` universal resolution to succeed.
     [{ extra = "ollama" }, { extra = "openhands" }],
-    # post-v0.5.0 (unreleased) cantus-local-llm-omlx-server — `omlx` is a documentary alias for
+    # v0.6.0 cantus-local-llm-omlx-server — `omlx` is a documentary alias for
     # `openai` (it targets a local OpenAI-compatible MLX server), so it inherits
     # the same transitive openai>=1.50,<2 pin and the same incompatibility with
     # `openhands`. Mirrors the `ollama`↔`openhands` entry above.

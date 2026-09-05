@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://pypi.org/project/cantus-agent/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/cantus-agent.svg"></a>
   <a href="LICENSE"><img alt="license ECL-2.0" src="https://img.shields.io/badge/license-ECL--2.0-green"></a>
-  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
+  <a href="https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/task_template.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg"></a>
 </p>
 
 <div align="center">
@@ -30,8 +30,8 @@ Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent
 
 | Notebook | 對象 | 一鍵啟動 |
 | --- | --- | --- |
-| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb) |
-| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/admin_setup.ipynb) |
+| `notebooks/task_template.ipynb` | 一般使用者 —— 建立你的第一個 agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/task_template.ipynb) |
+| `notebooks/admin_setup.ipynb` | 管理者 —— 把 Gemma 4 權重鏡像到 Drive（在下游使用者執行前先跑一次） | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.6.0/notebooks/admin_setup.ipynb) |
 
 建議的執行順序與 tag pinning 慣例詳見 [`notebooks/README.md`](./notebooks/README.md)。
 
@@ -39,10 +39,10 @@ Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent
 
 ```bash
 # PyPI（推薦 —— reproducible，不必 clone Git）。Distribution 名稱是 `cantus-agent`；Python import 名稱仍然是 `cantus`。
-pip install cantus-agent==0.5.0
+pip install cantus-agent==0.6.0
 
 # Git 安裝路徑 —— 用於追蹤 main / feature branch / 特定 commit 的 escape hatch
-pip install git+https://github.com/schola-cantorum/cantus@v0.5.0
+pip install git+https://github.com/schola-cantorum/cantus@v0.6.0
 pip install git+https://github.com/schola-cantorum/cantus@main
 pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 ```
@@ -50,13 +50,13 @@ pip install git+https://github.com/schola-cantorum/cantus@<commit-sha>
 Runtime extras（Gemma 4 + transformers + bitsandbytes）需要：
 
 ```bash
-pip install 'cantus-agent[runtime]==0.5.0'
+pip install 'cantus-agent[runtime]==0.6.0'
 ```
 
 Serve extras（v0.4.0 —— FastAPI app factory；會一併安裝 `fastapi`、`uvicorn`、`pydantic-settings`）：
 
 ```bash
-pip install 'cantus-agent[serve]==0.5.0'
+pip install 'cantus-agent[serve]==0.6.0'
 ```
 
 ## Serve Quickstart（v0.4.0）
@@ -75,7 +75,7 @@ uvicorn.run(app, host="127.0.0.1", port=8765)
 
 ```bash
 curl http://localhost:8765/health
-# {"status":"ok","cantus_version":"0.5.0"}
+# {"status":"ok","cantus_version":"0.6.0"}
 ```
 
 ## 桌面（Win / macOS / Linux）
@@ -215,6 +215,7 @@ Workflows building block：
 - [v0.4.5 → v0.4.6](./docs/migrations/MIGRATION_v0.4.5_to_v0.4.6.md)
 - [v0.4.6 → v0.4.7](./docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md)
 - [v0.4.7 → v0.5.0](./docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)
+- [v0.5.0 → v0.6.0](./docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)
 
 非 breaking 的所有變動（新增功能、內部變動、安全性 note）都記錄於 [`CHANGELOG.md`](./CHANGELOG.md)。
 

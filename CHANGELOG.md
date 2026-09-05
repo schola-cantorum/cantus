@@ -4,6 +4,41 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## ✨ [0.6.0] - 2026-09-06
+
+> Era 3 桌面本機 LLM 里程碑：`mlx`（Apple Silicon in-process）與 `omlx`（本機 OpenAI-compatible MLX 伺服器）兩個 provider、huggingface adapter 移植到 `smolagents.Tool`、channel 層 base-exception 政策、四道 CI 閘門（lint／strict typing／supply-chain／dev-path）、VitePress 雙語文件站，以及 Gate D 稽核硬化。從上一個 PyPI release v0.5.0 單步升級；一處契約層 breaking（詳見下方）。完整升版說明見 [`MIGRATION_v0.5.0_to_v0.6.0.md`](docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)。
+
+### 💥 Breaking Changes
+
+- **`cantus.adapters.expose_as_hf_tool` / `import_hf_tool` 改對準 `smolagents.Tool`**：`transformers.Tool` 自 transformers 4.53.0 起已被上游移除，`huggingface` extra 原本釘的 `transformers>=4.40,<5` 解析到的版本沒有它，因此 v0.5.0 的這個 adapter 在任何可安裝版本上都無法 import。現在 `expose_as_hf_tool` 回傳 `smolagents.Tool`、`import_hf_tool` 只接受 `smolagents.Tool`（含 `@smolagents.tool` 產生的實例），`TypeError` 字面值改為 `import_hf_tool expects smolagents.Tool`。公開函式名、extra 名稱、SDK-gate 訊息 `pip install cantus[huggingface]`、`huggingface_handshake_failed` / `huggingface_remote_error` 命名全部保留。([#33])
+  遷移方式：`pip install 'cantus-agent[huggingface]==0.6.0'` 會裝 `smolagents>=1.26,<2` 而非 transformers；匯出的工具交給 `smolagents.CodeAgent` / `ToolCallingAgent`；匯出工具不支援 `to_dict()` / `save()` / `push_to_hub()`（動態類別無原始碼）。
+
+### ✨ 新增 (Added)
+
+- **`mlx/<model_id>` provider（`MLXChatModel`）**：在 Apple Silicon 上以 `mlx-lm` in-process 執行本機模型，權重於第一次 `chat` / `stream` 才載入；`supports_tool_use = False`，帶 `tools` 呼叫會以 `NotImplementedError` 明確拒絕。`pip install 'cantus-agent[mlx]'`，extra 帶 `darwin` / `arm64` 平台 marker，其他平台的 ImportError 會指名這個限制。([#20])
+- **`omlx/<model>` provider（`OmlxChatModel`）**：對本機 OpenAI-compatible MLX 伺服器（omlx、mlx-omni-server）的 client，`base_url` 必填無預設；伺服器不驗證身分，未給 `api_key` 時送出 sentinel 憑證 `omlx`，且 `api_key=""` 不再落回 `OPENAI_API_KEY`。走既有 `openai` extra（`omlx` 為其文件性別名）。([#21])
+- **`mlx` 與 `huggingface` extras 可同時安裝**：`huggingface` 不再釘 transformers `<5`，`[tool.uv].conflicts` 中兩者的互斥條目移除。([#33])
+- **VitePress 雙語文件站**：`docs/site/`（English）與 `docs/site/zh-tw/`（繁體中文（台灣））各 25 頁，`npm run docs:build` 建置；互動式手冊 `docs/interactive/` 鏡射到站內 `/interactive/`；NotebookLM 語料由 `npm run docs:api` 產生到 `docs/api/`，CI 驗證已提交語料與站內來源同步。舊的 `docs/*.md` 頁縮為轉址 stub。([#22], [#23], [#24], [#25])
+- **CI 閘門**：`ruff check`（明確宣告規則集）與 `mypy cantus`（`strict = true`）成為獨立 lint job；`supply-chain.yml` 對 `main` / `mlx` / `openhands` 三個 install group 跑 `pip-audit`；`repo-hygiene.yml` 執行 `scripts/check_no_dev_paths.sh` 並附 pre-commit hook；所有 workflow 明確宣告 `permissions: contents: read`（release 另有 OIDC 的 `id-token: write`）。`tests/test_guardrail_config.py` 斷言這些閘門存在且行為與文件宣稱一致。([#28], [#32], [#35])
+- **決策與詞彙紀錄**：`docs/adr/0001`（supply-chain 稽核在 CI 執行）、`docs/adr/0002`（base-exception guard 不設豁免清單）；`CONTEXT.md` 詞彙表與 `.proj.tickets/` 版控 issue tracker。
+
+### 🔄 變更 (Changed)
+
+- **channel 層 base-exception 政策**：production 程式碼不再吞掉 `asyncio.CancelledError` / `KeyboardInterrupt` / `SystemExit`。`GoogleChatPubSubChannel.connect()` 被自家 `disconnect()` 取消時乾淨返回，其他來源的取消則 re-raise；一般 `Exception` 的 nack / best-effort close / reconnect backoff 行為不變。跨碼庫 AST guard 鎖住此政策。若你 await channel task 並依賴取消被吸收，現在它會浮上來。([#31])
+- 16 份 `MIGRATION_*.md` 從 repo 根目錄搬入 `docs/migrations/`；README 升版指南連結補齊 16 版並改用動態 PyPI badge。([#17], [#18], [#19])
+- `cantus.__version__` `"0.5.0"` → `"0.6.0"`；`pyproject.toml [project].version` 同步保持一致。
+
+### 🐛 修復 (Fixed)
+
+- **第三方稽核找到的 15 條文件↔程式碼 drift**：README ×2 的 `result.final_answer`（`AgentState` 無此屬性，改讀 `state.stream[-1]`）、desktop quickstart 把 `ChatModel` 直接餵給 `Agent`（須以 `ChatModelAsHandle` 包裝）、provider 頁從空的 `cantus.model` 匯入、`llms.txt` 停在 v0.1.3 的五 protocol API、`docs/README.md` 四個死連結、Memory 清單漏列 `MarkdownMemory` / `AutoMemory`、安裝名 `cantus[...]` 與 `cantus-agent[...]` 混用等；同時修掉 `mypy cantus` 的 5 個 strict errors。([#32])
+- Notebooks 修至現行 v0.5.0 API（`result.final_answer`、`snapshot_download` 的 `local_dir_use_symlinks`、套件改名 `cantus-agent`）。
+- **Gate D 稽核 M1–M4**：`expose_as_hf_tool` 的 `forward` 不再以 `exec` 從 property 名產生原始碼，改為閉包加合成 `inspect.Signature`，property 名為 `type` / `print` 等內建名稱不再於呼叫時崩潰；`MLXChatModel(model_id, **kwargs)` 的 `kwargs` 現在真的轉交 `mlx_lm.load`（先前靜默丟棄）；`MLXChatModel.stream(..., tools=[...])` 的拒絕改在呼叫當下而非第一次迭代。([#35])
+
+### 🔒 安全性 (Security)
+
+- supply-chain 承認清單 20 → 15 條：transformers 的 5 條公告（含 CVE-2026-9856）隨 smolagents 移植消失；剩餘 15 條全屬 `dspy` / `langchain` / `openhands` 重型 extras，追蹤於 `.proj.tickets/pending/supply-chain-backlog/01`。([#33])
+- Gate D 對 v0.5.0 → v0.6.0 整包稽核：0 Critical / 6 Medium / 5 Low，四條 Medium 已在本版修復（見上方 Fixed），其餘一條 Medium（omlx `base_url` 非 loopback 守門，屬公開行為變更）與五條 Low 各開一張票於 `.proj.tickets/todo/gate-d-audit-followup/`。([#35])
+
 ## ✨ [0.5.0] - 2026-05-30
 
 > C-series 教學就緒里程碑：唯讀 runtime introspection API + `cantus tui` 五分頁終端機儀表板 + Gate C 安全性硬化，全程向下相容（additive + 兩處行為收緊）。從上一個 PyPI release v0.4.7 單步升級。完整升版說明見 [`MIGRATION_v0.4.7_to_v0.5.0.md`](docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)。
