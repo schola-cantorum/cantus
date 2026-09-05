@@ -64,7 +64,7 @@ pip install 'cantus-agent[serve]==0.5.0'
 Spin up the bundled FastAPI app on `127.0.0.1:8765` with a fresh `Registry`:
 
 ```python
-from cantus import serve
+from cantus.serve import serve
 from cantus.core.registry import Registry
 import uvicorn
 app = serve(Registry())
@@ -96,7 +96,8 @@ model_handle = mount_drive_and_load(variant="E4B")
 agent = Agent(model=model_handle)
 
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 ## Multi-provider quickstart (v0.2.1)
@@ -111,7 +112,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("openai/gpt-4o-mini")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Anthropic (install `pip install 'cantus-agent[anthropic]'`, set `ANTHROPIC_API_KEY`):
@@ -122,7 +124,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("anthropic/claude-sonnet-4-6")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Google Gemini (install `pip install 'cantus-agent[google]'`, set `GOOGLE_API_KEY`; uses `google-genai`, **not** the legacy `google-generativeai`):
@@ -133,7 +136,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("google/gemini-2.0-flash")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 Groq (install `pip install 'cantus-agent[groq]'`, set `GROQ_API_KEY`):
@@ -144,7 +148,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("groq/llama-3.3-70b-versatile")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 NVIDIA NIM (install `pip install 'cantus-agent[openai]'` — NIM runs on the OpenAI SDK, so there is **no** `cantus-agent[nvidia]` extras; set `NVIDIA_API_KEY`):
@@ -155,7 +160,8 @@ from cantus import Agent, ChatModelAsHandle, load_chat_model
 chat = load_chat_model("nvidia/meta/llama-3.3-70b-instruct")
 agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
 result = agent.run("What is 17 plus 25?")
-print(result.final_answer)
+final = result.stream[-1]  # FinalAnswerAction when the loop converged
+print(getattr(final, "answer", final))
 ```
 
 `cantus-agent[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus-agent[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
@@ -169,7 +175,7 @@ print(result.final_answer)
 Two protocol kinds (the things cantus formally registers and dispatches):
 
 - **Skill** — a function the agent can call (tool use). Decorate with `@skill` or subclass `Skill`.
-- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`.
+- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`, `MarkdownMemory`, plus the `AutoMemory` wrapper that exposes any backend to the LLM as four Skills.
 
 Hook helpers (pre- / post-loop tooling, not protocol kinds):
 
@@ -182,7 +188,7 @@ Workflows building block:
 
 ## Documentation
 
-The docs are published as a **VitePress site** in English and 繁體中文, with the source under [`docs/site/`](./docs/site/). Run `npm run docs:build` to build it locally; the published site lives on Cloudflare Pages. Two other artifacts round it out: a NotebookLM-ready corpus under [`docs/api/`](./docs/api/), and an interactive manual at [`cantus-manual.html`](./cantus-manual.html).
+The docs are published as a **VitePress site** in English and 繁體中文, with the source under [`docs/site/`](./docs/site/). Run `npm run docs:build` to build it locally. The `docs.yml` workflow builds both locales on every push and pull request; publishing to Cloudflare Pages is configured outside this repository, so no deploy step lives here. Two other artifacts round it out: a NotebookLM-ready corpus under [`docs/api/`](./docs/api/), and an interactive manual at [`cantus-manual.html`](./cantus-manual.html).
 
 The site is the canonical home for the overview, quickstart, protocol guides, and cookbook. Two references live outside it:
 

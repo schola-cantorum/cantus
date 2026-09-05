@@ -33,11 +33,7 @@ Because `step` can return either branch, callers must handle both an `Action` an
 state = agent.run("What's the weather in Taipei on 8/15?")
 ```
 
-Or pass a workflow explicitly:
-
-```python
-state = agent.run(my_workflow, query="user input")
-```
+The first positional parameter is named `workflow_or_query` for forward compatibility, but the loop does not consult a workflow object: pass the query string directly (or as `query=`). `cantus.workflows` building blocks run on their own via `.run(input)` and do not go through `Agent.run`.
 
 `run` returns an `AgentState`, which carries the `query` and the `stream`. The loop works like this:
 

@@ -6,8 +6,8 @@
 
 ```
 +-----------------------------------------------------+
-|  User Code        @skill / @memory + analyzer /     |  <- decorator-first
-|                   validator hook helpers            |
+|  User Code        @skill + Memory subclass + hook   |  <- decorator-first
+|                   helpers (analyzer / validator)    |
 +-----------------------------------------------------+
 |  Protocols        skill | memory (two protocol      |  <- two kinds + hook
 |                   kinds) + analyzer / validator     |     helpers + workflows
@@ -27,13 +27,12 @@
 | 類別                       | 角色                                                                              | 回傳型別          |
 | -------------------------- | --------------------------------------------------------------------------------- | ----------------- |
 | `skill`（protocol kind）   | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
-| `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory 等等）            | 對應的 memory 介面 |
+| `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory、MarkdownMemory，加上 AutoMemory 包裝）            | 對應的 memory 介面 |
 | `analyzer`（hook helper）  | 在 agent loop 開始前讀取輸入，產出一份結構化的 insight                            | dataclass / dict  |
 | `validator`（hook helper） | 檢查 agent 的輸出是否合格，必要時可以觸發 retry                                   | `Result(ok, ...)` |
 | `cantus.workflows`         | 一個命名空間，裡面放的是把 skill 與 hook 組合成流程的 building block               | 任意值            |
-| `tool`                     | 對 LLM 公開的 function-call schema wrapper                                        | 任意值            |
 
-cantus 剛好只有兩個 protocol kind：`skill`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們在 agent loop 的前後執行，而不是在 loop 裡被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。`tool` 則始終是朝外的那一層，專供 LLM 做 function calling。
+cantus 剛好只有兩個 protocol kind：`skill`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們在 agent loop 的前後執行，而不是在 loop 裡被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Skill 的 `spec_for_llm()`；沒有另外的 `tool` 類別。
 
 ## Model Provider
 

@@ -14,7 +14,7 @@ Cantus 用一個 `provider/model` 字串，透過 `load_chat_model` 載入聊天
 | `omlx` | 本機 OpenAI 相容 MLX 伺服器 | 連到本機的 `mlx-omni-server`；必須提供 `base_url`。 |
 
 ```python
-from cantus.model import load_chat_model
+from cantus import load_chat_model
 
 model = load_chat_model("openai/gpt-4o-mini")
 # swap the prefix to change backends without touching the rest of your code:

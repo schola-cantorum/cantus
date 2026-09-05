@@ -1,41 +1,49 @@
 # cantus
 
-> A Python framework for writing LLM agent harnesses on Google Colab. Students compose five protocol kinds (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`) over a Gemma 4 backbone. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
+> A Python framework for writing LLM agent harnesses, designed for teaching on Google Colab and usable from any desktop with an API key. Students compose two protocol kinds (`Skill`, `Memory`), two hook helpers (`Analyzer`, `Validator`) and five `cantus.workflows` building blocks over either a local Gemma 4 model or a cloud `ChatModel`. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
 
 ## Versioning
 
-- Current release: `v0.1.3`. Install with `pip install git+https://github.com/schola-cantorum/cantus@v0.1.3` (use `cantus[runtime]` extras for the Gemma 4 loader).
-- Notebooks: open `notebooks/task_template.ipynb` in Colab via `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.1.3/notebooks/task_template.ipynb`. The companion `notebooks/admin_setup.ipynb` mirrors Gemma 4 weights to Drive once per installation.
+- Current release: `v0.5.0` (PyPI name `cantus-agent`, import name `cantus`). Install with `pip install cantus-agent==0.5.0`; add extras as needed: `cantus-agent[runtime]` (local Gemma 4 loader), `cantus-agent[providers]` (openai + anthropic + google + groq), `cantus-agent[serve]` (FastAPI server + channels), `cantus-agent[tui]` (terminal dashboard).
+- Git install: `pip install git+https://github.com/schola-cantorum/cantus@v0.5.0`.
+- Notebooks: open `notebooks/task_template.ipynb` in Colab via `https://colab.research.google.com/github/schola-cantorum/cantus/blob/v0.5.0/notebooks/task_template.ipynb`. The companion `notebooks/admin_setup.ipynb` mirrors Gemma 4 weights to Drive once per installation.
 
 ## When to use this file
 
-Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@skill` / `@analyzer` / `@validator` / `@workflow`, or a `Memory` subclass. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
+Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@skill`, an `@analyzer` / `@validator` hook, a `Memory` subclass, or a `cantus.workflows` composition. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
 
 ## Public API surface
 
 ```python
 from cantus import (
     # Decorator entries (most common)
-    skill, analyzer, validator, workflow, debug,
-    # Function-pass entries (intermediate)
-    register_skill, register_analyzer, register_validator, register_workflow,
-    # Class-first base classes (canonical / advanced)
-    Skill, Analyzer, Validator, Workflow, Memory,
+    skill, debug,
+    # Function-pass entry
+    register_skill,
+    # Class-first base classes
+    Skill, Memory,
     # Memory implementations (class-only)
-    ShortTermMemory, BM25Memory, EmbeddingMemory,
+    ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, AutoMemory,
+    # Identity
+    Soul, SoulParseError,
     # Runtime
     Action, CallSkillAction, FinalAnswerAction,
     Observation, SkillObservation, ToolErrorObservation,
     ValidationErrorObservation, MaxIterationsObservation,
-    EventStream, Agent, Inspector,
-    # Validator return type
-    Result,
-    # Loader
+    EventStream, JsonLinesPersistence, Agent, AgentState, Inspector,
+    Registry, get_registry, Result,
+    # Tier 2 chat models (cloud / local servers)
+    ChatModel, Message, ToolCall, ChatResponse, ChatModelAsHandle, load_chat_model,
+    # Environment profiles
+    ColabEnvironment, LocalEnvironment, CloudOnlyEnvironment,
+    # Tier 1 local Gemma loader (not in __all__, but importable)
     mount_drive_and_load,
 )
+from cantus.hooks import analyzer, validator, Analyzer, Validator   # hook helpers
+from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
 ```
 
-Memory has **no** decorator and **no** function-pass entry. `from cantus import memory` and `from cantus import register_memory` both raise `ImportError` by design — memory needs state, so a class is required.
+Things that do **not** exist (do not generate them): `@memory`, `register_memory`, `@workflow`, `register_workflow`, `Workflow`, a top-level `analyzer` / `validator` import, and `state.final_answer`. Memory needs state, so it is a class. Analyzer and Validator are hook helpers imported from `cantus.hooks`; they attach to a Skill and are never registered on their own. Workflows are plain classes in `cantus.workflows`.
 
 ## Skill — a tool the LLM can call
 
@@ -56,7 +64,7 @@ def search_book(title: str, lang: str = "zh-TW") -> str:
     ...
 ```
 
-The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block becomes per-arg descriptions.
+The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block becomes per-arg descriptions. `@skill` registers the function into the process-wide `Registry` under kind `"skill"`, the only registry kind.
 
 Function-pass form: `register_skill(search_book)`.
 Class-first form:
@@ -70,53 +78,49 @@ class SearchBook(Skill):
     def run(self, title: str, lang: str = "zh-TW") -> str: ...
 ```
 
-## Analyzer — parse text into a typed value
+## Analyzer and Validator — hooks attached to a Skill
 
 ```python
-from cantus import analyzer
 from pydantic import BaseModel
+from cantus import skill
+from cantus.hooks import analyzer, validator, Result
 
 class Book(BaseModel):
     title: str
     isbn: str
 
 @analyzer
-def parse_book_list(text: str) -> list[Book]:
-    """Parse search_book output into Book models."""
+def parse_query(text: str) -> dict:
+    """Normalise the raw query before the skill runs."""
+    return {"title": text.strip()}
+
+@validator
+def ensure_isbn_valid(result: str) -> Result:
+    """Reject results whose ISBN-13 checksum fails."""
+    if checksum_ok(result):
+        return Result.success(result)
+    return Result.failure(f"ISBN checksum mismatch in {result}")
+
+@skill(pre_hook=parse_query, post_hook=ensure_isbn_valid)
+def search_book(title: str) -> str:
+    """Search the library catalog."""
     ...
 ```
 
-## Validator — return Result(ok, value, feedback)
+The agent runs `pre_hook(**args)` before the skill and `post_hook(result)` after it. A `post_hook` returning `Result(ok=False, ...)` becomes a `ValidationErrorObservation`; the loop shows the feedback to the LLM and retries up to `max_retries` (default 3). A validator must always return `Result.success(...)` or `Result.failure(...)`. The names `non_empty_final_answer` and `action_parse` are reserved for the framework's own validators.
+
+## Workflows — five plain-Python building blocks
 
 ```python
-from cantus import validator, Result
+from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
 
-@validator
-def ensure_isbn_valid(book: Book) -> Result:
-    """Verify ISBN-13 checksum."""
-    if checksum_ok(book.isbn):
-        return Result.success(book)
-    return Result.failure(f"ISBN checksum mismatch on {book.isbn}")
+pipeline = PromptChain(steps=[search_book, parse_book_list, pick_top_three])
+books = pipeline.run("sci-fi")
 ```
 
-The agent loop wraps `Result(ok=False, ...)` as a `ValidationErrorObservation` and retries the previous action up to `max_retries` (default 3).
+Each class takes registered `Skill` instances (or any callable) in its constructor and exposes `.run(input) -> output`. `Router(routes, classifier)` picks a branch; `Parallel(branches)` runs every branch (sequentially, in-process) and returns the list; `OrchestratorWorker(orchestrator, workers)` hands sub-tasks to workers round-robin; `EvaluatorOptimizer(generator, evaluator, max_iters=3)` loops until the evaluator accepts. Workflows never register themselves and never appear in the registry's LLM-facing spec.
 
-## Workflow — orchestrate skills, analyzers, validators
-
-```python
-from cantus import workflow
-
-@workflow
-def recommend_books(topic: str, n: int = 3) -> list[Book]:
-    """Search → parse → validate."""
-    raw = search_book(topic=topic, n=n)
-    parsed = parse_book_list(raw)
-    return [b for b in parsed if ensure_isbn_valid(b).ok]
-```
-
-A workflow is a regular Python function (or class with `run`). Calls to other registered protocols inside the body go through the registry and appear in the `EventStream` automatically.
-
-## Memory — class-only, three reference implementations
+## Memory — class-only, five built-in implementations
 
 ```python
 from cantus import Memory
@@ -138,12 +142,14 @@ class TopicMemory(Memory):
 Built-in implementations:
 
 - `ShortTermMemory(n=10)` — most recent N turns (`collections.deque`)
-- `BM25Memory(top_k=5)` — keyword retrieval (requires `rank-bm25`)
-- `EmbeddingMemory(top_k=5)` — semantic retrieval (requires `sentence-transformers`)
+- `BM25Memory(top_k=5)` — keyword retrieval (requires `cantus-agent[memory]`)
+- `EmbeddingMemory(top_k=5)` — semantic retrieval (requires `cantus-agent[memory]`)
+- `MarkdownMemory(path)` — turns persisted as Markdown chunks on disk
+- `AutoMemory(backend)` — wraps any `Memory` and exposes `view` / `create` / `str_replace` / `delete` Skills so the LLM edits its own memory
 
 ## Tool-call grammar (for reference)
 
-The agent constrains the LLM output to:
+The agent asks the LLM for exactly one JSON object per turn:
 
 ```json
 {
@@ -161,30 +167,54 @@ or, to terminate:
 }
 ```
 
-`thought` is **never** constrained by grammar — only `skill_name` (whitelist of registered skills) and `args` (Pydantic schema of the named skill) are.
+`skill_name` must be a registered skill and `args` must satisfy that skill's Pydantic schema; anything else is recorded as a `ValidationErrorObservation` and retried. `thought` is free text.
+
+## Running an agent
+
+```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model, mount_drive_and_load
+
+# Tier 1: local Gemma 4 on Colab (requires cantus-agent[runtime])
+model = mount_drive_and_load(variant="E4B")          # or "E2B"
+agent = Agent(model=model)
+
+# Tier 2: any cloud / local-server provider — MUST be wrapped in ChatModelAsHandle
+chat = load_chat_model("openai/gpt-4o-mini")          # reads OPENAI_API_KEY
+agent = Agent(model=ChatModelAsHandle(chat, system="You are terse."))
+
+state = agent.run("Recommend three sci-fi books", max_iterations=8)
+final = state.stream[-1]                               # FinalAnswerAction when converged
+print(getattr(final, "answer", final))
+```
+
+`agent.run(query)` returns an `AgentState` with `.query` and `.stream` (an `EventStream` of `Action` / `Observation` objects). There is no `final_answer` attribute on the state; the answer is `stream[-1].answer` when the last event is a `FinalAnswerAction`. If the loop hits `max_iterations`, the last event is a `MaxIterationsObservation` instead. `Inspector(state.stream).replay()` prints the full trace. Provider prefixes: `openai/`, `anthropic/`, `google/`, `groq/`, `nvidia/`, `ollama/`, `omlx/`, `mlx/` (the last three need no API key).
+
+## Serving skills over HTTP (optional, requires cantus-agent[serve])
+
+```python
+from cantus.serve import serve
+from cantus import get_registry
+import uvicorn
+
+app = serve(get_registry())          # each skill -> POST /skills/<name>; GET /health, /skills, /introspection
+uvicorn.run(app, host="127.0.0.1", port=8765)
+```
+
+Or from the shell: `cantus serve --registry-import my_module:registry`, then `cantus tui` for the read-only terminal dashboard.
 
 ## Common patterns
 
 ```python
-# Three-protocol pipeline
-@workflow
-def pipeline(query: str):
-    raw = search_book(query)
-    parsed = parse_book_list(raw)
-    return [b for b in parsed if ensure_isbn_valid(b).ok]
-
-# @debug stacking — opt-in trace
-from cantus import debug
+# @debug stacking — opt-in trace of a Skill / Analyzer / Validator instance
+from cantus import debug, skill
 @debug
 @skill
 def traced_search(title: str) -> str: ...
 # stdout will include: [debug] traced_search args=... result=...
 
-# Loading the model
-from cantus import mount_drive_and_load, Agent
-model = mount_drive_and_load(variant="E4B")  # or "E2B"
-agent = Agent(model=model)
-state = agent.run("Recommend three sci-fi books", max_iterations=8)
+# Give the agent a personality from a SOUL.md file
+from cantus import Agent, Soul
+agent = Agent(model=model, soul=Soul.from_file("SOUL.md"))
 ```
 
 ## Style rules for generated code
@@ -192,6 +222,8 @@ state = agent.run("Recommend three sci-fi books", max_iterations=8)
 - Always use type annotations on every parameter and return.
 - Always include a Google-style docstring with description and `Args:` block.
 - Decorator goes on the line *immediately above* the function definition.
-- Stack `@debug` *above* `@skill` (or other protocol decorator), never below.
+- Stack `@debug` *above* `@skill`, never below.
+- Hooks attach through `@skill(pre_hook=..., post_hook=...)`; never register an analyzer or validator on its own.
 - For validators, always return `Result.success(...)` or `Result.failure(...)`.
 - Memory subclasses always implement both `recall(query)` and `remember(turn)`.
+- Wrap any `ChatModel` in `ChatModelAsHandle` before giving it to `Agent`.

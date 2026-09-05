@@ -14,7 +14,7 @@ Cantus loads a chat model from a single `provider/model` string via `load_chat_m
 | `omlx` | Local OpenAI-compatible MLX server | Talks to a local `mlx-omni-server`; `base_url` required. |
 
 ```python
-from cantus.model import load_chat_model
+from cantus import load_chat_model
 
 model = load_chat_model("openai/gpt-4o-mini")
 # swap the prefix to change backends without touching the rest of your code:

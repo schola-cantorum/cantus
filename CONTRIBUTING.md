@@ -13,7 +13,7 @@ When opening an issue, include the following:
 3. **Expected vs. actual** — what you expected to see and what you actually observed (include the full traceback).
 4. **What you tried** — any diagnostics you already ran, so suggestions are not repeated.
 
-For "the framework is behaving oddly" reports, first confirm that the Cantus version reported by `pip show cantus` matches the source you are reading. A common past pitfall is a stale Drive snapshot that does not match the local checkout.
+For "the framework is behaving oddly" reports, first confirm that the Cantus version reported by `pip show cantus-agent` matches the source you are reading. A common past pitfall is a stale Drive snapshot that does not match the local checkout.
 
 ## Pull Request Flow
 

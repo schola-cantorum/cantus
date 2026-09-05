@@ -19,6 +19,7 @@ import argparse
 import importlib
 import sys
 from types import ModuleType
+from typing import Any
 
 from cantus.config import AuthMode, Settings
 from cantus.core.registry import Registry
@@ -196,7 +197,7 @@ def _resolve_registry_import(spec: str) -> Registry:
     return obj
 
 
-def _resolve_channels_import(specs: list[str]) -> list:
+def _resolve_channels_import(specs: list[str]) -> list[Any]:
     """Resolve one or more dotted-import channel specs into channel objects.
 
     Each resolved attribute SHALL satisfy the `cantus.serve.channel.Channel`
@@ -347,4 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = _build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    # argparse stores the handler untyped; pin the int so strict mypy
+    # (no-any-return) sees the declared exit-code contract.
+    exit_code: int = args.func(args)
+    return exit_code

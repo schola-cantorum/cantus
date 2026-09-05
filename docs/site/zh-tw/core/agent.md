@@ -33,11 +33,7 @@ class Agent:
 state = agent.run("What's the weather in Taipei on 8/15?")
 ```
 
-或是顯式傳入一個 workflow：
-
-```python
-state = agent.run(my_workflow, query="user input")
-```
+第一個位置參數叫 `workflow_or_query` 只是為了向前相容，迴圈並不會使用 workflow 物件：直接把 query 字串傳進去（或用 `query=`）即可。`cantus.workflows` 的 building block 各自透過 `.run(input)` 執行，不會經過 `Agent.run`。
 
 `run` 回傳一個 `AgentState`，裡面帶著 `query` 與 `stream`。迴圈的運作方式如下：
 

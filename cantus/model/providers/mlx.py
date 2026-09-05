@@ -55,7 +55,11 @@ class MLXChatModel:
 
     def _ensure_loaded(self) -> None:
         if self._model is None:
-            self._model, self._tokenizer = mlx_lm.load(self.model_id)
+            # mlx_lm.load returns (model, tokenizer) by default and a 3-tuple
+            # only with return_config=True; index instead of unpacking so the
+            # Union return type checks under strict mypy.
+            loaded = mlx_lm.load(self.model_id)
+            self._model, self._tokenizer = loaded[0], loaded[1]
 
     def _build_prompt(self, messages: list[Message]) -> Any:
         conversation = [{"role": m.role, "content": m.content} for m in messages]
