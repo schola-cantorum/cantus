@@ -21,7 +21,7 @@ v0.3.3 (cross-framework batch2):
 - ``expose_as_dspy_tool(skill)`` / ``import_dspy_tool(tool)`` —
   cantus Skill <-> ``dspy.Tool``
   (requires ``cantus[dspy]``).
-- ``expose_as_hf_tool(skill)`` — cantus Skill -> ``transformers.Tool``
+- ``expose_as_hf_tool(skill)`` — cantus Skill -> ``smolagents.Tool``
   (requires ``cantus[huggingface]``).
 - ``expose_as_openhands_action(skill)`` — cantus Skill ->
   ``openhands.events.Action`` (requires ``cantus[openhands]``;
@@ -31,7 +31,7 @@ v0.3.3 (cross-framework batch2):
   delegate to).
 
 v0.3.4 (cross-framework batch3a — HF bidirectional close-out):
-- ``import_hf_tool(tool)`` — cantus Skill <- ``transformers.Tool``
+- ``import_hf_tool(tool)`` — cantus Skill <- ``smolagents.Tool``
   (requires ``cantus[huggingface]``). Completes the HuggingFace
   bidirectional matrix; the OpenHands import direction is intentionally
   omitted, see ``expose_as_openhands_action`` above.
@@ -98,14 +98,23 @@ def import_dspy_tool(*args: Any, **kwargs: Any) -> Any:
 
 
 def expose_as_hf_tool(*args: Any, **kwargs: Any) -> Any:
-    """Stub. Implemented in cantus.adapters.huggingface (requires cantus[huggingface])."""
+    """Stub. Implemented in cantus.adapters.huggingface (requires cantus[huggingface]).
+
+    Exported ``smolagents.Tool`` instances do not support ``to_dict()`` /
+    ``save()`` / ``push_to_hub()`` (dynamic subclass, no source code).
+    """
     from cantus.adapters.huggingface import expose_as_hf_tool as _impl
 
     return _impl(*args, **kwargs)
 
 
 def import_hf_tool(*args: Any, **kwargs: Any) -> Any:
-    """Stub. Implemented in cantus.adapters.huggingface (requires cantus[huggingface])."""
+    """Stub. Implemented in cantus.adapters.huggingface (requires cantus[huggingface]).
+
+    Accepts any ``smolagents.Tool`` instance; note that tools produced by
+    ``expose_as_hf_tool`` do not support ``to_dict()`` / ``save()`` /
+    ``push_to_hub()``.
+    """
     from cantus.adapters.huggingface import import_hf_tool as _impl
 
     return _impl(*args, **kwargs)

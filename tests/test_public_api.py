@@ -349,15 +349,18 @@ def test_v033_batch2_gates_require_extras(monkeypatch, module_name, extras):
     sdk_module = {
         "cantus.adapters.langchain": "langchain_core",
         "cantus.adapters.dspy": "dspy",
-        "cantus.adapters.huggingface": "transformers",
+        "cantus.adapters.huggingface": "smolagents",
         "cantus.adapters.openhands": "openhands",
     }[module_name]
 
+    # Remove via monkeypatch (restored on teardown): deleting the SDK's
+    # submodules outright would make a later import re-execute the package
+    # and mint duplicate classes, breaking isinstance checks elsewhere.
     for mod_name in list(sys.modules.keys()):
         if mod_name == module_name:
-            del sys.modules[mod_name]
-        if mod_name == sdk_module or mod_name.startswith(f"{sdk_module}."):
-            del sys.modules[mod_name]
+            monkeypatch.delitem(sys.modules, mod_name)
+        elif mod_name == sdk_module or mod_name.startswith(f"{sdk_module}."):
+            monkeypatch.delitem(sys.modules, mod_name)
     monkeypatch.setitem(sys.modules, sdk_module, None)
 
     with pytest.raises(ImportError, match=rf"pip install cantus\[{extras}\]"):

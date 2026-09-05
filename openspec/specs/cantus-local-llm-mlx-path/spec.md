@@ -85,7 +85,7 @@ When the `mlx_lm` package cannot be imported, the `cantus.model.providers.mlx` a
 ---
 ### Requirement: mlx is a platform-scoped extras group for Apple Silicon
 
-The `pyproject.toml` `[project.optional-dependencies]` section SHALL declare a key named `mlx` whose value is a list containing exactly one entry for the `mlx-lm` distribution, constrained by the PEP 508 environment marker `sys_platform == 'darwin' and platform_machine == 'arm64'`. The `mlx-lm` entry SHALL pin a lower bound and an upper bound (form `mlx-lm>=X,<Y`) rather than an unbounded requirement. The framework SHALL add exactly one `[tool.uv] conflicts` entry pairing the `mlx` extras group with the `huggingface` extras group, because `mlx-lm>=0.31.1` requires `transformers>=5` while `cantus[huggingface]` pins `transformers>=4.40,<5`; both groups can be requested on the same Apple-Silicon resolution split, so the platform marker alone does not isolate them (unlike the `bitsandbytes; sys_platform == 'linux'` precedent in the `runtime` extras group, which pulls no conflicting transitive dependency). The framework SHALL NOT add any OTHER `[tool.uv] conflicts` entry that names the `mlx` extras group.
+The `pyproject.toml` `[project.optional-dependencies]` section SHALL declare a key named `mlx` whose value is a list containing exactly one entry for the `mlx-lm` distribution, constrained by the PEP 508 environment marker `sys_platform == 'darwin' and platform_machine == 'arm64'`. The `mlx-lm` entry SHALL pin a lower bound and an upper bound (form `mlx-lm>=X,<Y`) rather than an unbounded requirement. The framework SHALL NOT declare any `[tool.uv] conflicts` entry that names the `mlx` extras group: since the `huggingface` extras group depends on `smolagents` rather than on `transformers`, no other extras group pins `transformers` below the `>=5` floor that `mlx-lm>=0.31.1` requires, so `mlx` and `huggingface` resolve together on the Apple-Silicon resolution split without a conflict declaration. Conflict entries that do not name `mlx` (for example the `openhands` cluster) are outside this Requirement and SHALL remain governed by their own Requirements.
 
 #### Scenario: mlx extras declares only platform-scoped mlx-lm
 
@@ -94,12 +94,36 @@ The `pyproject.toml` `[project.optional-dependencies]` section SHALL declare a k
 - **AND** that requirement string SHALL contain the marker substring `platform_machine == 'arm64'`
 - **AND** that requirement string SHALL contain the marker substring `sys_platform == 'darwin'`
 
-#### Scenario: mlx conflicts only with huggingface
+#### Scenario: mlx has no conflicts entry
 
-- **WHEN** a reader parses the `[tool.uv]` `conflicts` table in `pyproject.toml`
-- **THEN** exactly one conflict pair SHALL reference the extras group `mlx`
-- **AND** that pair SHALL pair `mlx` with the `huggingface` extras group
-- **AND** no other conflict pair SHALL reference the extras group `mlx`
+- **WHEN** a reader parses the `[tool.uv]` `conflicts` table in `pyproject.toml` (treating an absent table as an empty list)
+- **THEN** no conflict cluster SHALL contain an entry whose `extra` value is `mlx`
+
+#### Scenario: mlx and huggingface extras resolve together on Apple Silicon
+
+- **WHEN** a user on macOS arm64 runs `uv pip compile --extra mlx --extra huggingface pyproject.toml`
+- **THEN** resolution SHALL succeed
+- **AND** the resolved set SHALL contain `mlx-lm`, `smolagents`, and a `transformers` version satisfying `>=5`
+
+
+<!-- @trace
+source: cantus-hf-adapter-smolagents
+updated: 2026-09-05
+code:
+  - .github/workflows/test.yml
+  - docs/site/protocols/adapters.md
+  - .proj.tickets/pending/supply-chain-backlog/01-remediate-acknowledged-advisories.md
+  - cantus/adapters/huggingface.py
+  - .github/workflows/supply-chain.yml
+  - pyproject.toml
+  - cantus/adapters/__init__.py
+  - docs/site/zh-tw/protocols/adapters.md
+tests:
+  - tests/adapters/test_huggingface_real_sdk.py
+  - tests/adapters/test_huggingface.py
+  - tests/test_public_api.py
+  - tests/test_pyproject_extras_conflicts.py
+-->
 
 ---
 ### Requirement: docs/quickstart-desktop.md adds a Local LLMs via MLX (Apple Silicon) section
