@@ -1,5 +1,10 @@
 """Tests for the cantus base-exception policy.
 
+This module is also the codebase guard: the decision that the guard covers
+every spelling of a base-tier catch and carries no exemption list is
+ADR-0002 (docs/adr/0002-base-exception-guard-scope.md), which names this
+file as its control.
+
 Covers the ``cantus-base-exception-policy`` capability: production code
 MUST NOT swallow base-tier signals (``asyncio.CancelledError``,
 ``KeyboardInterrupt``, ``SystemExit``). Two forms are permitted — a

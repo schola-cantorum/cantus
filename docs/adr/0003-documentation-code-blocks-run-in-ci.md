@@ -73,8 +73,10 @@ the runner.
   grammar pinned by the `agent-runtime` capability. Changing that grammar
   already requires a Spectra change; the documentation tests fail with it by
   design.
-- **ADR guard.** `tests/test_guardrail_config.py` currently checks only that
-  the supply-chain ADR names an existing control. It will be generalised so
-  every ADR declares a status and every `status: accepted` ADR names at least
-  one existing workflow, test or script file whose contents contain the
-  literal `ADR-` followed by the ADR's four-digit number.
+- **ADR guard.** `tests/test_guardrail_config.py` keeps its hand-written
+  supply-chain assertion and adds a loop over every ADR: each declares a
+  status, and every `status: accepted` ADR names at least one existing
+  workflow, test or script file whose contents contain the literal `ADR-`
+  followed by the ADR's four-digit number. The status is one of `proposed`
+  or `accepted`; any other word fails, so a typo cannot become an exemption.
+  That loop cites `ADR-0003`.

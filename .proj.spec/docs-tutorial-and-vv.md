@@ -717,3 +717,10 @@ ignored on 3.10 and honoured on 3.11/3.12; `PYTHONPATH` honoured on all.
   fences must have the same number of lines, and a line may differ only when
   it begins with `#` (after leading whitespace) on both sides. Nested
   f-strings (3.12+) collapse as one run until the outermost `FSTRING_END`.
+- Guardrails (ticket 05 review): the ADR `status:` is read from YAML front
+  matter only and must be one of `accepted` or `proposed`; any other word
+  fails rather than being exempt, so a typo cannot silently exempt an ADR.
+  The workflow secret rule also rejects `secrets:` (a reusable-workflow
+  passthrough such as `secrets: inherit`), which forwards secrets without
+  the `secrets.` spelling. Synthetic fixtures cite `ADR-0999`, a number no
+  real ADR uses, so a fixture can never satisfy a real ADR's loop.

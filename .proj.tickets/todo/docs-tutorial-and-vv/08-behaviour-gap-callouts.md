@@ -1,7 +1,6 @@
 # 08: Six Known-limitation callouts on reference pages and the callout test
 
 Entered: 2026-09-06
-Blocked by: 04
 
 ## Context
 

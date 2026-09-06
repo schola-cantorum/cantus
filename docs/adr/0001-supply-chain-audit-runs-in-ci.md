@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # Supply-chain scanning runs in CI, not inside the framework
 
 ARCH-2 audit item 7 originally required `cantus.config` to scan installed
@@ -13,6 +17,11 @@ We therefore run `pip-audit` in CI (`.github/workflows/supply-chain.yml`) agains
 the installed environment, on pull requests and on a weekly schedule, and take
 the compromised-version list from that tool's advisory database. ARCH-2 item 7
 now describes this control.
+
+**Control.** `.github/workflows/supply-chain.yml` is the control; it cites
+`ADR-0001`. `tests/test_guardrail_config.py` asserts that the workflow exists,
+runs `pip-audit` on pull requests and on a schedule, covers all three install
+groups, and fails rather than warns on a finding.
 
 ## Considered options
 
