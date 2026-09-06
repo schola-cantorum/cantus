@@ -21,6 +21,16 @@ A validator does not repair data. Its job is to judge and to give feedback, noth
 ```python
 from cantus import skill
 from cantus.hooks import validator, Result
+from pydantic import BaseModel
+
+class Book(BaseModel):
+    title: str
+    isbn: str
+
+def checksum_ok(isbn: str) -> bool:
+    digits = [int(c) for c in isbn]
+    weighted = sum(d * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits))
+    return len(digits) == 13 and weighted % 10 == 0
 
 @validator
 def ensure_isbn_valid(book: Book) -> Result:
@@ -32,7 +42,17 @@ def ensure_isbn_valid(book: Book) -> Result:
 @skill(post_hook=ensure_isbn_valid)
 def fetch_book(title: str) -> Book:
     """Look up a book by title."""
-    return _do_fetch(title)
+    return Book(title=title, isbn="9780441013593")  # stand-in for the real lookup
+
+print(ensure_isbn_valid(Book(title="Dune", isbn="9780441013593")).ok)
+print(ensure_isbn_valid(Book(title="Dune", isbn="9780441013590")).feedback)
+```
+
+Called by hand, the validator returns the `Result` it would hand to the agent loop. You should see:
+
+```text
+True
+ISBN checksum mismatch — re-check the digits.
 ```
 
 ### 2. Class-first (advanced / canonical)

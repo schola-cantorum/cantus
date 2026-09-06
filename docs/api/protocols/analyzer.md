@@ -21,7 +21,14 @@ How it differs from a skill: a skill is a tool the LLM can see and choose to cal
 ```python
 from cantus import skill
 from cantus.hooks import analyzer
-from myapp.models import Location
+from pydantic import BaseModel
+
+class Location(BaseModel):
+    name: str
+
+    @classmethod
+    def from_text(cls, text: str) -> "Location":
+        return cls(name=text.strip().title())
 
 @analyzer
 def parse_location(text: str) -> Location:
@@ -31,14 +38,21 @@ def parse_location(text: str) -> Location:
 @skill(pre_hook=parse_location)
 def get_weather(loc: Location) -> str:
     """Look up the forecast for a location."""
-    return _do_lookup(loc)
+    return f"sunny in {loc.name}"  # stand-in for the real forecast lookup
+
+print(parse_location(" tainan ").name)
+```
+
+Called by hand, the analyzer is just a function: it returns the typed value it was declared to return. You should see:
+
+```text
+Tainan
 ```
 
 ### 2. Class-first (advanced / canonical)
 
 ```python
 from cantus.hooks import Analyzer
-from myapp.models import Location
 
 class ParseLocation(Analyzer):
     """Parse a natural-language place name into a Location."""

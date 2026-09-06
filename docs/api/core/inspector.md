@@ -19,8 +19,32 @@ Both methods accept an optional `out: IO[str]`. Leave it out and the text goes t
 
 ## Standard usage
 
+To make the trace below reproducible on any machine, this example drives the agent with a *scripted model*: an object whose `generate` returns fixed replies in order. Any object with a `generate(prompt) -> str` method works as a model, so you can swap in a real one at the end.
+
 ```python
-from cantus import Agent, Inspector
+from cantus import Agent, Inspector, skill
+
+@skill
+def add(a: int, b: int) -> int:
+    """Add two integers."""
+    return a + b
+
+class ScriptedModel:
+    """Stands in for the LLM: replies come from a fixed list, in order."""
+
+    def __init__(self, replies: list[str]) -> None:
+        self.replies = list(replies)
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        if len(self.replies) > 1:
+            return self.replies.pop(0)
+        return self.replies[0]  # keep repeating the last reply
+
+model = ScriptedModel([
+    '{"thought": "add the first two", "action": {"skill_name": "add", "args": {"a": 3, "b": 4}}}',
+    '{"thought": "now add 5", "action": {"skill_name": "add", "args": {"a": 7, "b": 5}}}',
+    '{"thought": "done", "action": {"final_answer": "3+4+5 = 12"}}',
+])
 
 agent = Agent(model=model)
 state = agent.run("Please compute 3 + 4 + 5")
@@ -32,14 +56,15 @@ Inspector(state.stream).replay()
 Inspector(state.stream).summary()
 ```
 
-The output of `replay()` looks like this:
+You should see:
 
-```
+```text
 [0] Action :: CallSkillAction :: CallSkillAction(thought='add the first two', skill_name='add', args={'a': 3, 'b': 4})
 [1] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=7)
 [2] Action :: CallSkillAction :: CallSkillAction(thought='now add 5', skill_name='add', args={'a': 7, 'b': 5})
 [3] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=12)
 [4] Action :: FinalAnswerAction :: FinalAnswerAction(thought='done', answer='3+4+5 = 12')
+EventStream: 5 events (3 actions, 2 observations)
 ```
 
 ## Writing to another IO

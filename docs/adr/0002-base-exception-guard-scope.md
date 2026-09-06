@@ -1,3 +1,7 @@
+---
+status: accepted
+---
+
 # The base-exception guard carries no exemption list
 
 The `cantus-base-exception-policy` capability forbids production code from
@@ -19,6 +23,12 @@ That is a context manager, so in the AST it is a `With` node, not an
 `ExceptHandler` — it is structurally outside what a handler scan examines and
 can never be flagged. The permitted form and the enforced form do not overlap,
 so there is nothing to exempt.
+
+**Control.** The guard and its tests live in
+`tests/serve/channels/test_exception_policy.py`, which cites `ADR-0002`: it
+scans the production package for every spelling listed above and proves, on
+a synthetic sample per spelling, that each is reported and that the permitted
+`suppress` form is not.
 
 ## Considered options
 

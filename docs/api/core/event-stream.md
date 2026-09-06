@@ -18,6 +18,30 @@ class EventStream:
 
 `Event = Action | Observation`. Note that `replay()` only *returns* a string; whether to print it is the caller's decision. That split is what lets `Inspector` send the same stream to any IO target (stdout, a file, a `StringIO`).
 
+You can build a stream by hand to see the contract without running an agent:
+
+```python
+from cantus import EventStream, CallSkillAction, SkillObservation
+
+stream = EventStream()
+stream.append(CallSkillAction(thought="add them", skill_name="add", args={"a": 1, "b": 2}))
+stream.append(SkillObservation(skill_name="add", result=3))
+print(len(stream))
+print(stream.replay())
+
+try:
+    stream.append("not an event")
+except TypeError as exc:
+    print(exc)
+```
+
+You should see the length, the two replay lines (one per event, numbered from `[0]`), and the `TypeError` message:
+
+```text
+2
+EventStream only accepts Action or Observation, got str
+```
+
 ## The Action hierarchy
 
 Every `Action` is a `frozen` dataclass. Once it has run, it cannot be changed, so the stream stays a true history of what happened rather than a mutable scratchpad.

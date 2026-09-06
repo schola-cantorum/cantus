@@ -35,7 +35,10 @@ def ensure_isbn(book: Book) -> Result:
 @skill(pre_hook=parse_book, post_hook=ensure_isbn)
 def lookup_book(text: str) -> Book:
     """Read a book from a 'title|isbn' record and validate it."""
-    return text  # the pre_hook turns the raw string into a Book first
+    return text  # pre_hook 會先把原始字串變成 Book
+
+book = parse_book("Dune|9780441013593")
+print(book.title, ensure_isbn(book).ok)
 ```
 
 重點在於每個零件只做一件事，而且彼此不重疊。skill 不負責解析，analyzer 不負責驗證，validator 永遠只回一個 `Result`。當 validator 失敗時，agent loop 會把那個 `Result.failure` 的回饋轉成一筆 observation 再餵回去，讓模型可以重試。
@@ -46,6 +49,12 @@ def lookup_book(text: str) -> Book:
 
 ```python
 from cantus import Skill
+
+calls = {"count": 0}
+
+def expensive_api_call(topic: str) -> str:
+    calls["count"] += 1
+    return f"results for {topic}"
 
 class CachedSearch(Skill):
     """Fetch a book from an API, querying each topic only once."""
@@ -61,9 +70,14 @@ class CachedSearch(Skill):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# Class-first skills do not register themselves — register one by hand.
+# class-first 的 skill 不會自己註冊，要手動註冊一個。
 from cantus.core.registry import get_registry
-get_registry().register("skill", CachedSearch())
+search = CachedSearch()
+get_registry().register("skill", search)
+
+search("space opera")
+search("space opera")
+print(calls["count"])  # API 只被打了一次
 ```
 
 什麼時候該用它：當你需要跨呼叫的快取、一條對外連線、一個計數器，或一個延遲載入的資源。decorator 寫法每次呼叫都共用 module 層級的全域變數，這既難測試也難重置。
@@ -79,20 +93,29 @@ from cantus.workflows import PromptChain
 @skill
 def outline(topic: str) -> str:
     """Sketch an outline for the given topic."""
-    ...
+    return f"outline: {topic}"
 
 @skill
 def draft(outline: str) -> str:
     """Expand an outline into prose."""
-    ...
+    return f"draft of {outline}"
 
 @skill
 def polish(text: str) -> str:
     """Tighten the prose."""
-    ...
+    return f"{text} (polished)"
 
 chain = PromptChain(steps=[outline, draft, polish])
 result = chain.run("write a haiku about Tainan")
+print(result)
+```
+
+你應該看到，前三個 recipe 合起來：
+
+```text
+Dune True
+1
+draft of outline: write a haiku about Tainan (polished)
 ```
 
 當這些分支彼此獨立、不是線性接龍時，用 `Parallel` 來扇出再收集；當下一步得先把輸入分類才知道要走哪條路時，用 `Router`。`OrchestratorWorker` 和 `EvaluatorOptimizer` 則涵蓋另外兩種情況：一個 skill 替其他 skill 規劃工作，或是一個產生器和一個評審來回迭代。這五個都共用同一種 `.run(input)` 形狀，所以你可以把它們互相嵌套：`PromptChain` 裡的某一步，本身可以又是另一個 workflow。
@@ -101,6 +124,7 @@ result = chain.run("write a haiku about Tainan")
 
 這條教學弧線從「資料結構」走到「資訊檢索」，再走到「機器學習」。三個實作共用一模一樣的介面，所以往上升一級只是換個建構子而已。
 
+<!-- vv:skip: needs the memory extra, which CI does not install -->
 ```python
 from cantus import ShortTermMemory, BM25Memory, EmbeddingMemory
 from cantus.protocols.memory import Turn

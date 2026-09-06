@@ -1,6 +1,7 @@
 name: supply-chain
 
-# Implements ARCH-2 audit item 7 (dependency supply-chain check).
+# Implements ARCH-2 audit item 7 (dependency supply-chain check); the decision
+# to run it here rather than inside the framework is ADR-0001.
 #
 # This lives in its own workflow rather than as a step in `test.yml` so that a
 # supply-chain red and a test red are distinguishable at a glance: they are

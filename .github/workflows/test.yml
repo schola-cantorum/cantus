@@ -6,6 +6,10 @@ on:
   pull_request:
 
 # Gate D audit M6: state the token scope explicitly; this workflow only verifies.
+# ADR-0003 execution context: this workflow runs untrusted pull-request code
+# (pytest and the documentation pages), so it never uses a privileged trigger,
+# reads no repository secret, checks out with `persist-credentials: false` and
+# holds `contents: read` only. tests/test_guardrail_config.py asserts each.
 permissions:
   contents: read
 
@@ -20,6 +24,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -47,6 +53,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6

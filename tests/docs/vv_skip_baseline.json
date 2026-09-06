@@ -1,0 +1,13 @@
+{
+  "total": 13,
+  "reason": "2026-09-06 retrofit of the twelve existing pages (ticket docs-tutorial-and-vv/03): signature sketches and excerpts that are not runnable Python (8) and blocks that need a provider, daemon, server, Colab or an extra CI does not install (5).",
+  "pages": {
+    "quickstart-desktop.md": 3,
+    "core/agent.md": 1,
+    "core/event-stream.md": 1,
+    "core/inspector.md": 1,
+    "protocols/workflows.md": 5,
+    "cookbook/patterns.md": 1,
+    "cookbook/errors.md": 1
+  }
+}

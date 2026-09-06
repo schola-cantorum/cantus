@@ -19,6 +19,9 @@ When students notice the gap, they learn that "can this be written as a decorato
 ```python
 from cantus.protocols.memory import Memory, Turn
 
+def _classify(text: str) -> str:
+    return "travel" if "Tainan" in text else "general"  # stand-in for a real topic classifier
+
 class TopicMemory(Memory):
     """Group turns by topic keyword and recall the matching bucket."""
 
@@ -32,6 +35,11 @@ class TopicMemory(Memory):
     def recall(self, query: str) -> list[Turn]:
         topic = _classify(query)
         return list(self._buckets.get(topic, []))
+
+mem = TopicMemory()
+mem.remember(Turn(user="What to eat in Tainan?", assistant="Danzai noodles."))
+mem.remember(Turn(user="Explain recursion.", assistant="A function calling itself."))
+print(len(mem.recall("Tainan snacks")))
 ```
 
 An implementation only needs to override two methods: `remember(turn)` and `recall(query)`. `Turn` is a frozen dataclass, `Turn(user: str, assistant: str)`.
@@ -118,6 +126,14 @@ p.append({"observation": "found 3 books"})
 # Reload across sessions
 restored = JsonLinesPersistence("session-001.jsonl").load()
 print(restored)  # [{'action': 'search', ...}, {'observation': ...}]
+```
+
+You should see, across the four blocks above:
+
+```text
+1
+['view', 'create', 'str_replace', 'delete']
+[{'action': 'search', 'query': 'Tainan'}, {'observation': 'found 3 books'}]
 ```
 
 **Design constraints**:

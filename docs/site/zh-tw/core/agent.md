@@ -4,6 +4,7 @@
 
 ## Class signature
 
+<!-- vv:skip: class signature excerpt, shown for its fields only -->
 ```python
 @dataclass
 class Agent:
@@ -30,7 +31,18 @@ class Agent:
 ## `run(workflow_or_query, query=None, max_iterations=8, max_retries=3)`
 
 ```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
+agent = Agent(model=model)
 state = agent.run("What's the weather in Taipei on 8/15?")
+print(type(state.stream[-1]).__name__)
+```
+
+沒有註冊任何 skill 時，模型無事可叫，只能直接作答，所以 stream 的最後一個事件就是 final answer。你應該看到：
+
+```text
+FinalAnswerAction
 ```
 
 第一個位置參數叫 `workflow_or_query` 只是為了向前相容，迴圈並不會使用 workflow 物件：直接把 query 字串傳進去（或用 `query=`）即可。`cantus.workflows` 的 building block 各自透過 `.run(input)` 執行，不會經過 `Agent.run`。
