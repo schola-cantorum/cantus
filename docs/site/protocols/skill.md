@@ -13,10 +13,15 @@ Once registered, a skill lands in the registry under the `kind="skill"` set. The
 ```python
 from cantus import skill
 
+def _do_search(title: str) -> str:
+    return f"found: {title}"  # stand-in for the real catalog lookup
+
 @skill
 def search_book(title: str) -> str:
     """Search the library catalog."""
     return _do_search(title)
+
+print(search_book("Dune"))  # a skill is still callable by hand
 ```
 
 ### 2. Function-pass entry
@@ -45,6 +50,15 @@ class SearchBook(Skill):
         return _do_search(title)
 
 get_registry().register("skill", SearchBook())
+
+print(get_registry().names_for("skill"))
+```
+
+Registering the same name again replaces the earlier record rather than adding a second one, so the three definitions above leave one entry. You should see:
+
+```text
+found: Dune
+['search_book']
 ```
 
 All three styles take the same path: each ends up as a `Skill` instance with one `kind="skill"` record in the registry. The decorator and function-pass forms call `_from_function()`, which synthesizes a subclass on the fly, takes the first paragraph of the docstring as the description, and reads the `Args:` block for per-argument descriptions.

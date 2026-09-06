@@ -36,6 +36,9 @@ def ensure_isbn(book: Book) -> Result:
 def lookup_book(text: str) -> Book:
     """Read a book from a 'title|isbn' record and validate it."""
     return text  # the pre_hook turns the raw string into a Book first
+
+book = parse_book("Dune|9780441013593")
+print(book.title, ensure_isbn(book).ok)
 ```
 
 The point is that each piece has a single job and they do not overlap. The skill does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry.
@@ -46,6 +49,12 @@ When a skill needs to keep state across calls — a connection pool, a cache, a 
 
 ```python
 from cantus import Skill
+
+calls = {"count": 0}
+
+def expensive_api_call(topic: str) -> str:
+    calls["count"] += 1
+    return f"results for {topic}"
 
 class CachedSearch(Skill):
     """Fetch a book from an API, querying each topic only once."""
@@ -63,7 +72,12 @@ class CachedSearch(Skill):
 
 # Class-first skills do not register themselves — register one by hand.
 from cantus.core.registry import get_registry
-get_registry().register("skill", CachedSearch())
+search = CachedSearch()
+get_registry().register("skill", search)
+
+search("space opera")
+search("space opera")
+print(calls["count"])  # the API was hit once
 ```
 
 Reach for this when you need a cross-call cache, an external connection, a counter, or a lazily loaded resource. The decorator form shares module-level globals on every call, which is hard to test and hard to reset.
@@ -79,20 +93,29 @@ from cantus.workflows import PromptChain
 @skill
 def outline(topic: str) -> str:
     """Sketch an outline for the given topic."""
-    ...
+    return f"outline: {topic}"
 
 @skill
 def draft(outline: str) -> str:
     """Expand an outline into prose."""
-    ...
+    return f"draft of {outline}"
 
 @skill
 def polish(text: str) -> str:
     """Tighten the prose."""
-    ...
+    return f"{text} (polished)"
 
 chain = PromptChain(steps=[outline, draft, polish])
 result = chain.run("write a haiku about Tainan")
+print(result)
+```
+
+You should see, across the three recipes so far:
+
+```text
+Dune True
+1
+draft of outline: write a haiku about Tainan (polished)
 ```
 
 When the branches are independent rather than sequential, use `Parallel` to fan out and collect; when the next step depends on classifying the input first, use `Router`. `OrchestratorWorker` and `EvaluatorOptimizer` cover the cases where one skill plans work for others, or where a generator and a critic iterate together. All five share the same `.run(input)` shape, so you can nest them: a step inside a `PromptChain` can itself be another workflow.

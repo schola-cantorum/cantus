@@ -10,17 +10,30 @@ from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, 
 
 This maps to the **Prompt Chaining** pattern in the Anthropic playbook. It runs several Skills in order, feeding each step's return value straight into the next step as input; the final step's return value is the return value of the whole chain. It fits tasks that break down into a stable linear sequence, such as outline → draft → polish.
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class PromptChain:
     def __init__(self, steps: Iterable[Callable[..., Any]]) -> None: ...
     def run(self, input: Any) -> Any: ...
 ```
 
+The examples on this page use plain functions as stand-ins for registered skills; the building blocks accept any callable.
+
 ```python
 from cantus.workflows import PromptChain
 
+def outline(topic: str) -> str:
+    return f"outline of {topic}"
+
+def draft(outline: str) -> str:
+    return f"draft from {outline}"
+
+def polish(text: str) -> str:
+    return f"polished {text}"
+
 chain = PromptChain(steps=[outline, draft, polish])
 final = chain.run("write a haiku about Tainan")
+print(final)
 ```
 
 Things to keep in mind:
@@ -33,6 +46,7 @@ Things to keep in mind:
 
 This is the **Routing** pattern. A classifier first sorts the input into a single string key, then dispatches to the matching Skill; a given input only ever reaches one route. It fits intent classification followed by a dedicated handler.
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class Router:
     def __init__(
@@ -46,11 +60,20 @@ class Router:
 ```python
 from cantus.workflows import Router
 
+def get_weather(text: str) -> str:
+    return f"weather: {text}"
+
+def fetch_news(text: str) -> str:
+    return f"news: {text}"
+
+def classify_intent(text: str) -> str:
+    return "weather" if "typhoon" in text else "news"
+
 router = Router(
     routes={"weather": get_weather, "news": fetch_news},
     classifier=classify_intent,
 )
-router.run("typhoon update")
+print(router.run("typhoon update"))
 ```
 
 Things to keep in mind:
@@ -63,6 +86,7 @@ Things to keep in mind:
 
 This is the **Parallelization** pattern. It fans the same input out to several branch Skills and collects each one's return value into a `list`, in the same order the branches were declared. It fits cases where you want several perspectives on the same input and aggregate them afterward.
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class Parallel:
     def __init__(self, branches: Iterable[Callable[..., Any]]) -> None: ...
@@ -72,8 +96,15 @@ class Parallel:
 ```python
 from cantus.workflows import Parallel
 
+def summarize_en(text: str) -> str:
+    return f"EN summary of {len(text)} chars"
+
+def summarize_zh(text: str) -> str:
+    return f"ZH summary of {len(text)} chars"
+
 fanout = Parallel(branches=[summarize_en, summarize_zh])
 en_summary, zh_summary = fanout.run("Long article ...")
+print(en_summary, "|", zh_summary)
 ```
 
 Things to keep in mind:
@@ -86,6 +117,7 @@ Things to keep in mind:
 
 This is the **Orchestrator-Workers** pattern. The orchestrator Skill takes the input and returns a series of subtasks; `OrchestratorWorker` dispatches the subtasks one at a time to the workers and returns a list of results in the same order the orchestrator produced the subtasks. It fits cases where you don't know the number of subtasks ahead of time and need to plan dynamically.
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class OrchestratorWorker:
     def __init__(
@@ -99,9 +131,20 @@ class OrchestratorWorker:
 ```python
 from cantus.workflows import OrchestratorWorker, PromptChain
 
+def plan_cities(topic: str) -> list[str]:
+    return ["Anping", "West Central"]  # a real planner would derive these from the topic
+
+def fetch_section(city: str) -> str:
+    return f"section on {city}"
+
+def synthesize(sections: list[str]) -> str:
+    return " + ".join(sections)
+
 ow = OrchestratorWorker(orchestrator=plan_cities, workers=[fetch_section])
-sections = ow.run("Tainan travel guide")  # plan_cities might return 5 cities
+sections = ow.run("Tainan travel guide")  # one worker call per planned city
 guide = PromptChain(steps=[ow.run, synthesize]).run("Tainan travel guide")
+print(sections)
+print(guide)
 ```
 
 Things to keep in mind:
@@ -114,6 +157,7 @@ Things to keep in mind:
 
 This is the **Evaluator-Optimizer** pattern. A generator produces a candidate and an evaluator judges it; if it fails, the generator runs again; if it passes, the result is returned. It runs at most `max_iters` rounds. It fits output whose quality can be checked and is worth refining over several rounds, such as an argument, a translation, or code.
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class EvaluatorOptimizer:
     def __init__(
@@ -127,9 +171,33 @@ class EvaluatorOptimizer:
 
 ```python
 from cantus.workflows import EvaluatorOptimizer
+from cantus import Result
+
+attempts = {"count": 0}
+
+def draft(prompt: str) -> str:
+    attempts["count"] += 1
+    return f"attempt {attempts['count']}: {prompt}"
+
+def critique(candidate: str) -> Result:
+    if candidate.startswith("attempt 1"):
+        return Result.failure("too thin, try again")
+    return Result.success(candidate)
 
 eo = EvaluatorOptimizer(generator=draft, evaluator=critique, max_iters=3)
 best = eo.run("Argue for solar over wind")
+print(best)
+```
+
+You should see, across the five examples:
+
+```text
+polished draft from outline of write a haiku about Tainan
+weather: typhoon update
+EN summary of 16 chars | ZH summary of 16 chars
+['section on Anping', 'section on West Central']
+section on Anping + section on West Central
+attempt 2: Argue for solar over wind
 ```
 
 Things to keep in mind:

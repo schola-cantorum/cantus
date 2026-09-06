@@ -4,6 +4,7 @@
 
 ## Class signature
 
+<!-- vv:skip: class signature excerpt, shown for its fields only -->
 ```python
 @dataclass
 class Agent:
@@ -30,7 +31,18 @@ Because `step` can return either branch, callers must handle both an `Action` an
 ## `run(workflow_or_query, query=None, max_iterations=8, max_retries=3)`
 
 ```python
+from cantus import Agent, ChatModelAsHandle, load_chat_model
+
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
+agent = Agent(model=model)
 state = agent.run("What's the weather in Taipei on 8/15?")
+print(type(state.stream[-1]).__name__)
+```
+
+With no skill registered, the model has nothing to call and answers directly, so the last event on the stream is the final answer. You should see:
+
+```text
+FinalAnswerAction
 ```
 
 The first positional parameter is named `workflow_or_query` for forward compatibility, but the loop does not consult a workflow object: pass the query string directly (or as `query=`). `cantus.workflows` building blocks run on their own via `.run(input)` and do not go through `Agent.run`.

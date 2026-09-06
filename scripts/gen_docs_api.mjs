@@ -83,6 +83,10 @@ function flatten(text, baseDir) {
   t = t.replace(/<script[\s\S]*?<\/script>/g, '')
   t = t.replace(/<style[\s\S]*?<\/style>/g, '')
   t = t.replace(/^:::.*$/gm, '') // VitePress container fences (open + close)
+  // Executable-documentation skip markers (ADR-0003) are harness metadata, not
+  // prose: drop the whole line so the corpus never carries them.
+  t = t.replace(/^[ ]*<!-- vv:skip: .* -->[ ]*\n/gm, '')
+  t = t.replace(/[ ]*# under docs tests: cantus_docs_model\(\)$/gm, '')
   t = t.replace(/\n{3,}/g, '\n\n').trimStart()
   if (!t.endsWith('\n')) t += '\n'
   return t

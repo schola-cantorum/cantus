@@ -4,15 +4,43 @@ Below are the mistakes students hit most often with cantus. Each entry shows the
 
 ## 1. Calling a skill that doesn't exist
 
-When the LLM misspells a skill name, the agent loop does not raise. Instead it pushes a `ToolErrorObservation` into the EventStream and feeds it back to the model. The `available` field tells you the correct name:
+When the LLM misspells a skill name, the agent loop does not raise. `step` returns a `ValidationErrorObservation` with `validator_name="action_parse"` whose feedback names the error type and lists the skills that are registered, and the loop feeds it back to the model. The examples on this page drive the agent with a *scripted model* so each mistake is reproducible:
 
 ```python
+from cantus import Agent, ValidationErrorObservation, skill
+
+class ScriptedModel:
+    """Stands in for the LLM: replies come from a fixed list, in order."""
+
+    def __init__(self, replies: list[str]) -> None:
+        self.replies = list(replies)
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        if len(self.replies) > 1:
+            return self.replies.pop(0)
+        return self.replies[0]  # keep repeating the last reply
+
+@skill
+def search_book(topic: str) -> str:
+    """Search the catalog."""
+    return f"books about {topic}"
+
 # The LLM produced {"action": {"skill_name": "serch_book", ...}}  # typo
-# Inspect the stream:
+agent = Agent(model=ScriptedModel([
+    '{"thought": "look it up", "action": {"skill_name": "serch_book", "args": {"topic": "sci-fi"}}}',
+    '{"thought": "give up", "action": {"final_answer": "no books found"}}',
+]))
+state = agent.run("find a science fiction novel")
+
+# Inspect the stream: the feedback's first two lines are the error type and the detail
 for ev in state.stream:
-    if isinstance(ev, ToolErrorObservation):
-        print(ev.message)
-# -> "skill 'serch_book' not registered. Available: ['search_book', ...]"
+    if isinstance(ev, ValidationErrorObservation):
+        print(ev.validator_name)
+        for line in ev.feedback.splitlines()[:2]:
+            print(line)
+# -> action_parse
+# -> error_type: unknown_skill
+# -> detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
 ```
 
 Fix: add the correct name to an example in the system prompt, or raise `max_retries` so the LLM can correct itself.
@@ -22,8 +50,12 @@ Fix: add the correct name to an example in the system prompt, or raise `max_retr
 A skill's argument schema is derived from its function signature. If the LLM passes a value of the wrong type, Pydantic rejects it:
 
 ```python
+from cantus import skill
+
 @skill
-def search_book(topic: str, n: int = 5) -> str: ...
+def search_book(topic: str, n: int = 5) -> str:
+    """Search the catalog."""
+    return f"{n} books about {topic}"
 
 # Observed: passing n="abc"
 # -> ToolErrorObservation(message="args validation failed: ValidationError: ...")
@@ -41,11 +73,24 @@ print(search_book.spec_for_llm()["args_schema"])
 A validator's contract is that it **must return a `Result`**. Otherwise `__call__` raises `TypeError` directly. (`validator` and `analyzer` are skill hook helpers, not protocol kinds — attach them to a skill so they run during dispatch.)
 
 ```python
+from cantus.hooks import validator
+from pydantic import BaseModel
+
+class Book(BaseModel):
+    isbn: str
+
+def checksum_ok(isbn: str) -> bool:
+    return len(isbn) == 13  # stand-in for the real checksum
+
 @validator
 def ensure_isbn(book: Book):
     """Wrong example: returns a bool."""
     return checksum_ok(book.isbn)  # TypeError!
 
+try:
+    ensure_isbn(Book(isbn="9780441013593"))
+except TypeError as exc:
+    print(exc)
 # TypeError: Validator ensure_isbn must return Result, got bool
 ```
 
@@ -56,6 +101,7 @@ from cantus import Result
 
 @validator
 def ensure_isbn(book: Book) -> Result:
+    """Verify the ISBN checksum."""
     if checksum_ok(book.isbn):
         return Result.success(book)
     return Result.failure("ISBN checksum is wrong, please recheck the digits.")
@@ -68,16 +114,25 @@ The string passed to `Result.failure` is fed back to the LLM as a `ValidationErr
 `@debug` must sit on the **outermost** layer, because it wraps a protocol instance that has already been built:
 
 ```python
+from cantus import debug, skill
+
 # Wrong
-@skill
-@debug
-def f(x): ...
+try:
+    @skill
+    @debug
+    def f(x: int) -> int:
+        """Double x."""
+        return 2 * x
+except TypeError as exc:
+    print(type(exc).__name__)
 # TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function
 
 # Correct
 @debug
 @skill
-def f(x): ...
+def f(x: int) -> int:
+    """Double x."""
+    return 2 * x
 ```
 
 Fix: always put `@debug` on top. Python applies decorators bottom-up, so `@skill` must first turn the function into a `Skill` instance before `@debug` can receive that instance. `@debug` also accepts the `Analyzer` and `Validator` hook helpers.
@@ -87,8 +142,15 @@ Fix: always put `@debug` on top. Python applies decorators bottom-up, so `@skill
 Memory is the only class-only protocol. It deliberately has no decorator entry point:
 
 ```python
-from cantus import memory          # ImportError
-from cantus import register_memory # ImportError
+try:
+    from cantus import memory
+except ImportError:
+    print("no @memory decorator")
+
+try:
+    from cantus import register_memory
+except ImportError:
+    print("no register_memory either")
 ```
 
 Fix: always subclass `Memory` and write a class:
@@ -111,9 +173,16 @@ The reasoning: state can't be expressed with a single function call, and forcing
 If the LLM keeps returning `CallSkillAction` and never returns `FinalAnswerAction`, the loop runs until it reaches `max_iterations`. The framework then appends a `MaxIterationsObservation` at the end:
 
 ```python
+from cantus import MaxIterationsObservation
+
+# A model that never returns final_answer:
+agent = Agent(model=ScriptedModel([
+    '{"thought": "search again", "action": {"skill_name": "search_book", "args": {"topic": "sci-fi"}}}',
+]))
 state = agent.run("query", max_iterations=8)
 if isinstance(state.stream[-1], MaxIterationsObservation):
-    print("Hit the cap, last action:", state.stream[-1].last_action_summary)
+    print("Hit the cap after", state.stream[-1].iterations, "iterations")
+    print("Last action:", state.stream[-1].last_action_summary)
 ```
 
 Two ways to fix it:
@@ -142,6 +211,20 @@ Common causes:
 - `args` was written as a string instead of an object.
 
 Fix: constrain decoding with `outlines` / `xgrammar` using the schema from `build_schema(registry)`, or supply few-shot examples in the prompt.
+
+You should see, across the runnable examples in sections 1 to 7:
+
+```text
+action_parse
+error_type: unknown_skill
+detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+Validator ensure_isbn must return Result, got bool
+TypeError
+no @memory decorator
+no register_memory either
+Hit the cap after 8 iterations
+missing required keys 'thought' or 'action'
+```
 
 ## 8. 空 FinalAnswer 與小模型 robustness (Empty FinalAnswer and small-model robustness)
 

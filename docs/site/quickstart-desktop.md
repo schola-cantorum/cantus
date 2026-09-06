@@ -42,13 +42,15 @@ from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
+
+print(add(17, 25))  # a skill is still a plain function you can call yourself
 ```
 
 ### 4. Load a chat model
 
 ```python
-chat = load_chat_model("openai/gpt-4o-mini")
-agent = Agent(model=ChatModelAsHandle(chat))
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
+agent = Agent(model=model)
 ```
 
 `load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`). `Agent` only speaks the Tier 1 `.generate(prompt) -> str` protocol, so a `ChatModel` must be wrapped in `ChatModelAsHandle` before it is passed in.
@@ -61,7 +63,11 @@ final = state.stream[-1]
 print(getattr(final, "answer", final))
 ```
 
-You should see the agent invoke the `add` skill and print `42`.
+You should see `42` from the direct call, followed by the agent's own reply (with a capable model, also `42`, after it invokes `add`):
+
+```text
+42
+```
 
 ## Serve via CLI
 
@@ -109,6 +115,7 @@ ollama pull gemma3:4b
 
 Then use it from Python exactly like any other provider:
 
+<!-- vv:skip: needs a running Ollama daemon -->
 ```python
 from cantus import Agent, Message, load_chat_model
 
@@ -131,6 +138,7 @@ pip install cantus[mlx]
 
 Then point `load_chat_model` at any Hugging Face / MLX model id (you supply your own; cantus does not download weights for you):
 
+<!-- vv:skip: needs Apple Silicon and the mlx extra -->
 ```python
 from cantus import Message, load_chat_model
 
@@ -151,6 +159,7 @@ pip install cantus[openai]
 
 Start your server of choice, then point `load_chat_model` at its `/v1` endpoint. **`base_url` is required** — omlx and mlx-omni-server listen on different ports, so there is no single sensible default and you must say which one you mean:
 
+<!-- vv:skip: needs a local MLX server listening on the base_url -->
 ```python
 from cantus import Message, load_chat_model
 
