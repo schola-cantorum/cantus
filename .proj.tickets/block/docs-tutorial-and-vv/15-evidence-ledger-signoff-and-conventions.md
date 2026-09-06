@@ -11,7 +11,11 @@ policy); user stories 31, 35, 37; A.2.8. The ledger is not versioned: it goes to
 the gitignored roadmap directory. The prose-gate deviation is already recorded
 in `pending/docs-prose-gate/01`; this ticket only adds the human line.
 
-Last ticket before the single PR.
+Last ticket of the batch. The work ships as three pull requests rather than
+the single one the spec assumed: PR-A tickets 01–06 (harness, retrofit,
+parity, guardrails, hygiene), PR-B tickets 08 and 07, PR-C tickets 09–15.
+The `docs/README.md` conventions this ticket writes therefore describe a
+harness already merged, not one landing alongside them.
 
 ## Acceptance criteria
 

@@ -8,6 +8,7 @@ what they say. Nothing is executed.
 
 from __future__ import annotations
 
+import sys
 import textwrap
 
 import pytest
@@ -217,5 +218,30 @@ def test_shell_comment_may_differ_only_at_the_same_position() -> None:
 
 
 def test_nested_fstring_collapses_into_one_string_token() -> None:
+    """A nested f-string is one string token, on every supported Python.
+
+    The inner quotes differ from the outer ones here, which is the only nesting
+    that parses before 3.12. Below 3.12 ``tokenize`` hands back the whole
+    f-string as a single ``STRING``; from 3.12 it hands back an
+    ``FSTRING_START`` … ``FSTRING_END`` run that the collapse folds into one.
+    Both roads must end at the same three tokens, or the same page would
+    compare differently depending on which interpreter ran the suite.
+    """
+    kinds = [t.kind for t in tokens_of("""x = f"a {f'b {c}'} d"\n""")]
+    assert kinds == ["NAME", "OP", "STRING"]
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason="reusing the outer quote inside an f-string is PEP 701, new in 3.12",
+)
+def test_quote_reusing_nested_fstring_collapses_into_one_string_token() -> None:
+    """The 3.12 spelling of the same nesting, where the quotes may repeat.
+
+    This is the form that produces the deepest ``FSTRING_START`` nesting, so it
+    is the one that would expose a collapse that stops at the first
+    ``FSTRING_END``. It cannot be written in a file that 3.10 must import,
+    hence the source text and the version gate.
+    """
     kinds = [t.kind for t in tokens_of('x = f"a {f"b {c}"} d"\n')]
     assert kinds == ["NAME", "OP", "STRING"]

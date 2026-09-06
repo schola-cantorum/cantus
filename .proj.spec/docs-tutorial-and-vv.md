@@ -738,3 +738,11 @@ ignored on 3.10 and honoured on 3.11/3.12; `PYTHONPATH` honoured on all.
   (`sk-proj-`, `sk-ant-`, `github_pat_`) escape the alphanumeric run, and an
   uppercase named placeholder such as `Bearer YOUR_SERVE_TOKEN` would be a
   false positive, so a placeholder is written `Bearer <token>` or `Bearer $VAR`.
+- Parity self-test portability (PR-A CI, 2026-09-06): the nested-f-string case
+  must nest with a *different* inner quote. Reusing the outer quote inside an
+  f-string is PEP 701 and parses only from 3.12, so on the 3.10 and 3.11 legs of
+  the matrix `tokenize` split that sample into eight tokens and the self-test
+  failed while every real page passed. The portable spelling collapses to one
+  string token on every supported version; the quote-reusing spelling keeps its
+  own test behind a 3.12 gate, because it is the form that nests
+  `FSTRING_START` deepest.
