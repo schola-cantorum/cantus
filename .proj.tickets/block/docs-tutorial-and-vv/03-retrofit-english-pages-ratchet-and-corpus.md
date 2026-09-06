@@ -16,6 +16,13 @@ After this ticket every existing in-scope page passes the harness from tickets
 what cannot run in CI (with an honest reason), and add exactly one
 expected-output block per page. Then freeze the skip total.
 
+Inventory from ticket 01 (2026-09-06, parser only, nothing executed): the
+twelve pages parse with zero malformed findings and hold 58 Python blocks
+(quickstart-desktop 6, agent 2, event-stream 1, inspector 3, skill 3, memory 4,
+analyzer 3, validator 3, workflows 11, patterns 4, errors 12 incl. the two
+list-indented fences, tips 6); no page carries a skip marker or a hook yet.
+Ticket 02 adds the runnable / failing split from the first execution run.
+
 The generator change rides here because the first commit that adds marker lines
 to corpus-source pages would otherwise turn the CI corpus sync check red.
 
