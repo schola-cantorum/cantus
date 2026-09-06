@@ -31,6 +31,7 @@ from tests.docs.pages import (
 )
 
 EXPECTED_OUTPUT_PHRASE = "You should see"
+EXPECTED_OUTPUT_PHRASE_ZH_TW = "你應該看到"
 EXPECTED_OUTPUT_INFO = "text"
 DEFAULT_TIMEOUT_SECONDS = 120
 
@@ -142,13 +143,15 @@ class PageOutcome:
 
 
 def find_expected_output(
-    text: str, parsed: ParsedPage
+    text: str, parsed: ParsedPage, *, phrase: str = EXPECTED_OUTPUT_PHRASE
 ) -> tuple[ExpectedOutput | None, list[Malformed]]:
     """A.2.2: locate the page's expected-output block, if any.
 
     Args:
         text: the page source.
         parsed: its parse.
+        phrase: the marker phrase the preceding prose line must contain
+            (English pages use ``You should see``, zh-tw pages ``你應該看到``).
 
     Returns:
         The block and the problems found. Exactly one block is required on a
@@ -172,7 +175,7 @@ def find_expected_output(
         if preceding is None or preceding in inside or preceding in in_comment:
             continue
         prose = lines[preceding - 1].strip()
-        if prose.startswith(":::") or EXPECTED_OUTPUT_PHRASE not in prose:
+        if prose.startswith(":::") or phrase not in prose:
             continue
         if fence.char != "`":
             problems.append(

@@ -13,10 +13,15 @@ Skill 就是 agent 在推理到一半時可以呼叫的「單一動作」：查�
 ```python
 from cantus import skill
 
+def _do_search(title: str) -> str:
+    return f"found: {title}"  # 代替真正的目錄查詢
+
 @skill
 def search_book(title: str) -> str:
     """Search the library catalog."""
     return _do_search(title)
+
+print(search_book("Dune"))  # skill 一樣可以手動呼叫
 ```
 
 ### 2. Function-pass entry
@@ -45,6 +50,15 @@ class SearchBook(Skill):
         return _do_search(title)
 
 get_registry().register("skill", SearchBook())
+
+print(get_registry().names_for("skill"))
+```
+
+再次註冊同名的 skill 會取代先前那筆紀錄，而不是多加一筆，所以上面三個定義只留下一個 entry。你應該看到：
+
+```text
+found: Dune
+['search_book']
 ```
 
 三種寫法走的是同一條路：最後都會變成一個 `Skill` instance，在 registry 留下一筆 `kind="skill"` 紀錄。Decorator 跟 function-pass 這兩種會去呼叫 `_from_function()`，它當場合成一個 subclass，把 docstring 的第一段拿來當 description，再讀 `Args:` 區塊取得每個參數各自的說明。

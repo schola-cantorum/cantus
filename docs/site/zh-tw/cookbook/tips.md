@@ -8,6 +8,7 @@ skill 的 args schema 是從 function signature 推導出來的，所以你寫�
 
 ```python
 from typing import Optional
+from cantus import skill
 
 @skill
 def search_book(
@@ -43,6 +44,8 @@ def search_book(topic: str, n: int = 5) -> str:
         多筆 'title|isbn' 用換行分隔的字串。
     """
     ...
+
+print(search_book.spec_for_llm()["args_schema"]["required"])
 ```
 
 格式要求很嚴格：一行只能寫一個 `name: description`，name 跟冒號之間可以選擇性地加上 `(type)`。只有第一個段落（也就是第一個空行之前的部分）會被當成 description。
@@ -52,19 +55,27 @@ def search_book(topic: str, n: int = 5) -> str:
 註冊一個 skill 有三種寫法，三種寫出來的 `Skill` instance 完全等價：
 
 ```python
+from cantus import Skill, register_skill, skill
+
 # (A) Decorator —— 90% 場景，最簡。
 @skill
-def f(x: int) -> int: ...
+def f(x: int) -> int:
+    """把 x 乘以 2。"""
+    return 2 * x
 
 # (B) Function-pass —— 別人寫好的 plain function 想拿來註冊。
-from cantus import register_skill
+def third_party_function(x: int) -> int:
+    """把 x 乘以 3。"""
+    return 3 * x
+
 register_skill(third_party_function)
 
 # (C) Class-first —— 需要 instance state、複雜 init、或子類覆寫。
 class MySkill(Skill):
+    """記住目前看過的每個 x。"""
     name = "my_skill"
     def __init__(self): super().__init__(); self.cache = {}
-    def run(self, x: int) -> int: ...
+    def run(self, x: int) -> int: return self.cache.setdefault(x, x)
 ```
 
 一個好記的口訣：沒有狀態就用 (A)；要包別人寫好的 function 就用 (B)；有狀態就用 (C)。
@@ -84,12 +95,18 @@ class MySkill(Skill):
 不必。`@debug` 是逐個 skill 各自決定要不要開（per-skill opt-in），只會 wrap 你貼上去的那一個：
 
 ```python
+from cantus import debug, skill
+
 @debug
 @skill
-def search_book(topic: str): ...   # 有 trace
+def search_book(topic: str) -> str:
+    """搜尋目錄。"""
+    return f"books about {topic}"   # 有 trace
 
 @skill
-def parse_book_list(text: str): ...   # 沒 trace
+def parse_book_list(text: str) -> list[str]:
+    """把以換行分隔的清單切開。"""
+    return text.splitlines()   # 沒 trace
 ```
 
 一個不錯的做法：先讓全部 skill 安靜地跑一遍，等到發現某個 skill 行為怪怪的，再**只**對那一個加上 `@debug`。這樣輸出量會少很多，也好讀很多。至於 agent loop 本身則永遠是安靜的（這是一條硬性的 spec 要求），不會污染 stdout。
@@ -99,27 +116,52 @@ def parse_book_list(text: str): ...   # 沒 trace
 `Inspector.replay` 跟 `Inspector.summary` 都接受一個 `out` 參數，預設值是 `sys.stdout`。只要傳一個 file handle 進去，輸出就會轉向到檔案：
 
 ```python
-from cantus import Inspector
+from cantus import Agent, ChatModelAsHandle, Inspector, load_chat_model
 
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
+agent = Agent(model=model)
 state = agent.run("找 3 本科幻小說", max_iterations=8)
 
-with open("/tmp/run_trace.log", "w", encoding="utf-8") as f:
+with open("run_trace.log", "w", encoding="utf-8") as f:
     Inspector(state.stream).replay(out=f)
     Inspector(state.stream).summary(out=f)
+
+with open("run_trace.log", encoding="utf-8") as f:
+    print(f.readline().startswith("[0] "))  # 檔案開頭就是第一行 replay
 ```
 
-在 Colab 上有個常用的做法：先在一個 cell 把 trace 寫到檔案，再用 `!cat /tmp/run_trace.log | head -50` 讀其中一段。這樣比把一大坨 trace 直接倒進 cell output 好讀多了。
+在 Colab 上有個常用的做法：先在一個 cell 把 trace 寫到檔案，再用 `!head -50 run_trace.log` 讀其中一段。這樣比把一大坨 trace 直接倒進 cell output 好讀多了。
 
 ## 7. 加碼：測試隔離請用自己的 `Registry()`，別用全域那一個
 
 `get_registry()` 回傳的是一個 process 範圍的 singleton，狀態會在不同 test case 之間互相污染。寫測試時，請改成自己建一個 `Registry()`：
 
 ```python
-from cantus.core.registry import Registry
+from cantus import Agent, Registry, skill
+
+class ScriptedModel:
+    """代替 LLM：每次都回同一個 final answer。"""
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        return '{"thought": "done", "action": {"final_answer": "ok"}}'
+
+@skill
+def my_skill(x: int) -> int:
+    """原樣回傳。"""
+    return x
 
 reg = Registry()
-reg.register("skill", my_skill_instance)
-agent = Agent(model=mock, registry=reg)
+reg.register("skill", my_skill)
+agent = Agent(model=ScriptedModel(), registry=reg)
+print(reg.names_for("skill"))
+```
+
+你應該看到，本頁可執行的技巧合起來：
+
+```text
+['topic']
+True
+['my_skill']
 ```
 
 用 `get_registry().clear()` 也行，但它會把同一個 session 裡其他 cell 也一起清掉，連帶受影響。

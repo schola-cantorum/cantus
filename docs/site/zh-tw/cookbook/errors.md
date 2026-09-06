@@ -4,15 +4,46 @@
 
 ## 1. 呼叫不存在的 skill
 
-LLM 拼錯 skill 名稱時，agent loop 不會 raise，而是把 `ToolErrorObservation` 推進 EventStream 餵回模型。看 `available` 欄位就能找到正確名字：
+LLM 拼錯 skill 名稱時，agent loop 不會 raise。`step` 會回一個 `validator_name="action_parse"` 的 `ValidationErrorObservation`，feedback 裡寫著錯誤類型並列出已註冊的 skill，迴圈再把它餵回模型。本頁的範例都用一個「腳本模型」驅動 agent，讓每個錯誤都能重現：
 
 ```python
+from cantus import Agent, ValidationErrorObservation, skill
+
+
+class ScriptedModel:
+    """代替 LLM：回覆依序來自固定清單。"""
+
+    def __init__(self, replies: list[str]) -> None:
+        self.replies = list(replies)
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        if len(self.replies) > 1:
+            return self.replies.pop(0)
+        return self.replies[0]  # 用完之後一直重複最後一句
+
+
+@skill
+def search_book(topic: str) -> str:
+    """搜尋目錄。"""
+    return f"books about {topic}"
+
+
 # LLM 產生 {"action": {"skill_name": "serch_book", ...}}  # 拼錯
-# 觀察 stream：
+agent = Agent(model=ScriptedModel([
+    '{"thought": "look it up", "action": {"skill_name": "serch_book", "args": {"topic": "sci-fi"}}}',
+    '{"thought": "give up", "action": {"final_answer": "no books found"}}',
+]))
+state = agent.run("find a science fiction novel")
+
+# 觀察 stream：feedback 的前兩行是錯誤類型與細節
 for ev in state.stream:
-    if isinstance(ev, ToolErrorObservation):
-        print(ev.message)
-# -> "skill 'serch_book' not registered. Available: ['search_book', ...]"
+    if isinstance(ev, ValidationErrorObservation):
+        print(ev.validator_name)
+        for line in ev.feedback.splitlines()[:2]:
+            print(line)
+# -> action_parse
+# -> error_type: unknown_skill
+# -> detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
 ```
 
 修法：把正確名字加進 system prompt 的範例，或調 `max_retries` 讓 LLM 自己更正。
@@ -22,8 +53,12 @@ for ev in state.stream:
 skill 的 args schema 由 function signature 推導。如果 LLM 傳了型別錯誤的值，會被 Pydantic 擋下：
 
 ```python
+from cantus import skill
+
 @skill
-def search_book(topic: str, n: int = 5) -> str: ...
+def search_book(topic: str, n: int = 5) -> str:
+    """搜尋目錄。"""
+    return f"{n} books about {topic}"
 
 # 觀察：傳 n="abc"
 # -> ToolErrorObservation(message="args validation failed: ValidationError: ...")
@@ -41,11 +76,24 @@ print(search_book.spec_for_llm()["args_schema"])
 Validator 的 contract 是 **必須回 `Result`**，否則 `__call__` 會直接 raise `TypeError`。（`validator` 和 `analyzer` 是 skill 的 hook helper，不是 protocol kind——把它們掛到某個 skill 上，dispatch 時才會跑。）
 
 ```python
+from cantus.hooks import validator
+from pydantic import BaseModel
+
+class Book(BaseModel):
+    isbn: str
+
+def checksum_ok(isbn: str) -> bool:
+    return len(isbn) == 13  # 代替真正的 checksum
+
 @validator
 def ensure_isbn(book: Book):
     """錯誤示範：回 bool。"""
     return checksum_ok(book.isbn)  # TypeError!
 
+try:
+    ensure_isbn(Book(isbn="9780441013593"))
+except TypeError as exc:
+    print(exc)
 # TypeError: Validator ensure_isbn must return Result, got bool
 ```
 
@@ -56,6 +104,7 @@ from cantus import Result
 
 @validator
 def ensure_isbn(book: Book) -> Result:
+    """驗證 ISBN checksum。"""
     if checksum_ok(book.isbn):
         return Result.success(book)
     return Result.failure("ISBN checksum 不對，請重檢數字。")
@@ -68,16 +117,25 @@ def ensure_isbn(book: Book) -> Result:
 `@debug` 必須在 **最外層**，因為它要 wrap 一個已經建立好的 protocol instance：
 
 ```python
+from cantus import debug, skill
+
 # 錯誤
-@skill
-@debug
-def f(x): ...
+try:
+    @skill
+    @debug
+    def f(x: int) -> int:
+        """把 x 乘以 2。"""
+        return 2 * x
+except TypeError as exc:
+    print(type(exc).__name__)
 # TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function
 
 # 正確
 @debug
 @skill
-def f(x): ...
+def f(x: int) -> int:
+    """把 x 乘以 2。"""
+    return 2 * x
 ```
 
 修法：永遠把 `@debug` 放最上面。Python decorator 由下往上套，`@skill` 要先把 function 變成 `Skill` instance，`@debug` 才能接到這個 instance。`@debug` 同樣可以 wrap `Analyzer` 和 `Validator` 這兩個 hook helper。
@@ -87,8 +145,15 @@ def f(x): ...
 Memory 是唯一 class-only 的 protocol，刻意沒有 decorator 入口：
 
 ```python
-from cantus import memory          # ImportError
-from cantus import register_memory # ImportError
+try:
+    from cantus import memory
+except ImportError:
+    print("no @memory decorator")
+
+try:
+    from cantus import register_memory
+except ImportError:
+    print("no register_memory either")
 ```
 
 修法：永遠繼承 `Memory` 寫 class：
@@ -111,9 +176,16 @@ class TopicMemory(Memory):
 LLM 如果一直回 `CallSkillAction`、不回 `FinalAnswerAction`，loop 會一直跑直到 `max_iterations`。框架會在最後塞一個 `MaxIterationsObservation`：
 
 ```python
+from cantus import MaxIterationsObservation
+
+# 一個永遠不回 final_answer 的模型：
+agent = Agent(model=ScriptedModel([
+    '{"thought": "search again", "action": {"skill_name": "search_book", "args": {"topic": "sci-fi"}}}',
+]))
 state = agent.run("query", max_iterations=8)
 if isinstance(state.stream[-1], MaxIterationsObservation):
-    print("跑滿了，最後一個 action：", state.stream[-1].last_action_summary)
+    print("Hit the cap after", state.stream[-1].iterations, "iterations")
+    print("Last action:", state.stream[-1].last_action_summary)
 ```
 
 修法兩條路：
@@ -133,6 +205,20 @@ try:
     parse_tool_call(raw)
 except GrammarError as e:
     print(e)  # -> missing required keys 'thought' or 'action'
+```
+
+你應該看到，第 1 到 7 節可執行的範例合起來：
+
+```text
+action_parse
+error_type: unknown_skill
+detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+Validator ensure_isbn must return Result, got bool
+TypeError
+no @memory decorator
+no register_memory either
+Hit the cap after 8 iterations
+missing required keys 'thought' or 'action'
 ```
 
 常見原因：
@@ -163,6 +249,7 @@ state = agent.run("找一本科幻小說", max_iterations=12)
 
 第二條配套是觀測用的：拿 `state.stream.replay()` 把整段 retry 攤開來看。在生出非空答之前，stream 會夾進一筆或多筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`，replay 出來就是一條清楚的軌跡：
 
+<!-- vv:skip: needs Colab and Google Drive -->
 ```python
 from cantus import Agent, mount_drive_and_load
 

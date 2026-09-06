@@ -40,15 +40,17 @@ from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
 
 @skill
 def add(a: int, b: int) -> int:
-    """Add two integers."""
+    """把兩個整數相加。"""
     return a + b
+
+print(add(17, 25))  # skill 仍然是普通函式，你可以自己呼叫
 ```
 
 ### 4. 載入 chat model
 
 ```python
-chat = load_chat_model("openai/gpt-4o-mini")
-agent = Agent(model=ChatModelAsHandle(chat))
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
+agent = Agent(model=model)
 ```
 
 `load_chat_model("openai/gpt-4o-mini")` 會從環境變數讀取 `OPENAI_API_KEY`，再走 OpenAI Chat Completions API。同一個 factory 也吃 `"anthropic/claude-..."`、`"google/gemini-..."`、`"groq/..."`，前提是你裝好對應的 extras（`uv pip install "cantus-agent[anthropic,google,groq]"`）。`Agent` 只認 Tier 1 的 `.generate(prompt) -> str` 介面，所以 `ChatModel` 一定要先用 `ChatModelAsHandle` 包起來再交給它。
@@ -61,7 +63,11 @@ final = state.stream[-1]
 print(getattr(final, "answer", final))
 ```
 
-你應該會看到 agent 呼叫 `add` 這個 skill，然後印出 `42`。
+你應該看到直接呼叫印出的 `42`，接著是 agent 自己的回答（換成夠強的模型，它會在呼叫 `add` 之後同樣回 `42`）：
+
+```text
+42
+```
 
 ## 用 CLI 啟動服務
 
@@ -109,6 +115,7 @@ ollama pull gemma3:4b
 
 接著在 Python 裡用它，就跟其他任何供應商一模一樣：
 
+<!-- vv:skip: needs a running Ollama daemon -->
 ```python
 from cantus import Agent, Message, load_chat_model
 
@@ -131,6 +138,7 @@ pip install cantus[mlx]
 
 接著把 `load_chat_model` 指向任何一個 Hugging Face / MLX 的 model id（這得你自己提供；cantus 不會幫你下載權重）：
 
+<!-- vv:skip: needs Apple Silicon and the mlx extra -->
 ```python
 from cantus import Message, load_chat_model
 
@@ -151,6 +159,7 @@ pip install cantus[openai]
 
 啟動你選的那台伺服器，再把 `load_chat_model` 指向它的 `/v1` 端點。**`base_url` 是必填的**——omlx 和 mlx-omni-server 監聽的 port 不一樣，沒有哪個單一預設值說得通，所以你得明講是哪一台：
 
+<!-- vv:skip: needs a local MLX server listening on the base_url -->
 ```python
 from cantus import Message, load_chat_model
 

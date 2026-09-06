@@ -711,3 +711,9 @@ ignored on 3.10 and honoured on 3.11/3.12; `PYTHONPATH` honoured on all.
   whose right-hand side contains `==` matches. Decision: keep the regex; the
   row now reads "bare `x == y` comparison (no assignment target)". No
   implementation change.
+- A.2.7 (ticket 04 review): ASCII runs are computed on the literal's body,
+  with the string prefix and quote delimiters removed, so an opening quote
+  never joins the first word into a run. The shell rule is positional: both
+  fences must have the same number of lines, and a line may differ only when
+  it begins with `#` (after leading whitespace) on both sides. Nested
+  f-strings (3.12+) collapse as one run until the outermost `FSTRING_END`.

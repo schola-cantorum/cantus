@@ -21,7 +21,14 @@ from cantus.hooks import analyzer, Analyzer, Result
 ```python
 from cantus import skill
 from cantus.hooks import analyzer
-from myapp.models import Location
+from pydantic import BaseModel
+
+class Location(BaseModel):
+    name: str
+
+    @classmethod
+    def from_text(cls, text: str) -> "Location":
+        return cls(name=text.strip().title())
 
 @analyzer
 def parse_location(text: str) -> Location:
@@ -31,14 +38,21 @@ def parse_location(text: str) -> Location:
 @skill(pre_hook=parse_location)
 def get_weather(loc: Location) -> str:
     """Look up the forecast for a location."""
-    return _do_lookup(loc)
+    return f"sunny in {loc.name}"  # 代替真正的天氣查詢
+
+print(parse_location(" tainan ").name)
+```
+
+直接呼叫時，analyzer 就只是一個函式：回傳它宣告要回傳的型別。你應該看到：
+
+```text
+Tainan
 ```
 
 ### 2. Class-first（進階／正統寫法）
 
 ```python
 from cantus.hooks import Analyzer
-from myapp.models import Location
 
 class ParseLocation(Analyzer):
     """Parse a natural-language place name into a Location."""

@@ -10,17 +10,30 @@ from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, 
 
 對應 Anthropic playbook 的 **Prompt Chaining** pattern。把多個 Skill 依序串起來，前一步的 return 直接餵給下一步當 input；最後一步的 return 就是整條 chain 的 return。適合可拆成穩定線性步驟的任務（例如 outline → draft → polish）。
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class PromptChain:
     def __init__(self, steps: Iterable[Callable[..., Any]]) -> None: ...
     def run(self, input: Any) -> Any: ...
 ```
 
+本頁的範例用純函式代替已註冊的 skill；building block 接受任何 callable。
+
 ```python
 from cantus.workflows import PromptChain
 
+def outline(topic: str) -> str:
+    return f"outline of {topic}"
+
+def draft(outline: str) -> str:
+    return f"draft from {outline}"
+
+def polish(text: str) -> str:
+    return f"polished {text}"
+
 chain = PromptChain(steps=[outline, draft, polish])
 final = chain.run("write a haiku about Tainan")
+print(final)
 ```
 
 使用時請注意：
@@ -33,6 +46,7 @@ final = chain.run("write a haiku about Tainan")
 
 對應 Anthropic playbook 的 **Routing** pattern。先用 classifier 把 input 分類成一個 string key，再分派給對應的 Skill；同一個 input 最終只會打到一條 route。適合做 intent classification 後接專責 handler。
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class Router:
     def __init__(
@@ -46,11 +60,20 @@ class Router:
 ```python
 from cantus.workflows import Router
 
+def get_weather(text: str) -> str:
+    return f"weather: {text}"
+
+def fetch_news(text: str) -> str:
+    return f"news: {text}"
+
+def classify_intent(text: str) -> str:
+    return "weather" if "typhoon" in text else "news"
+
 router = Router(
     routes={"weather": get_weather, "news": fetch_news},
     classifier=classify_intent,
 )
-router.run("typhoon update")
+print(router.run("typhoon update"))
 ```
 
 使用時請注意：
@@ -63,6 +86,7 @@ router.run("typhoon update")
 
 對應 Anthropic playbook 的 **Parallelization** pattern。把同一個 input fan-out 給多條 branch Skill，收集每條的 return 成一個 `list`，順序與 `branches` 的宣告順序一致。適合需要多視角輸出再 aggregate 的情境。
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class Parallel:
     def __init__(self, branches: Iterable[Callable[..., Any]]) -> None: ...
@@ -72,8 +96,15 @@ class Parallel:
 ```python
 from cantus.workflows import Parallel
 
+def summarize_en(text: str) -> str:
+    return f"EN summary of {len(text)} chars"
+
+def summarize_zh(text: str) -> str:
+    return f"ZH summary of {len(text)} chars"
+
 fanout = Parallel(branches=[summarize_en, summarize_zh])
 en_summary, zh_summary = fanout.run("Long article ...")
+print(en_summary, "|", zh_summary)
 ```
 
 使用時請注意：
@@ -86,6 +117,7 @@ en_summary, zh_summary = fanout.run("Long article ...")
 
 對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator Skill 拿到 input 後回一串 subtask；`OrchestratorWorker` 把這些 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class OrchestratorWorker:
     def __init__(
@@ -99,9 +131,20 @@ class OrchestratorWorker:
 ```python
 from cantus.workflows import OrchestratorWorker, PromptChain
 
+def plan_cities(topic: str) -> list[str]:
+    return ["Anping", "West Central"]  # 真正的 planner 會從主題推出這些城市
+
+def fetch_section(city: str) -> str:
+    return f"section on {city}"
+
+def synthesize(sections: list[str]) -> str:
+    return " + ".join(sections)
+
 ow = OrchestratorWorker(orchestrator=plan_cities, workers=[fetch_section])
-sections = ow.run("Tainan travel guide")  # plan_cities 可能回 5 個城市
+sections = ow.run("Tainan travel guide")  # 每個規劃出的城市呼叫一次 worker
 guide = PromptChain(steps=[ow.run, synthesize]).run("Tainan travel guide")
+print(sections)
+print(guide)
 ```
 
 使用時請注意：
@@ -114,6 +157,7 @@ guide = PromptChain(steps=[ow.run, synthesize]).run("Tainan travel guide")
 
 對應 Anthropic playbook 的 **Evaluator-Optimizer** pattern。一個 generator 產 candidate、一個 evaluator 判斷；不過就再生，過了就回，最多跑 `max_iters` 輪。適合品質可被檢核、值得多輪修正的輸出（例如論點、翻譯、程式碼）。
 
+<!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
 class EvaluatorOptimizer:
     def __init__(
@@ -127,9 +171,33 @@ class EvaluatorOptimizer:
 
 ```python
 from cantus.workflows import EvaluatorOptimizer
+from cantus import Result
+
+attempts = {"count": 0}
+
+def draft(prompt: str) -> str:
+    attempts["count"] += 1
+    return f"attempt {attempts['count']}: {prompt}"
+
+def critique(candidate: str) -> Result:
+    if candidate.startswith("attempt 1"):
+        return Result.failure("too thin, try again")
+    return Result.success(candidate)
 
 eo = EvaluatorOptimizer(generator=draft, evaluator=critique, max_iters=3)
 best = eo.run("Argue for solar over wind")
+print(best)
+```
+
+你應該看到，五個範例合起來：
+
+```text
+polished draft from outline of write a haiku about Tainan
+weather: typhoon update
+EN summary of 16 chars | ZH summary of 16 chars
+['section on Anping', 'section on West Central']
+section on Anping + section on West Central
+attempt 2: Argue for solar over wind
 ```
 
 使用時請注意：

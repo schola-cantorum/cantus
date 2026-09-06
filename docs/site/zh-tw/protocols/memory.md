@@ -19,6 +19,9 @@ Memory 負責 agent 的「狀態化回憶」：把過去的對話 turn 存起來
 ```python
 from cantus.protocols.memory import Memory, Turn
 
+def _classify(text: str) -> str:
+    return "travel" if "Tainan" in text else "general"  # 代替真正的主題分類器
+
 class TopicMemory(Memory):
     """Group turns by topic keyword and recall the matching bucket."""
 
@@ -32,6 +35,11 @@ class TopicMemory(Memory):
     def recall(self, query: str) -> list[Turn]:
         topic = _classify(query)
         return list(self._buckets.get(topic, []))
+
+mem = TopicMemory()
+mem.remember(Turn(user="What to eat in Tainan?", assistant="Danzai noodles."))
+mem.remember(Turn(user="Explain recursion.", assistant="A function calling itself."))
+print(len(mem.recall("Tainan snacks")))
 ```
 
 一個實作只需要 override 兩個方法：`remember(turn)` 跟 `recall(query)`。`Turn` 是一個凍結（frozen）的 dataclass，`Turn(user: str, assistant: str)`。
@@ -118,6 +126,14 @@ p.append({"observation": "found 3 books"})
 # 跨 session 重新載入
 restored = JsonLinesPersistence("session-001.jsonl").load()
 print(restored)  # [{'action': 'search', ...}, {'observation': ...}]
+```
+
+你應該看到，上面四個區塊合起來：
+
+```text
+1
+['view', 'create', 'str_replace', 'delete']
+[{'action': 'search', 'query': 'Tainan'}, {'observation': 'found 3 books'}]
 ```
 
 **設計約束**：

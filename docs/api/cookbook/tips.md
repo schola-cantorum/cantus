@@ -45,7 +45,7 @@ def search_book(topic: str, n: int = 5) -> str:
     """
     ...
 
-print(search_book.spec_for_llm()["description"])
+print(search_book.spec_for_llm()["args_schema"]["required"])
 ```
 
 The format is strict: one `name: description` per line, with an optional `(type)` allowed between the name and the colon. Only the first paragraph (everything before the first blank line) counts as the description.
@@ -159,7 +159,7 @@ print(reg.names_for("skill"))
 You should see, across the runnable tips on this page:
 
 ```text
-Search the catalog for books.
+['topic']
 True
 ['my_skill']
 ```

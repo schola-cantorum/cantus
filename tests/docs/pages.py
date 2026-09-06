@@ -41,6 +41,7 @@ IN_SCOPE_PAGES: tuple[str, ...] = (
 )
 
 FenceChar = Literal["`", "~"]
+SHELL_INFOS = frozenset({"bash", "sh", "console"})
 MalformedKind = Literal["fence", "marker", "hook"]
 
 # A.2.0: a fence opens on a line with at most three spaces of indentation and
@@ -134,6 +135,11 @@ class Fence:
     def is_python(self) -> bool:
         """A.2.0: a backtick fence whose stripped info string is exactly ``python``."""
         return self.char == "`" and self.info == "python"
+
+    @property
+    def is_shell(self) -> bool:
+        """A backtick fence whose info string names a shell (``bash``, ``sh``, ``console``)."""
+        return self.char == "`" and self.info in SHELL_INFOS
 
 
 @dataclass(frozen=True)

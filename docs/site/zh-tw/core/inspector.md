@@ -6,6 +6,7 @@
 
 ## Class signature
 
+<!-- vv:skip: class signature sketch, method bodies omitted -->
 ```python
 @dataclass
 class Inspector:
@@ -19,8 +20,35 @@ class Inspector:
 
 ## 標準用法
 
+為了讓下面的 trace 在任何機器上都能重現，這個範例用一個「腳本模型」來驅動 agent：一個 `generate` 依序回傳固定回覆的物件。任何有 `generate(prompt) -> str` method 的物件都能當模型，所以最後把它換成真的模型即可。
+
 ```python
-from cantus import Agent, Inspector
+from cantus import Agent, Inspector, skill
+
+
+@skill
+def add(a: int, b: int) -> int:
+    """把兩個整數相加。"""
+    return a + b
+
+
+class ScriptedModel:
+    """代替 LLM：回覆依序來自固定清單。"""
+
+    def __init__(self, replies: list[str]) -> None:
+        self.replies = list(replies)
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        if len(self.replies) > 1:
+            return self.replies.pop(0)
+        return self.replies[0]  # 用完之後一直重複最後一句
+
+
+model = ScriptedModel([
+    '{"thought": "add the first two", "action": {"skill_name": "add", "args": {"a": 3, "b": 4}}}',
+    '{"thought": "now add 5", "action": {"skill_name": "add", "args": {"a": 7, "b": 5}}}',
+    '{"thought": "done", "action": {"final_answer": "3+4+5 = 12"}}',
+])
 
 agent = Agent(model=model)
 state = agent.run("Please compute 3 + 4 + 5")
@@ -32,14 +60,15 @@ Inspector(state.stream).replay()
 Inspector(state.stream).summary()
 ```
 
-`replay()` 的輸出長這樣：
+你應該看到：
 
-```
+```text
 [0] Action :: CallSkillAction :: CallSkillAction(thought='add the first two', skill_name='add', args={'a': 3, 'b': 4})
 [1] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=7)
 [2] Action :: CallSkillAction :: CallSkillAction(thought='now add 5', skill_name='add', args={'a': 7, 'b': 5})
 [3] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=12)
 [4] Action :: FinalAnswerAction :: FinalAnswerAction(thought='done', answer='3+4+5 = 12')
+EventStream: 5 events (3 actions, 2 observations)
 ```
 
 ## 寫到別的 IO

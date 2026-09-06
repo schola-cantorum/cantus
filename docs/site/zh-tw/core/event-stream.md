@@ -4,6 +4,7 @@
 
 ## 介面
 
+<!-- vv:skip: interface sketch with abbreviated signatures, not valid Python -->
 ```python
 @dataclass
 class EventStream:
@@ -17,6 +18,30 @@ class EventStream:
 ```
 
 `Event = Action | Observation`。注意 `replay()` 只「回傳」字串，要不要印出來是 caller 自己決定的事。正是這個分工，讓 `Inspector` 可以把同一個 stream 送到任何 IO 目標（stdout、檔案，或一個 `StringIO`）。
+
+不跑 agent 也可以手動組一個 stream，直接看契約長什麼樣：
+
+```python
+from cantus import EventStream, CallSkillAction, SkillObservation
+
+stream = EventStream()
+stream.append(CallSkillAction(thought="add them", skill_name="add", args={"a": 1, "b": 2}))
+stream.append(SkillObservation(skill_name="add", result=3))
+print(len(stream))
+print(stream.replay())
+
+try:
+    stream.append("not an event")
+except TypeError as exc:
+    print(exc)
+```
+
+你應該看到長度、兩行 replay（每個事件一行，從 `[0]` 開始編號）與 `TypeError` 訊息：
+
+```text
+2
+EventStream only accepts Action or Observation, got str
+```
 
 ## Action 階層
 
