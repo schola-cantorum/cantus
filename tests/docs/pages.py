@@ -52,7 +52,7 @@ _TILDE_OPEN = re.compile(r"^(?P<indent>[ ]{0,3})(?P<run>~{3,})(?P<info>.*)$")
 # A line of four or more spaces followed by backticks is not a fence in
 # CommonMark (it is an indented code block); A.2.0 flags it when its content is
 # Python that mentions cantus, because that is a fence the author meant to write.
-_DEEP_INDENT_OPEN = re.compile(r"^[ ]{4,}`{3,}")
+_DEEP_INDENT_OPEN = re.compile(r"^[ ]{4,}(?P<run>`{3,}|~{3,})")
 
 # A.2.1: the skip marker. ``[^-]`` in the reason class is what makes a hyphen a
 # malformed marker rather than a valid one with a hyphen in it.
@@ -130,6 +130,11 @@ class Fence:
     info: str
     lines: list[str]
 
+    @property
+    def is_python(self) -> bool:
+        """A.2.0: a backtick fence whose stripped info string is exactly ``python``."""
+        return self.char == "`" and self.info == "python"
+
 
 @dataclass(frozen=True)
 class PythonBlock:
@@ -149,10 +154,12 @@ class PythonBlock:
 
     @property
     def lines(self) -> list[str]:
+        """The block's content lines, dedented."""
         return self.fence.lines
 
     @property
     def skipped(self) -> bool:
+        """True when a valid skip marker sits directly before the fence."""
         return self.skip is not None
 
 
@@ -192,7 +199,7 @@ def parse_page(text: str) -> ParsedPage:
         if verdict is not None:
             malformed.append(Malformed(fence.open_line, "fence", verdict))
             continue
-        if fence.char == "`" and fence.info == "python":
+        if fence.is_python:
             skip = _marker_before(lines, fence.open_line)
             if skip is not None:
                 valid_marker_lines.add(skip.line)
@@ -213,7 +220,7 @@ def parse_page(text: str) -> ParsedPage:
                     number,
                     "marker",
                     f"line contains {_SKIP_TOKEN!r} but is not a valid skip marker "
-                    "immediately before a Python fence (A.2.1: "
+                    "immediately before a Python fence (ADR-0003 skip marker: "
                     "'<!-- vv:skip: <reason> -->', reason of at least "
                     f"{_SKIP_MIN_REASON_CHARS} non-space characters, no hyphen)",
                 )
@@ -231,20 +238,30 @@ def _dedent(line: str, indent: str) -> str:
     return line[n:]
 
 
-def _closing_run(line: str, char: FenceChar, min_indent: int, max_indent: int) -> int:
+def _closing_run(line: str, char: FenceChar, min_indent: int, max_indent: int | None) -> int:
     """Length of the fence run on a closing line, or 0 if the line is not one.
 
-    A closing line is a run of ``char`` and nothing else, indented within
-    ``[min_indent, max_indent]`` spaces.
+    A closing line is a run of ``char`` and nothing else, indented by at least
+    ``min_indent`` spaces and at most ``max_indent`` (``None`` = unbounded).
     """
-    m = re.match(
-        rf"^[ ]{{{min_indent},{max_indent}}}({re.escape(char)}{{3,}})[ \t]*$", line
-    )
+    upper = "" if max_indent is None else str(max_indent)
+    m = re.match(rf"^[ ]{{{min_indent},{upper}}}({re.escape(char)}{{3,}})[ \t]*$", line)
     return len(m.group(1)) if m is not None else 0
 
 
+def _match_open(line: str) -> tuple[FenceChar, re.Match[str]] | None:
+    """The fence character and match for a CommonMark fence opener, else None."""
+    m = _BACKTICK_OPEN.match(line)
+    if m is not None:
+        return "`", m
+    m = _TILDE_OPEN.match(line)
+    if m is not None:
+        return "~", m
+    return None
+
+
 def _opens_fence(line: str) -> bool:
-    return _BACKTICK_OPEN.match(line) is not None or _TILDE_OPEN.match(line) is not None
+    return _match_open(line) is not None
 
 
 def _scan_fences(lines: list[str]) -> tuple[list[Fence], list[Malformed]]:
@@ -253,12 +270,9 @@ def _scan_fences(lines: list[str]) -> tuple[list[Fence], list[Malformed]]:
     i = 0
     while i < len(lines):
         line = lines[i]
-        char: FenceChar = "`"
-        m = _BACKTICK_OPEN.match(line)
-        if m is None:
-            m = _TILDE_OPEN.match(line)
-            char = "~"
-        if m is not None:
+        opened = _match_open(line)
+        if opened is not None:
+            char, m = opened
             indent, run, info = m.group("indent"), m.group("run"), m.group("info").strip()
             # A.2.0: the block ends at the next line that is at least as many
             # fence characters as the opening run, nothing else, indented by at
@@ -284,39 +298,47 @@ def _scan_fences(lines: list[str]) -> tuple[list[Fence], list[Malformed]]:
             )
             i = j + 1
             continue
-        if _DEEP_INDENT_OPEN.match(line):
-            i = _check_deep_indented_block(lines, i, malformed)
+        deep = _DEEP_INDENT_OPEN.match(line)
+        if deep is not None:
+            deep_char: FenceChar = "~" if deep.group("run").startswith("~") else "`"
+            finding, i = _check_deep_indented_block(lines, i, deep_char)
+            if finding is not None:
+                malformed.append(finding)
             continue
         i += 1
     return fences, malformed
 
 
-def _check_deep_indented_block(lines: list[str], start: int, malformed: list[Malformed]) -> int:
+def _check_deep_indented_block(
+    lines: list[str], start: int, char: FenceChar
+) -> tuple[Malformed | None, int]:
     """A.2.0: a fence indented by four or more spaces is not a fence.
 
     It never opens a block, so it cannot swallow a real fence that follows: its
     content runs until a deep-indented closing line or the next real fence
     opener, whichever comes first. If that content, dedented, is Python that
     mentions cantus, the author meant to write a fence and the page is
-    malformed. Returns the index to resume scanning from.
+    malformed.
+
+    Returns:
+        The finding (or ``None``) and the index to resume scanning from.
     """
     j = start + 1
     while j < len(lines) and not _opens_fence(lines[j]):
-        if _closing_run(lines[j], "`", 4, 10**6):
+        if _closing_run(lines[j], char, 4, None):
             break
         j += 1
     body = textwrap.dedent("\n".join(lines[start + 1 : j]))
+    finding = None
     if "cantus" in body and _parses_as_python(body):
-        malformed.append(
-            Malformed(
-                start + 1,
-                "fence",
-                "fence indented by four or more spaces is an indented code block, "
-                "not a fence; its content is Python that mentions cantus",
-            )
+        finding = Malformed(
+            start + 1,
+            "fence",
+            "fence indented by four or more spaces is an indented code block, "
+            "not a fence; its content is Python that mentions cantus",
         )
     closed = j < len(lines) and not _opens_fence(lines[j])
-    return j + 1 if closed else j
+    return finding, (j + 1 if closed else j)
 
 
 def _parses_as_python(source: str) -> bool:
@@ -331,11 +353,11 @@ def _python_fence_verdict(fence: Fence) -> str | None:
     """Return a malformed-fence message for a fence that carries Python under a
     wrong info string, ``None`` for anything else (including a valid block)."""
     info = fence.info
+    if fence.is_python:
+        return None
     if fence.char == "~":
         if info.startswith("py"):
             return f"tilde fence with info string {info!r}; Python blocks use backticks"
-        return None
-    if info == "python":
         return None
     if info == "py" or info.startswith("python"):
         return f"info string {info!r}; a Python block's info string must be exactly 'python'"
@@ -374,7 +396,8 @@ def _scan_hooks(fence: Fence) -> tuple[list[Hook], list[Malformed]]:
                     page_line,
                     "hook",
                     f"line names {HOOK_NAME} but is not a hook line "
-                    "(A.2.3: '<name> = <expr>  # under docs tests: cantus_docs_model()')",
+                    "(ADR-0003 model hook: "
+                    "'<name> = <expr>  # under docs tests: cantus_docs_model()')",
                 )
             )
             continue

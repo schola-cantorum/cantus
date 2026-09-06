@@ -556,7 +556,7 @@ piece-by-piece page, and every page under `tutorial/`, of which lessons 0, 7,
 | Page script | imports optional extra not installed | fail; author adds a marker | page test |
 | Hook | line matches A.2.3 | rhs replaced, lhs and indent kept | page test |
 | Hook | `cantus_docs_model` on a non-matching block line | malformed → fail | hook test |
-| Hook | `==` comparison on the marked line | not a hook; malformed → fail | hook test |
+| Hook | bare `x == y` comparison (no assignment target) on the marked line | not a hook; malformed → fail | hook test |
 | zh-tw pair | block count differs | fail | parity test |
 | zh-tw pair | marker present on one side only | fail | parity test |
 | zh-tw pair | marker reason differs from English | fail | parity test |
@@ -703,3 +703,11 @@ these final edits are clarifications and are self-reviewed only.
 Python check recorded by the reviewer: `python -B -s -X utf8` accepted on
 3.10, 3.11, 3.12; `-P` rejected on 3.10; `PYTHONSAFEPATH=1` silently
 ignored on 3.10 and honoured on 3.11/3.12; `PYTHONPATH` honoured on all.
+
+## Appendix F — Post-implementation clarification (2026-09-06, ticket 01 review)
+
+- A.4 row "Hook | `==` comparison on the marked line" contradicted the A.2.3
+  regex, which constrains only the first `=` after the target: an assignment
+  whose right-hand side contains `==` matches. Decision: keep the regex; the
+  row now reads "bare `x == y` comparison (no assignment target)". No
+  implementation change.

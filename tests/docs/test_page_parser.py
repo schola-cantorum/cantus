@@ -1,6 +1,6 @@
 """Unit cases for the documentation page parser (ticket docs-tutorial-and-vv/01).
 
-Each case is one row of the spec's type × boundary matrix (A.4), fed an inline
+Each case is one row of the planning snapshot's type × boundary matrix (A.4), fed an inline
 markdown sample so the boundary is visible in the test itself. The parser is
 observed only through ``parse_page``: what it reports as Python blocks and what
 it reports as malformed.
@@ -336,7 +336,7 @@ def test_hook_name_on_a_non_matching_block_line_is_malformed() -> None:
     assert parsed.python_blocks[0].hooks == []
 
 
-def test_equality_comparison_on_a_marked_line_is_malformed_not_a_hook() -> None:
+def test_bare_comparison_is_malformed_but_assignment_with_comparison_is_a_hook() -> None:
     # A.2.3 constrains only the first ``=`` after the target, so an assignment
     # whose right-hand side compares with ``==`` is a hook; the A.4 row
     # "``==`` comparison on the marked line" is the bare ``x == y`` statement.
@@ -354,7 +354,7 @@ def test_equality_comparison_on_a_marked_line_is_malformed_not_a_hook() -> None:
     assert [(m.line, m.kind) for m in parsed.malformed] == [(3, "hook")]
 
 
-def test_hooks_in_skipped_blocks_are_scanned_but_recorded_as_hooks() -> None:
+def test_skipped_blocks_are_scanned_for_hooks_and_malformed_hooks_alike() -> None:
     page = _page(
         """
         <!-- vv:skip: needs a running Ollama daemon -->
@@ -419,3 +419,19 @@ def test_four_space_indented_pseudo_fence_does_not_swallow_a_real_fence() -> Non
     parsed = parse_page(page)
     assert parsed.malformed == []
     assert [b.lines for b in parsed.python_blocks] == [["from cantus import Agent"]]
+
+
+def test_four_space_indented_tilde_python_mentioning_cantus_is_malformed() -> None:
+    # Review finding: A.2.0 does not limit the deep-indent rule to backticks.
+    page = _page(
+        """
+        - item
+
+            ~~~python
+            from cantus import Agent
+            ~~~
+        """
+    )
+    parsed = parse_page(page)
+    assert parsed.python_blocks == []
+    assert [(m.line, m.kind) for m in parsed.malformed] == [(3, "fence")]
