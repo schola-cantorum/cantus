@@ -724,3 +724,17 @@ ignored on 3.10 and honoured on 3.11/3.12; `PYTHONPATH` honoured on all.
   passthrough such as `secrets: inherit`), which forwards secrets without
   the `secrets.` spelling. Synthetic fixtures cite `ADR-0999`, a number no
   real ADR uses, so a fixture can never satisfy a real ADR's loop.
+- Install pin (ticket 06 review): the A.4 row says `pip install cantus[` and the
+  Implementation Decisions paragraph says `pip install cantus`; the wider
+  reading governs, and the implemented rule is wider still in one respect — an
+  extras bracket after any installer (`uv add cantus[mlx]`, a quoted or
+  flag-carrying `pip install`) fails too, because the wrong distribution name
+  reaches PyPI whichever command asks for it. The rule cannot distinguish a
+  command from its output, so a page quoting the package's own
+  `pip install cantus[serve]` gate message inside a `console` fence would fail;
+  no in-scope page does, and the fix would be to correct the message.
+- Hygiene patterns (ticket 06 review): the three shapes are as specified and
+  were not widened. Two known limits are recorded in the script: prefixed keys
+  (`sk-proj-`, `sk-ant-`, `github_pat_`) escape the alphanumeric run, and an
+  uppercase named placeholder such as `Bearer YOUR_SERVE_TOKEN` would be a
+  false positive, so a placeholder is written `Bearer <token>` or `Bearer $VAR`.

@@ -133,7 +133,7 @@ Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is
 > **Apple Silicon only.** This provider is supported **only on Apple Silicon (macOS arm64)**. On any other platform the `mlx` extras group resolves to empty and importing the adapter raises an `ImportError` telling you MLX needs Apple Silicon. Install it with:
 
 ```bash
-pip install cantus[mlx]
+pip install cantus-agent[mlx]
 ```
 
 Then point `load_chat_model` at any Hugging Face / MLX model id (you supply your own; cantus does not download weights for you):
@@ -154,7 +154,7 @@ print(response.message.content)
 `load_chat_model("omlx/...")` talks to a **local OpenAI-compatible MLX server** that runs as a separate process on Apple Silicon — either [`omlx`](https://omlx.ai) (default `http://localhost:8000/v1`) or [`mlx-omni-server`](https://github.com/madroidmaq/mlx-omni-server) (default `http://localhost:10240/v1`). Unlike the in-process MLX path above, `OmlxChatModel` is a thin `OpenAIChatModel` subclass, so it runs on the openai SDK with **no new dependency** — install (or reuse) the openai extras:
 
 ```bash
-pip install cantus[openai]
+pip install cantus-agent[openai]
 ```
 
 Start your server of choice, then point `load_chat_model` at its `/v1` endpoint. **`base_url` is required** — omlx and mlx-omni-server listen on different ports, so there is no single sensible default and you must say which one you mean:
