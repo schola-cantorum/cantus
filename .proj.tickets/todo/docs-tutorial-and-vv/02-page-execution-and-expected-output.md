@@ -1,7 +1,6 @@
 # 02: Page execution in a subprocess and expected-output assertion
 
 Entered: 2026-09-06
-Blocked by: 01
 
 ## Context
 

@@ -1,7 +1,6 @@
 # 06: Site-scoped token patterns and the install-name pin test
 
 Entered: 2026-09-06
-Blocked by: 01
 
 ## Context
 

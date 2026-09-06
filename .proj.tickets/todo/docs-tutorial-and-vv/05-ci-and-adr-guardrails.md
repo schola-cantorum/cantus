@@ -1,7 +1,6 @@
 # 05: Workflow guardrail test, ADR status loop, ADR-0001/0002/0003 accepted
 
 Entered: 2026-09-06
-Blocked by: 01
 
 ## Context
 
