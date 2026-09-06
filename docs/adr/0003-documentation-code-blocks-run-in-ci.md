@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Documentation code blocks will run in CI against a scripted model
@@ -14,10 +14,14 @@ fixed tool-call JSON, and compares stdout against the page's expected-output
 block. Once that module exists, a page whose expected output no longer matches
 will fail CI.
 
-**Until the test module named below exists in `tests/`, nothing in this ADR is
-enforced.** This status line is the guard against the repo's own definition of
-an unimplemented guardrail (`CONTEXT.md`). When the module lands, this ADR's
-status changes to `accepted` in the same commit and the ADR names the module.
+**Control.** The test modules under `tests/docs/` enforce this ADR:
+`tests/docs/pages.py` parses each in-scope page, `tests/docs/runner.py` runs
+the page script and checks the expected-output block, and
+`tests/docs/test_in_scope_pages.py` applies both to every in-scope page in
+CI. Each cites `ADR-0003`. The status line above was `proposed` until those
+modules landed, as the repo's own definition of an unimplemented guardrail
+(`CONTEXT.md`) requires; it changed to `accepted` in the commit that added
+the runner.
 
 ## Considered options
 

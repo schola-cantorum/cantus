@@ -21,7 +21,28 @@ twelve pages parse with zero malformed findings and hold 58 Python blocks
 (quickstart-desktop 6, agent 2, event-stream 1, inspector 3, skill 3, memory 4,
 analyzer 3, validator 3, workflows 11, patterns 4, errors 12 incl. the two
 list-indented fences, tips 6); no page carries a skip marker or a hook yet.
-Ticket 02 adds the runnable / failing split from the first execution run.
+First execution run from ticket 02 (2026-09-06, page scripts built from
+the pages as they are, expected-output rule ignored for this inventory; the
+real test fails all twelve for lacking an expected-output block):
+
+| Page | Result | Cause (0-based block index) |
+| --- | --- | --- |
+| quickstart-desktop | fails | block 1 needs OPENAI_API_KEY (provider) → skip or hook |
+| core/agent | fails | block 0 is a class excerpt with no imports (`dataclass`) → skip (illustrative) or add imports |
+| core/event-stream | fails | block 0 is not valid Python (`SyntaxError`), prose-like excerpt |
+| core/inspector | fails | block 0 same shape as event-stream |
+| protocols/skill | runs | 3 blocks, prints nothing yet → add a print + expected-output |
+| protocols/memory | runs | 4 blocks, 3 stdout lines → add expected-output |
+| protocols/analyzer | fails | block 1 imports a fictional `myapp` module |
+| protocols/validator | fails | block 1 references `Book` defined nowhere |
+| protocols/workflows | fails | block 1 uses `Iterable` without import |
+| cookbook/patterns | fails | block 3 needs `EmbeddingMemory` (`memory` extra absent in CI) → skip |
+| cookbook/errors | fails | block 0 references `state` from an earlier, unshown snippet |
+| cookbook/tips | fails | block 0 uses `skill` without import |
+
+Two pages already run end to end; the other ten need imports added, missing
+names defined in an earlier block, or a skip marker where the block is an
+illustrative excerpt or needs a provider or an extra.
 
 The generator change rides here because the first commit that adds marker lines
 to corpus-source pages would otherwise turn the CI corpus sync check red.

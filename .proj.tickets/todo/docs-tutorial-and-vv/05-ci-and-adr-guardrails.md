@@ -13,8 +13,10 @@ The trust model says the real controls on a pull request are: no secrets, no
 persisted credentials, read-only token. This ticket makes each of those a
 tested fact instead of a sentence, and generalises the existing ARCH-2 pattern
 so that every accepted ADR and its control point at each other by number.
-ADR-0003 flips here because its control (the harness module from ticket 01)
-now exists; ADR-0004 flips in ticket 10 with the fixture.
+ADR-0003 already flipped to `accepted` in ticket 02, naming the harness
+modules, because the ADR's own text requires the flip in the commit that lands
+the module; this ticket's loop must pass for it. ADR-0004 flips in ticket 10
+with the fixture.
 
 ## Acceptance criteria
 
@@ -33,6 +35,6 @@ now exists; ADR-0004 flips in ticket 10 with the fixture.
 - [ ] ADR-0001 and ADR-0002 gain `status: accepted`; ADR-0002 names the
       exception-policy test module as its control; the supply-chain workflow and
       the exception-policy test module each gain a comment citing their ADR
-- [ ] ADR-0003 gains `status: accepted` and names the docs harness module, which
-      cites `ADR-0003` (ticket 01); the loop passes for 0001, 0002, 0003 and
-      treats 0004 as exempt
+- [ ] The loop passes for ADR-0003 as flipped in ticket 02 (it names the docs
+      harness modules, which cite `ADR-0003`), for 0001 and 0002, and treats
+      0004 as exempt
