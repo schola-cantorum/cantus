@@ -1,17 +1,17 @@
 # Cantus 程式碼知識圖譜剖析（CodeGraph）
 
 > 由 [CodeGraph](https://github.com/colbymchenry/codegraph) `1.6.2` 建立索引，
-> 索引對應 commit `99f738b`。
+> 索引對應 commit `e1cec70`。
 > 再以 `scripts/codegraph_report.py` 從 `.codegraph/codegraph.db` 萃取成本文件與
 > [`codegraph-summary.json`](codegraph-summary.json)。資料庫本身是機器本地檔、不進版控；
 > 本頁與 JSON 是可 diff 的快照，重跑步驟見文末〈重現方式〉。
 
 ## 1. 總覽
 
-- 索引檔案：**290**（語言：python 217、yaml 68、javascript 4、typescript 1）
-- 依頂層目錄：`tests` 133、`cantus` 84、`openspec` 36、`.agents` 20、`.github` 6、`docs` 4、`scripts` 2、`regen-manifest.yaml` 1、`.wiki.manifest.yaml` 1、`.wiki-init.manifest.yaml` 1、`.spectra.yaml` 1、`.pre-commit-config.yaml` 1
-- 節點 **3646**：function 1587、import 909、method 400、variable 263、class 240、file 222、constant 15、route 10
-- 邊 **7885**：contains 3414、calls 1705、imports 977、instantiates 931、references 724、decorates 91、extends 43
+- 索引檔案：**275**（語言：python 226、yaml 44、javascript 4、typescript 1）
+- 依頂層目錄：`tests` 134、`cantus` 84、`.agents` 36、`.github` 6、`scripts` 4、`docs` 4、`.claude` 3、`regen-manifest.yaml` 1、`.wiki.manifest.yaml` 1、`.wiki-init.manifest.yaml` 1、`.pre-commit-config.yaml` 1
+- 節點 **3773**：function 1652、import 940、method 400、variable 285、class 240、file 231、constant 15、route 10
+- 邊 **8206**：contains 3532、calls 1871、imports 977、instantiates 931、references 761、decorates 91、extends 43
 
 ## 2. 套件層級依賴圖（`cantus/*`）
 
