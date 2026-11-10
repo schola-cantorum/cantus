@@ -1,146 +1,170 @@
-# Issue tracker: `.proj.tickets/` (state-directory markdown)
+# Issue tracker: local markdown
 
-Issues, tickets and specs for this repo live as markdown under sibling top-level
-`.proj.*` directories. There is no remote tracker; `gh issue` / `glab issue` are
-**not** used for this workflow.
-
-- `.proj.tickets/` — implementation tickets, state expressed as directory. Tracked.
-- `.proj.spec/` — specs (the `to-spec` output), one file per feature. Tracked.
-- `.proj.handoffs/` — session handoff documents. **Not** tracked; see below.
+Specs and tickets live as committed markdown files in this repo. They are the evidence chain behind
+every review and every deferral, which is why they are versioned rather than scratch.
 
 ## Layout
 
 ```
-.proj.tickets/                 ← tracked
-  todo/        processing/   review/
-  done/        block/        pending/
-    └── <feature-slug>/<NN>-<slug>.md
-
-.proj.spec/                    ← tracked
-  <feature-slug>.md            ← current
-  _shipped/<feature-slug>.md   ← delivered
-
-.proj.handoffs/                ← NOT tracked (gitignored)
-  <YYYY-MM-DD>-<slug>.md       ← session handoff documents
+.proj.specs/
+  OPEN-QUESTIONS.md
+  NNNN-<epic-slug>/
+    spec.en.md
+    spec.zh-TW.md
+    traceability.md
+    review/prompt.md
+    review/round-1.md
+    review/round-2.md
+    reports/<slug>.html
+  _reports/<slug>.html
+.proj.tickets/
+  NNNN-<epic-slug>/
+    T-NNNN-<slug>.md
 ```
 
-**Why `.proj.handoffs/` is the odd one out.** Tickets and specs are shared, durable
-project state, so they belong in git. A handoff is a transit document about one
-session's work in flight: it is dead once that work lands, it duplicates what the
-commits and specs already record, and keeping it would accumulate stale summaries
-that later sessions might read as current. It lives in the repo (so it survives a
-reboot, unlike the OS temp directory) but stays out of version control.
+Epic numbers (`NNNN-<epic-slug>`) are sequential per epic. Ticket ids (`T-NNNN`) are **global**,
+sequential across the whole project, and permanent — `git branch tickets/<ticket-id>/<slug>` depends
+on them never changing. Allocate the next id by scanning every epic directory for the highest
+`T-NNNN`, not just the current epic's.
 
-`<NN>` is numbered from `01` **per feature**, in dependency order (blockers first).
-Because numbering is feature-scoped, **always reference a ticket as
-`<feature-slug>/<NN>`** (e.g. `auth-refresh/03`), never as a bare `03`.
+Specs freeze after review; tickets churn. They live in separate roots so a spec directory's diff
+stays readable.
 
-## The six states
+Optional drift diagnoses are non-authoritative Markdown snapshots under an existing
+epic's reports/ or .proj.specs/_reports/. Their complete/partial/blocked/stale status
+belongs only to the report: it does not change a spec, traceability row, ticket
+status or delivery gate. Template-maintenance reports stay in .tmpl.docs/research/.
+The [drift contract](drift-report.md) owns scope and filenames; HTML evidence reports
+retain their existing format and purpose.
 
-State is expressed **only** by which directory the file sits in. There is no
-`Status:` line; the directory is the single source of truth.
+### cantus additions
 
-| State | Means |
-| --- | --- |
-| `todo` | Ready to start now. Every blocker is already in `done/`. |
-| `processing` | An agent is working it. One ticket at a time. |
-| `review` | Work is done and committed; awaiting the user's acceptance. |
-| `done` | Accepted. |
-| `block` | Blocked by another ticket in this repo. Machine-decidable: see `Blocked by:`. |
-| `pending` | Blocked by something outside the repo — a decision from the user, a third party, a timing condition. Only a human can clear it. |
+- **`.proj.tickets/0000-maintenance/`** holds lightweight-path tickets (see
+  [workflow.md](workflow.md#lightweight-path-cantus-override) and ADR-0012). It has no spec
+  directory. Its tickets use the same frontmatter plus `lightweight_reason:`.
+- **`.proj.tickets/_legacy/`** and **`.proj.specs/_legacy/`** hold work frozen during the
+  harness-agile migration: tickets kept in the old status-directory layout and throwaway spec
+  snapshots. They are not on any status view, carry no `T-NNNN` id, and are not review
+  evidence. Reviving an item starts at stage 1 (or the lightweight path) and gives it a new id.
+- The capability contract ledger `openspec/specs/` was removed with Spectra (ADR-0011). Read it
+  at the Git tag `pre-harness-migration`:
+  `git show pre-harness-migration:openspec/specs/<capability>/spec.md`.
 
-`block` vs `pending` is the load-bearing distinction: `block` clears automatically
-(see *Transitions*), `pending` never does.
 
-## Ticket file format
+Status lives in **frontmatter**, never in the path. Moving files between status directories would
+break the ticket's own references, produce rename conflicts across concurrent branches, and split
+one truth across two places.
 
-Plain markdown lines near the top of the file, matching the existing `Blocked by:`
-convention. No YAML frontmatter.
-
-```markdown
-# 03: Ticket title
-
-Entered: 2026-08-28
-Blocked by: 01, 02
-Pending reason: waiting on the user to decide the retention window
+```md
+---
+id: T-0007
+title: Load a scenario definition from disk
+epic: 0001-scenario-loading
+status: todo
+blocked_by: [T-0005, T-0006]
+---
 
 ## Context
-...
+
+Why this ticket exists, in the project's glossary vocabulary.
+
+## Deliverable
+
+The end-to-end behaviour this ticket makes work.
+
 ## Acceptance criteria
-- [ ] ...
+
+Traced back to rows of the epic's `traceability.md`.
+
+## 給使用者（zh-TW）
+
+這張票要做什麼、做完之後長什麼樣。供使用者稽核用；正文以 en 為準。
+
+## Comments
 ```
 
-- `Entered:` — the date the ticket entered its **current** state. Rewrite it on every
-  transition; it records the latest entry only. Full history is in `git log --follow`.
-- `Blocked by:` — feature-scoped ticket numbers, present only when the ticket has
-  blockers.
-- `Pending reason:` — **required** for every ticket in `pending/`, absent everywhere
-  else. It is what gets shown back to the user when they ask what is outstanding.
+Tickets are single-file and English-primary, with the one Traditional Chinese section above for the
+user's audit. They change too often for a parallel translated file to stay in sync — see
+[language.md](language.md).
 
-## Transitions
+## The six statuses
 
-Moves use `git mv`, and a state move is committed **together with that ticket's code
-change** — never as a rename-only commit.
+Five are written to `status:`. One is derived.
 
-| From → To | Who | When |
-| --- | --- | --- |
-| `todo` → `processing` | agent | when it starts the ticket |
-| `processing` → `review` | agent | when the work is committed |
-| `review` → `done` | **user** | acceptance checkpoint; the agent never does this |
-| `block` → `todo` | agent | automatically, see below |
-| any → `pending` | either | when an external blocker appears; write `Pending reason:` |
-| `pending` → `todo` \| `done` | **user** | after the user confirms, see *Reporting* |
+| Status | Meaning | Set by |
+|---|---|---|
+| `todo` | ready to start | `/to-tickets` |
+| `processing` | claimed, work in progress | the agent, before the first edit |
+| `review` | implementation done, in stages 6–8 | the agent |
+| `done` | landed on `main` | the agent, after the merge |
+| `pending` | deliberately paused | the user's decision, recorded |
+| `blocked` | **derived**, never written | computed from `blocked_by` |
 
-**Automatic unblocking.** Whenever a ticket is moved into `done/`, scan `block/` for
-tickets whose `Blocked by:` references it. Any ticket whose blockers are now all in
-`done/` moves to `todo/` in the same step. Without this, the frontier silently stops
-advancing.
+**Blocking is computed.** A ticket is blocked when any id in `blocked_by` is not yet `done`. Writing
+a blocked state by hand would create a second truth that drifts from the edges.
+
+**`pending` carries its reasoning.** Add these to frontmatter when setting it:
+
+```yaml
+status: pending
+pending_reason: <why it was paused>
+pending_evidence: <file:line, command output, or link that supports the call>
+pending_on: <YYYY-MM-DD>
+revisit_when: <the condition that should bring it back>
+```
+
+A `pending` ticket stays out of "what can I work on" answers. When the user asks what is left, name
+it, state why it was paused, when, and show the evidence.
+
+## Views, not directories
+
+The six statuses are **queries** over the tree, not folders:
+
+- **Frontier** — what can start now: `status: todo` and every `blocked_by` id is `done`. Lowest
+  ticket id first.
+- **Blocked** — `status: todo` with at least one `blocked_by` id not `done`. Report which ones.
+- **In flight** — `status: processing` or `status: review`.
+- **Paused** — `status: pending`. Surfaced only when the user asks what is left.
 
 ## When a skill says "publish to the issue tracker"
 
-- **A spec** → write `.proj.spec/<feature-slug>.md`.
-- **Tickets** → write one file per ticket. A ticket with no unmet blocker goes to
-  `.proj.tickets/todo/<feature-slug>/`; a ticket with any unmet blocker goes straight
-  to `.proj.tickets/block/<feature-slug>/`. Never publish everything to `todo/`:
-  `todo/` means startable, and the reporting rules below depend on that being true.
-- Do **not** apply triage labels. The `triage` skill is not installed in this repo and
-  no label vocabulary exists.
+Create the file under the layout above. Create the epic directory if it does not exist.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at `<feature-slug>/<NN>`, searching across the state directories. The
-user will normally pass the reference directly.
+The user will normally pass the ticket id or path. Given only an id, search
+`.proj.tickets/*/T-NNNN-*.md`.
 
-## Reporting outstanding work
+## Triage labels
 
-When the user asks what is left / what still needs doing, report **three sections**:
-
-1. **`todo`** — startable now.
-2. **`block`** — with the ticket that blocks each one named.
-3. **`pending`** — each one with its `Pending reason:` quoted, presented **for the user
-   to confirm or re-decide**.
-
-`pending` tickets surface **only** in response to this question. They are never offered
-as work to pick up, and never enter the frontier.
-
-## The frontier
-
-`.proj.tickets/todo/` **is** the frontier. Nothing else is startable.
+`/to-spec` and `/to-tickets` reference a triage vocabulary. This repo does not use one: a spec that
+has cleared adversarial review is ready by construction, and ticket readiness is the derived
+frontier above.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`, which is **not currently installed**. If it is added later, maps
-go to `.proj.maps/<effort>.md` and their child decision tickets follow the ticket rules
-above, with a `Type:` line recording `research` / `prototype` / `grilling` / `task`.
+Decision maps precede implementation specs. Keep them in
+`.proj.specs/_discovery/<effort>/map.md`, with one child at
+`.proj.specs/_discovery/<effort>/decisions/D-NNNN-<slug>.md`.
+These are decision ids local to a map, separate from permanent implementation
+ticket ids. Creating a decision map does not satisfy the product spec gate.
 
-## Spec snapshots
+- **Map:** use wayfinder's Destination, Notes, Decisions so far, Not yet specified
+  and Out of scope sections. Link each resolved decision once.
+- **Child:** frontmatter has `id`, `type` (`research`, `prototype`, `grilling`,
+  `task`), `status` (`todo`, `processing`, `done`, `pending`), `blocked_by` and
+  optional `owner`. Put the decision under `## Question`.
+- **Frontier:** children with `status: todo` whose blockers are all `done`, ordered
+  by local decision id. The claim operation sets `processing` and `owner` before
+  work. A single writer allocates ids and updates the map; concurrent researchers
+  return findings to that writer instead of racing on shared files.
+- **Resolve:** append evidence under `## Answer`, set `done`, and link from the
+  map's Decisions so far. An out-of-scope closure records its reason and links from
+  Out of scope instead. `pending` carries the same reason/evidence/revisit fields
+  as implementation tickets.
+- **Research:** resolve with the project `research` skill (it decides whether to
+  delegate the reading); the main session saves the findings beside the decision
+  and links it.
 
-`.proj.spec/` holds **throwaway syntheses** from `to-spec`: snapshots with no sync
-mechanism. Never cite them as a requirements authority.
-
-`.proj.tickets/_legacy/` holds frozen work that is not on any status board. Each entry
-records why it was frozen; reviving one starts again from `/grill-with-docs`.
-
-The former capability contract ledger `openspec/specs/` and the Spectra workflow were
-removed during the harness-agile migration. Read them at the Git tag
-`pre-harness-migration` (`git show pre-harness-migration:openspec/specs/<capability>/spec.md`).
+Map labels and issue assignments in upstream wayfinder instructions map to these
+frontmatter fields. Use these paths rather than its generic `.scratch/` examples.

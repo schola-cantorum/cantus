@@ -73,7 +73,12 @@ weights/
 checkpoints/
 
 # Claude Code / AI tooling
-.claude/
+# Project skills (.claude/skills/) and roles (.claude/agents/) are versioned;
+# everything else under .claude/ stays local (settings, worktrees, locks).
+.claude/*
+!.claude/skills/
+!.claude/agents/
+.codex/*.local.toml
 .cursor/
 .copilot/
 

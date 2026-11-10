@@ -2,6 +2,8 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
+**This repo is single-context**: one `CONTEXT.md` and one `docs/adr/`, both at the repo root.
+
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root, or

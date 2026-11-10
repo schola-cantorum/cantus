@@ -90,6 +90,38 @@ def test_spec_definition_tokens_not_flagged(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize("runtime", [".claude", ".agents"])
+def test_the_commit_sanitizer_examples_are_exempt(tmp_path: Path, runtime: str) -> None:
+    """The tw-emoji sanitizers document the IDE link they strip with a sample home path.
+
+    That docstring is the sanitizer's specification, copied from the harness-agile
+    template; rewriting it would be undone by every template upgrade. The exemption
+    names those three scripts in both runtime trees and nothing else.
+    """
+    _init_repo(tmp_path)
+    sample = "file://" + "/Users/" + "alice" + "/project/scripts/build.sh\n"
+    for skill, script in (
+        ("tw-emoji-commit", "sanitize_commit.py"),
+        ("tw-emoji-pr-note", "sanitize_pr_note.py"),
+        ("tw-emoji-release-note", "sanitize_release_note.py"),
+    ):
+        _add(tmp_path, f"{runtime}/skills/{skill}/scripts/{script}", sample)
+    result = _run(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_the_sanitizer_exemption_does_not_cover_other_skill_files(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    leak = "/Users/" + "alice" + "/project\n"
+    _add(tmp_path, ".claude/skills/tw-emoji-commit/SKILL.md", leak)
+    _add(tmp_path, ".claude/skills/other/scripts/sanitize_commit.py", leak)
+    result = _run(tmp_path)
+    assert result.returncode == 1
+    output = result.stdout + result.stderr
+    assert "tw-emoji-commit/SKILL.md" in output
+    assert "other/scripts/sanitize_commit.py" in output
+
+
 def test_untracked_file_is_ignored(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     _add(tmp_path, "clean.txt", "ok\n")

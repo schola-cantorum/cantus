@@ -80,3 +80,12 @@ the runner.
   followed by the ADR's four-digit number. The status is one of `proposed`
   or `accepted`; any other word fails, so a typo cannot become an exemption.
   That loop cites `ADR-0003`.
+
+## Amendment (2026-11-10): manual enforcement
+
+Some accepted decisions are enforced by a person at a pipeline stage rather than by a file, such as
+who may land on `main` (ADR-0014) or what must hold before a release (ADR-0013). Such an ADR
+declares `enforcement: manual` in its front matter and states, under an `## Enforcement` heading,
+who checks it and when. The ADR loop in `tests/test_guardrail_config.py` accepts it on that basis and
+rejects any other `enforcement:` value. "No control" is therefore always an explicit, reviewable
+claim. Since ADR-0011, this ADR's references to "a Spectra change" read as "a public-API epic".

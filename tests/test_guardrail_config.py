@@ -661,7 +661,10 @@ def test_the_execution_context_check_rejects_permissions_beyond_contents_read(
 # invariant for all of them: an ADR that says it is in force must name a
 # control that exists, and the control must cite the ADR back, so that naming
 # a file that merely exists cannot pass. A `proposed` ADR is a decision not yet
-# in force and is exempt. ADR-0003 defines the rule; this module is its control.
+# in force and is exempt. An accepted ADR enforced by a person rather than a
+# file declares `enforcement: manual` and says who checks it under an
+# `## Enforcement` heading (the 2026-11-10 amendment to ADR-0003).
+# ADR-0003 defines the rule; this module is its control.
 
 # The directories a control may live in. Anything else an ADR names (a package
 # module, a prose page) is context, not a control.
@@ -694,12 +697,17 @@ def _adr_status(text: str) -> str | None:
         front matter has no ``status:`` line. Only front matter counts, so the
         word "status" appearing in prose is never mistaken for a declaration.
     """
+    return _adr_front_matter_value(text, "status")
+
+
+def _adr_front_matter_value(text: str, field: str) -> str | None:
+    """One ``field:`` value from an ADR's YAML front matter, or ``None``."""
     match = re.match(r"---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.DOTALL)
     if not match:
         return None
     for line in match.group(1).splitlines():
         key, sep, value = line.partition(":")
-        if sep and key.strip() == "status":
+        if sep and key.strip() == field:
             # Tolerate the YAML a hand would write: a trailing comment, quotes.
             value = value.split("#", 1)[0].strip().strip("'\"")
             return value or None
@@ -740,6 +748,19 @@ def _adr_problem(path: Path, root: Path) -> str | None:
     if status not in _KNOWN_STATUSES:
         return f"{path.name} has status {status!r}; expected one of {sorted(_KNOWN_STATUSES)}"
     if status != "accepted":
+        return None
+    enforcement = _adr_front_matter_value(text, "enforcement")
+    if enforcement is not None:
+        if enforcement != "manual":
+            return (
+                f"{path.name} has enforcement {enforcement!r}; "
+                "the only recognised value is 'manual'"
+            )
+        if not re.search(r"^## Enforcement[ \t]*\r?$", text, re.MULTILINE):
+            return (
+                f"{path.name} declares `enforcement: manual` but has no "
+                "`## Enforcement` section saying who checks it and when"
+            )
         return None
     number = _adr_number(path)
     named = _control_paths_named(text)
@@ -910,3 +931,49 @@ def test_the_control_path_pattern_reads_backticked_and_bare_paths() -> None:
         ".github/workflows/supply-chain.yml",
         "scripts/check_no_dev_paths.sh",
     }
+
+
+# --- Manual enforcement (amendment to ADR-0003, 2026-11-10) -------------------
+#
+# Some accepted decisions are enforced by a person at a pipeline stage, not by
+# a file: who may merge into main, what must happen before a PyPI release. They
+# declare `enforcement: manual` and must say, under an `## Enforcement` heading,
+# who checks and when. The declaration is explicit so that "no control" is a
+# visible claim rather than a silent gap.
+
+
+def test_the_adr_loop_accepts_a_manual_adr_that_states_its_enforcement(tmp_path: Path) -> None:
+    adr = _write_adr(
+        tmp_path,
+        "0108",
+        "---\nstatus: accepted\nenforcement: manual\n---\n\n# Human gate.\n\n"
+        "## Enforcement\n\nThe maintainer checks this before every merge.\n",
+    )
+
+    assert _adr_problem(adr, tmp_path) is None
+
+
+def test_the_adr_loop_rejects_a_manual_adr_without_an_enforcement_section(tmp_path: Path) -> None:
+    adr = _write_adr(
+        tmp_path,
+        "0109",
+        "---\nstatus: accepted\nenforcement: manual\n---\n\n# Human gate.\n\nTrust us.\n",
+    )
+
+    assert _adr_problem(adr, tmp_path) == (
+        "0109-synthetic.md declares `enforcement: manual` but has no "
+        "`## Enforcement` section saying who checks it and when"
+    )
+
+
+def test_the_adr_loop_rejects_an_unknown_enforcement_word(tmp_path: Path) -> None:
+    """Only `manual` opts out of the control check; a typo must not."""
+    adr = _write_adr(
+        tmp_path,
+        "0110",
+        "---\nstatus: accepted\nenforcement: manul\n---\n\n# Gate.\n\n## Enforcement\n\nx\n",
+    )
+
+    assert _adr_problem(adr, tmp_path) == (
+        "0110-synthetic.md has enforcement 'manul'; the only recognised value is 'manual'"
+    )

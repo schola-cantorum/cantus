@@ -1,22 +1,23 @@
 ---
 name: to-spec
 description: "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed."
-disable-model-invocation: true
 ---
 
 This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user; just synthesize what you already know.
 
-The issue tracker and triage label vocabulary should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
+Read `docs/agents/issue-tracker.md` for paths, statuses and publication rules, and
+`docs/agents/language.md` for spec language and translation timing. If the tracker
+configuration is missing, ask the user to run `/setup-matt-pocock-skills`.
 
 ## Process
 
-1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the spec, and respect any ADRs in the area you're touching.
+1. Reuse the confirmed conversation and codebase context. Read affected interfaces and relevant glossary or ADR entries to resolve remaining factual gaps.
 
-2. Sketch out the seams at which you're going to test the feature. Existing seams should be preferred to new ones. Use the highest seam possible. If new seams are needed, propose them at the highest point you can. The fewer seams across the codebase, the better - the ideal number is one.
+2. Map each required behavior and boundary to an observable public seam. Prefer existing seams at the highest useful boundary; use as many as needed for coverage without duplicating tests.
 
-Check with the user that these seams match their expectations.
+Reuse already-approved seams. Confirm only new or materially changed seams with the user before proceeding.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+3. Build `traceability.md` with `{type × field × boundary} → {expected behavior → acceptance criterion}` for applicable combinations. Derive the spec from it using the template below, then save both through the configured tracker. Every matrix row must reach an acceptance criterion. Follow configured statuses; saving the spec does not authorize tickets or implementation.
 
 <spec-template>
 
@@ -30,7 +31,7 @@ The solution to the problem, from the user's perspective.
 
 ## User Stories
 
-A LONG, numbered list of user stories. Each user story should be in the format of:
+A numbered list of distinct user stories covering the agreed requirements. Each user story uses:
 
 1. As an <actor>, I want a <feature>, so that <benefit>
 
@@ -38,7 +39,7 @@ A LONG, numbered list of user stories. Each user story should be in the format o
 1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
 </user-story-example>
 
-This list of user stories should be extremely extensive and cover all aspects of the feature.
+Cover each agreed behavior without padding or invented features. Put boundary detail in acceptance criteria and traceability rather than repeating stories to increase length.
 
 ## Implementation Decisions
 
