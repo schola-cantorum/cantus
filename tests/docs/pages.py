@@ -4,7 +4,7 @@ Reads one English page under ``docs/site/`` and reports two things: the Python
 blocks it contains, and every place where the page is *malformed* under the
 rules the documentation harness enforces. The rules are restated in the
 docstrings below so this module is readable on its own; the planning snapshot
-they were drafted in is ``.proj.spec/docs-tutorial-and-vv.md`` Appendix A
+they were drafted in is ``.proj.specs/_legacy/docs-tutorial-and-vv.md`` Appendix A
 (A.2.0 fences, A.2.1 skip markers, A.2.3 model hooks).
 
 This module is a helper imported by the docs test modules; it holds no tests.

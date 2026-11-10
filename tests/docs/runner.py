@@ -4,7 +4,7 @@ Takes a page parsed by :mod:`tests.docs.pages`, builds the *page script* (the
 non-skipped Python blocks in document order, hook lines substituted), runs it
 once in a subprocess that looks like a reader's machine, and checks the page's
 *expected-output block* against the captured stdout. The rules restated below
-were drafted in ``.proj.spec/docs-tutorial-and-vv.md`` Appendix A (A.2.2
+were drafted in ``.proj.specs/_legacy/docs-tutorial-and-vv.md`` Appendix A (A.2.2
 expected-output block, A.2.3 hook substitution, A.2.10 page execution).
 
 This module is a helper imported by the docs test modules; it holds no tests.

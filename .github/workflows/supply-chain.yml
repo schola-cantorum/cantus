@@ -105,7 +105,8 @@ jobs:
       # successful run. All 19 enter through the heavy optional extras
       # (`dspy`, `langchain`, `runtime`); the surface a reader installs with
       # `cantus-agent[serve]` carries none of them. Remediation is tracked in
-      # .proj.tickets/pending/supply-chain-backlog/ and is deliberately NOT
+      # the supply-chain-backlog ticket (frozen under .proj.tickets/_legacy/pending/
+      # until revived with a T-NNNN id) and is deliberately NOT
       # part of the change that introduced this workflow: detection and
       # remediation are separate decisions.
       #

@@ -2,6 +2,11 @@
 
 ADRs live in `docs/adr/` and use sequential numbering: `0001-slug.md`, `0002-slug.md`, etc.
 
+> **cantus:** front matter is required, not optional. CI (`tests/test_guardrail_config.py`, ADR-0003)
+> accepts only `status: proposed` or `status: accepted`, and an accepted ADR must name a control
+> under `tests/`, `scripts/` or `.github/workflows/` that cites it back, or declare
+> `enforcement: manual` with an `## Enforcement` section. See `docs/agents/domain.md`.
+
 Create the `docs/adr/` directory lazily: only when the first ADR is needed.
 
 ## Template

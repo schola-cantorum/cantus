@@ -13,9 +13,25 @@ Which language a document is written in follows from who has to accept it.
 | Ticket body | **English** | Drives implementation |
 | Ticket `## 給使用者（zh-TW）` section | **Traditional Chinese** | The user audits intent in this |
 | Commit messages, PR descriptions, release notes | **Traditional Chinese** | Produced by `/tw-emoji-*` |
-| README, user guides and research for the user | **Traditional Chinese** | Setup and evidence; `README.en.md` is the English companion |
+| README, user guides and research for the user | **Traditional Chinese** | Setup and evidence; cantus product docs differ, see below |
 | Standalone HTML reports | **Traditional Chinese** | Written for the user |
 | Conversation with the user | **Traditional Chinese** | |
+
+## cantus product documentation
+
+The table above is the template's default. cantus is a published English-first package, so its
+product documentation follows its own layout:
+
+| Document | Language |
+|---|---|
+| `README.md`, `CONTRIBUTING.md` | **English**, primary |
+| `README.zhTW.md`, `CONTRIBUTING.zhTW.md` | **Traditional Chinese** companions |
+| `docs/site/**` (VitePress source) | **English** |
+| `docs/site/zh-tw/**` | **Traditional Chinese** mirror; parity is checked by `tests/docs/parity.py` |
+| `docs/agents/README.md`, `docs/guide.md` | **Traditional Chinese**, written for the maintainer |
+| `CHANGELOG.md`, `docs/migrations/*` | as produced by `/tw-emoji-release-note` and existing practice |
+
+The rest of `docs/agents/*`, `AGENTS.md`, `CLAUDE.md` and `docs/adr/*` stay English.
 
 ## Traditional Chinese means Taiwan usage
 

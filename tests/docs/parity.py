@@ -6,7 +6,7 @@ comparison that tolerates translated comments, docstrings and CJK strings but
 nothing else; identical expected-output lines; identical shell fences apart
 from comment lines. Skipped blocks take part, and their markers must match
 position by position with the English reason repeated verbatim. They were
-drafted as A.2.7 of the planning snapshot ``.proj.spec/docs-tutorial-and-vv.md``.
+drafted as A.2.7 of the planning snapshot ``.proj.specs/_legacy/docs-tutorial-and-vv.md``.
 
 This module is a helper imported by the docs test modules; it holds no tests.
 """

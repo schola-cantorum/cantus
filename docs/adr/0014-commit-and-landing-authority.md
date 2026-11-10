@@ -13,10 +13,16 @@ approval, code review and landing gates. It also says existing authorization for
 valid.
 
 We take the template's commit rule and tighten its landing rule. Agents may commit on a ticket
-branch without asking; the branch is reversible. Merging into `main`, whether by merging a PR or by
+branch, or on an epic's `specs/<NNNN-epic-slug>` branch, without asking; the branch is reversible. Merging into `main`, whether by merging a PR or by
 a local `--no-ff` merge, happens only when the user approves that specific change. An approval for
 one change does not carry over to the next. This matches the maintainer's standing rule that work
 always happens on a branch and never lands on `main` directly.
+
+Two consequences follow from the user performing the merge. An epic's spec, traceability, review
+records and tickets (stages 2–4) are committed on a `specs/<NNNN-epic-slug>` branch and land through
+their own approved PR before ticket branches start. And the agent sets a ticket's `status: done` in
+the ticket branch's last commit, so the status becomes true on `main` exactly when the user merges
+(see `docs/agents/workflow.md`).
 
 ## Enforcement
 

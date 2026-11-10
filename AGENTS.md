@@ -28,15 +28,14 @@ When the user asks to inspect or improve this template, keep the project tokens 
 Charter placeholder intact and perform that maintenance. The product gates below
 apply when adopting the template for a product; they do not force template maintainers
 to invent a product or initialize the source template. Existing user authorization
-and approved choices carry forward; ask only for a decision not already settled.
+and approved choices carry forward, except landing on `main`, which hard rule 6 keeps
+per-change; ask only for a decision not already settled.
 While `.tmpl.docs/` exists, read its README for template maintenance and save template
 plans, research and change history there. Keep adopted project rules in `docs/`.
 
 ## Project Charter
 
 **cantus** — A teaching-oriented framework for composing LLM agent harnesses, from a Colab notebook to a student's own laptop.
-
-<!-- DRAFT 2026-11-10: drafted by Claude from README.md, CONTEXT.md and the maintainer's teaching notes; awaiting the maintainer's edits. -->
 
 **Who it serves.** Senior-high-school students in Taiwan learning to build LLM agents: they write
 Skills, Memory and hooks, run them on Google Colab or locally, and finish by connecting an agent to a
@@ -59,9 +58,9 @@ repository. Multi-tenant serving and teacher dashboards are deferred.
 
 **Status.** v0.6.0 is on PyPI. Round 0 is satisfied by the existing codebase (ADR-0010).
 
-**Gate (product work):** while this section is a placeholder, the only permitted work is the walking skeleton
-(below) and the conversation that defines it. Before writing a spec, opening a ticket, or writing
-implementation code, ask the user to run `/grill-with-docs` and fill this section in.
+**Gate (product work):** satisfied. The Charter was filled in on 2026-11-10 and round 0 is the
+existing codebase ([ADR-0010](docs/adr/0010-existing-codebase-satisfies-round-zero.md)); no walking
+skeleton is built. Change the Charter itself through `/grill-with-docs`.
 
 ## Delivery model
 
@@ -71,7 +70,8 @@ increment. Finish an epic, then return to stage 1 for the next one.
 Round 0 is the **walking skeleton**: the thinnest path that runs end to end, built so that real
 **seams** exist. It carries no spec and no adversarial review, because both take seams as input and
 a new repository has none yet. That exemption expires the moment the skeleton merges to `main`;
-every ticket after that has a spec behind it.
+every ticket after that has a spec behind it, except lightweight-path tickets in `0000-maintenance`
+([ADR-0012](docs/adr/0012-lightweight-path.md)).
 See [ADR-0005](docs/adr/0005-walking-skeleton-then-epic-loop.md). In cantus, round 0 is the code that existed
 before the harness-agile migration ([ADR-0010](docs/adr/0010-existing-codebase-satisfies-round-zero.md)).
 
@@ -107,6 +107,8 @@ upstream examples; use the existing configuration without asking to set it up ag
 ## Hard rules
 
 1. **One branch per ticket:** `tickets/<ticket-id>/<ticket-slug>` (e.g. `tickets/T-0007/session-store`).
+   In cantus an epic's spec, traceability, review records and tickets land first on
+   `specs/<NNNN-epic-slug>` (see [workflow.md](docs/agents/workflow.md#stage-4--break-into-tickets)).
    Ticket ids are global, sequential, and permanent — branch names depend on them never changing.
 2. **Two tables gate a ticket's tests.** A **test plan table** before the first test is written, which
    the user approves; a **coverage report table** when the ticket closes. Between them, `/tdd` governs
@@ -123,7 +125,8 @@ upstream examples; use the existing configuration without asking to set it up ag
    `/tw-emoji-pr-note`, release notes use `/tw-emoji-release-note`. Load the project copy even if a global skill has the same name. Generate and sanitize
    the message with that skill, then use a UTF-8 message file for Git. If one is
    unavailable, stop the affected action and report; do not write a fallback message.
-6. **Landing needs the user's go-ahead (cantus).** Agents may commit on a ticket branch. Merging into
+6. **Landing needs the user's go-ahead (cantus).** Agents may commit on a ticket branch or on an epic's
+   `specs/<NNNN-epic-slug>` branch. Merging into
    `main` (a PR merge or a local merge) happens only when the user approves that specific change;
    earlier approvals do not carry over. See [ADR-0014](docs/adr/0014-commit-and-landing-authority.md).
 
@@ -167,7 +170,7 @@ review and every deferral. `.proj.handoffs/` is not: a handoff expires, so it st
 Python 3.10+ with `uv`. Install the development extras, then run the checks CI runs:
 
 ```bash
-uv sync --extra dev --extra serve --extra providers --extra tui
+uv sync --extra dev --extra serve --extra providers --extra tui --extra huggingface
 PATH="$PWD/.venv/bin:$PATH" .venv/bin/python -m pytest -q   # CLI tests spawn `cantus` from PATH
 .venv/bin/ruff check .
 .venv/bin/mypy cantus
@@ -213,11 +216,14 @@ The agent reads `docs/llm_wiki/index.md` first, then drills into relevant pages 
 
 Periodic lint passes detect contradictions across pages, stale claims, orphan pages, missing cross-references, and synthesis gaps.
 
-### Roadmap／架構視覺化產物（不進版控）
+### Roadmap and architecture visualisations (not versioned)
 
-`cantus-roadmap.html`、`cantus-explorer.html` 等路線圖與架構視覺化 HTML 屬於本地工程輔助檔（engineering artifacts），**不納入版本控制**。若要產生或更新這類產物，一律輸出到 **`.scratch/roadmap/`**（`.scratch/` 已列入 `.gitignore`，不會進版控）：
+Roadmap and architecture HTML such as `cantus-roadmap.html` and `cantus-explorer.html` are local
+engineering artifacts and are **not version-controlled**. Generate or update them only under
+**`.scratch/roadmap/`**, which `.gitignore` excludes:
 
-- `.scratch/roadmap/cantus-roadmap.html` — 決策稽核／時間軸／進度儀表板
-- `.scratch/roadmap/cantus-explorer.html` — 互動式分層架構 + 各情境資料流模擬
+- `.scratch/roadmap/cantus-roadmap.html`: decision audit, timeline and progress dashboard
+- `.scratch/roadmap/cantus-explorer.html`: interactive layered architecture and per-scenario data-flow simulation
 
-兩檔以相對路徑互相連結，必須放在同一資料夾。**請勿**在 repo root 產生這類 HTML，也不要 `git add` 它們（產生後它們會自動被 `.scratch/` 的 ignore 規則蓋住）。
+The two files link to each other by relative path and must stay in the same folder. Never write them
+at the repository root and never `git add` them.
