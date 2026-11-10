@@ -1,0 +1,911 @@
+{
+  "codegraph_version": "1.6.2",
+  "indexed_at_commit": "99f738b8f25383bb24987b3332303b2bb87a4db9",
+  "files_total": 290,
+  "files_by_language": {
+    "python": 217,
+    "yaml": 68,
+    "javascript": 4,
+    "typescript": 1
+  },
+  "files_by_top_dir": {
+    "tests": 133,
+    "cantus": 84,
+    "openspec": 36,
+    ".agents": 20,
+    ".github": 6,
+    "docs": 4,
+    "scripts": 2,
+    "regen-manifest.yaml": 1,
+    ".wiki.manifest.yaml": 1,
+    ".wiki-init.manifest.yaml": 1,
+    ".spectra.yaml": 1,
+    ".pre-commit-config.yaml": 1
+  },
+  "nodes_by_kind": {
+    "function": 1587,
+    "import": 909,
+    "method": 400,
+    "variable": 263,
+    "class": 240,
+    "file": 222,
+    "constant": 15,
+    "route": 10
+  },
+  "edges_by_kind": {
+    "contains": 3414,
+    "calls": 1705,
+    "imports": 977,
+    "instantiates": 931,
+    "references": 724,
+    "decorates": 91,
+    "extends": 43
+  },
+  "modules": [
+    "cantus/__init__",
+    "cantus/__main__",
+    "cantus/adapters",
+    "cantus/cli",
+    "cantus/config",
+    "cantus/core",
+    "cantus/env",
+    "cantus/grammar",
+    "cantus/hooks",
+    "cantus/identity",
+    "cantus/inspect",
+    "cantus/model",
+    "cantus/protocols",
+    "cantus/serve",
+    "cantus/tui",
+    "cantus/workflows"
+  ],
+  "module_edges": [
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/core",
+      "weight": 22
+    },
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/env",
+      "weight": 4
+    },
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/identity",
+      "weight": 3
+    },
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/inspect",
+      "weight": 2
+    },
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/model",
+      "weight": 12
+    },
+    {
+      "from": "cantus/__init__",
+      "to": "cantus/protocols",
+      "weight": 13
+    },
+    {
+      "from": "cantus/__main__",
+      "to": "cantus/cli",
+      "weight": 3
+    },
+    {
+      "from": "cantus/adapters",
+      "to": "cantus/core",
+      "weight": 1
+    },
+    {
+      "from": "cantus/adapters",
+      "to": "cantus/inspect",
+      "weight": 1
+    },
+    {
+      "from": "cantus/adapters",
+      "to": "cantus/protocols",
+      "weight": 29
+    },
+    {
+      "from": "cantus/cli",
+      "to": "cantus/config",
+      "weight": 4
+    },
+    {
+      "from": "cantus/cli",
+      "to": "cantus/core",
+      "weight": 3
+    },
+    {
+      "from": "cantus/cli",
+      "to": "cantus/serve",
+      "weight": 1
+    },
+    {
+      "from": "cantus/cli",
+      "to": "cantus/tui",
+      "weight": 1
+    },
+    {
+      "from": "cantus/core",
+      "to": "cantus/identity",
+      "weight": 3
+    },
+    {
+      "from": "cantus/env",
+      "to": "cantus/model",
+      "weight": 30
+    },
+    {
+      "from": "cantus/grammar",
+      "to": "cantus/core",
+      "weight": 9
+    },
+    {
+      "from": "cantus/hooks",
+      "to": "cantus/core",
+      "weight": 2
+    },
+    {
+      "from": "cantus/hooks",
+      "to": "cantus/protocols",
+      "weight": 7
+    },
+    {
+      "from": "cantus/inspect",
+      "to": "cantus/core",
+      "weight": 8
+    },
+    {
+      "from": "cantus/model",
+      "to": "cantus/core",
+      "weight": 1
+    },
+    {
+      "from": "cantus/model",
+      "to": "cantus/env",
+      "weight": 1
+    },
+    {
+      "from": "cantus/protocols",
+      "to": "cantus/core",
+      "weight": 6
+    },
+    {
+      "from": "cantus/serve",
+      "to": "cantus/adapters",
+      "weight": 1
+    },
+    {
+      "from": "cantus/serve",
+      "to": "cantus/config",
+      "weight": 25
+    },
+    {
+      "from": "cantus/serve",
+      "to": "cantus/core",
+      "weight": 40
+    },
+    {
+      "from": "cantus/serve",
+      "to": "cantus/model",
+      "weight": 2
+    },
+    {
+      "from": "cantus/tui",
+      "to": "cantus/core",
+      "weight": 3
+    },
+    {
+      "from": "cantus/workflows",
+      "to": "cantus/core",
+      "weight": 3
+    }
+  ],
+  "module_fan_in": {
+    "cantus/adapters": 1,
+    "cantus/cli": 1,
+    "cantus/config": 2,
+    "cantus/core": 11,
+    "cantus/env": 2,
+    "cantus/identity": 2,
+    "cantus/inspect": 2,
+    "cantus/model": 3,
+    "cantus/protocols": 3,
+    "cantus/serve": 1,
+    "cantus/tui": 1
+  },
+  "module_fan_out": {
+    "cantus/__init__": 6,
+    "cantus/__main__": 1,
+    "cantus/adapters": 3,
+    "cantus/cli": 4,
+    "cantus/core": 1,
+    "cantus/env": 1,
+    "cantus/grammar": 1,
+    "cantus/hooks": 2,
+    "cantus/inspect": 1,
+    "cantus/model": 2,
+    "cantus/protocols": 1,
+    "cantus/serve": 4,
+    "cantus/tui": 1,
+    "cantus/workflows": 1
+  },
+  "module_cycles": [
+    [
+      "cantus/env",
+      "cantus/model"
+    ]
+  ],
+  "hotspots_fan_in": [
+    {
+      "name": "skill",
+      "kind": "function",
+      "file": "cantus/protocols/skill.py",
+      "line": 80,
+      "deg": 82,
+      "from_tests": 80
+    },
+    {
+      "name": "Message",
+      "kind": "class",
+      "file": "cantus/model/chat.py",
+      "line": 39,
+      "deg": 73,
+      "from_tests": 68
+    },
+    {
+      "name": "serve",
+      "kind": "function",
+      "file": "cantus/serve/app.py",
+      "line": 74,
+      "deg": 58,
+      "from_tests": 57
+    },
+    {
+      "name": "Registry",
+      "kind": "class",
+      "file": "cantus/core/registry.py",
+      "line": 21,
+      "deg": 50,
+      "from_tests": 47
+    },
+    {
+      "name": "Settings",
+      "kind": "class",
+      "file": "cantus/config.py",
+      "line": 48,
+      "deg": 46,
+      "from_tests": 40
+    },
+    {
+      "name": "Agent",
+      "kind": "class",
+      "file": "cantus/core/agent.py",
+      "line": 76,
+      "deg": 27,
+      "from_tests": 27
+    },
+    {
+      "name": "load_chat_model",
+      "kind": "function",
+      "file": "cantus/model/factory.py",
+      "line": 56,
+      "deg": 25,
+      "from_tests": 25
+    },
+    {
+      "name": "Skill",
+      "kind": "class",
+      "file": "cantus/protocols/skill.py",
+      "line": 35,
+      "deg": 24,
+      "from_tests": 17
+    },
+    {
+      "name": "Registry::register",
+      "kind": "method",
+      "file": "cantus/core/registry.py",
+      "line": 29,
+      "deg": 22,
+      "from_tests": 22
+    },
+    {
+      "name": "Agent::run",
+      "kind": "method",
+      "file": "cantus/core/agent.py",
+      "line": 97,
+      "deg": 21,
+      "from_tests": 21
+    },
+    {
+      "name": "get_registry",
+      "kind": "function",
+      "file": "cantus/core/registry.py",
+      "line": 81,
+      "deg": 20,
+      "from_tests": 16
+    },
+    {
+      "name": "OpenAIChatModel",
+      "kind": "class",
+      "file": "cantus/model/providers/openai.py",
+      "line": 25,
+      "deg": 19,
+      "from_tests": 16
+    },
+    {
+      "name": "Result::success",
+      "kind": "method",
+      "file": "cantus/core/result.py",
+      "line": 23,
+      "deg": 19,
+      "from_tests": 19
+    },
+    {
+      "name": "Turn",
+      "kind": "class",
+      "file": "cantus/protocols/memory.py",
+      "line": 31,
+      "deg": 18,
+      "from_tests": 15
+    },
+    {
+      "name": "Registry::names_for",
+      "kind": "method",
+      "file": "cantus/core/registry.py",
+      "line": 51,
+      "deg": 17,
+      "from_tests": 9
+    },
+    {
+      "name": "main",
+      "kind": "function",
+      "file": "cantus/cli.py",
+      "line": 342,
+      "deg": 17,
+      "from_tests": 16
+    },
+    {
+      "name": "GoogleChatPubSubChannel",
+      "kind": "class",
+      "file": "cantus/serve/channels/googlechat.py",
+      "line": 88,
+      "deg": 16,
+      "from_tests": 16
+    },
+    {
+      "name": "export_as_mcp_server",
+      "kind": "function",
+      "file": "cantus/adapters/mcp_server.py",
+      "line": 117,
+      "deg": 16,
+      "from_tests": 6
+    },
+    {
+      "name": "_IntrospectionClient::aclose",
+      "kind": "method",
+      "file": "cantus/tui/app.py",
+      "line": 42,
+      "deg": 15,
+      "from_tests": 15
+    },
+    {
+      "name": "register_skill",
+      "kind": "function",
+      "file": "cantus/protocols/skill.py",
+      "line": 97,
+      "deg": 15,
+      "from_tests": 15
+    }
+  ],
+  "hotspots_fan_out": [
+    {
+      "name": "serve",
+      "kind": "function",
+      "file": "cantus/serve/app.py",
+      "line": 74,
+      "deg": 19,
+      "from_tests": 0
+    },
+    {
+      "name": "CantusTUI::on_mount",
+      "kind": "method",
+      "file": "cantus/tui/app.py",
+      "line": 105,
+      "deg": 11,
+      "from_tests": 0
+    },
+    {
+      "name": "Agent::run",
+      "kind": "method",
+      "file": "cantus/core/agent.py",
+      "line": 97,
+      "deg": 8,
+      "from_tests": 0
+    },
+    {
+      "name": "GatewayClient::_run_one_session",
+      "kind": "method",
+      "file": "cantus/serve/channels/_realtime.py",
+      "line": 208,
+      "deg": 8,
+      "from_tests": 0
+    },
+    {
+      "name": "CantusTUI::compose",
+      "kind": "method",
+      "file": "cantus/tui/app.py",
+      "line": 83,
+      "deg": 7,
+      "from_tests": 0
+    },
+    {
+      "name": "_register_skill_endpoint::endpoint",
+      "kind": "function",
+      "file": "cantus/serve/app.py",
+      "line": 237,
+      "deg": 7,
+      "from_tests": 0
+    },
+    {
+      "name": "Agent::_dispatch_skill",
+      "kind": "method",
+      "file": "cantus/core/agent.py",
+      "line": 343,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "ColabEnvironment::prepare_model",
+      "kind": "method",
+      "file": "cantus/env/colab.py",
+      "line": 32,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "TelegramWebhookChannel::__init__",
+      "kind": "method",
+      "file": "cantus/serve/channels/telegram.py",
+      "line": 49,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "_cmd_serve",
+      "kind": "function",
+      "file": "cantus/cli.py",
+      "line": 262,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "expose_as_dspy_tool",
+      "kind": "function",
+      "file": "cantus/adapters/dspy.py",
+      "line": 61,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "expose_as_hf_tool",
+      "kind": "function",
+      "file": "cantus/adapters/huggingface.py",
+      "line": 118,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "register_introspection_routes::introspection_rollup",
+      "kind": "function",
+      "file": "cantus/serve/introspection.py",
+      "line": 483,
+      "deg": 6,
+      "from_tests": 0
+    },
+    {
+      "name": "Agent::_parse_action",
+      "kind": "method",
+      "file": "cantus/core/agent.py",
+      "line": 201,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "GoogleChatPubSubChannel::connect",
+      "kind": "method",
+      "file": "cantus/serve/channels/googlechat.py",
+      "line": 215,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "MLXChatModel::chat",
+      "kind": "method",
+      "file": "cantus/model/providers/mlx.py",
+      "line": 73,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "_from_function",
+      "kind": "function",
+      "file": "cantus/protocols/skill.py",
+      "line": 119,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "_parse",
+      "kind": "function",
+      "file": "cantus/identity/soul.py",
+      "line": 104,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "from_anthropic_response",
+      "kind": "function",
+      "file": "cantus/model/providers/_translate.py",
+      "line": 168,
+      "deg": 5,
+      "from_tests": 0
+    },
+    {
+      "name": "from_google_response",
+      "kind": "function",
+      "file": "cantus/model/providers/_translate.py",
+      "line": 270,
+      "deg": 5,
+      "from_tests": 0
+    }
+  ],
+  "largest_files": [
+    {
+      "file": "cantus/serve/introspection.py",
+      "symbols": 36,
+      "lines": 491
+    },
+    {
+      "file": "cantus/tui/widgets.py",
+      "symbols": 31,
+      "lines": 325
+    },
+    {
+      "file": "cantus/serve/channels/_googlechat_internals.py",
+      "symbols": 20,
+      "lines": 235
+    },
+    {
+      "file": "cantus/tui/app.py",
+      "symbols": 19,
+      "lines": 194
+    },
+    {
+      "file": "cantus/protocols/memory.py",
+      "symbols": 19,
+      "lines": 171
+    },
+    {
+      "file": "cantus/serve/channel.py",
+      "symbols": 15,
+      "lines": 133
+    },
+    {
+      "file": "cantus/serve/channels/_realtime.py",
+      "symbols": 13,
+      "lines": 417
+    },
+    {
+      "file": "cantus/protocols/memory_auto.py",
+      "symbols": 13,
+      "lines": 151
+    },
+    {
+      "file": "cantus/protocols/skill.py",
+      "symbols": 12,
+      "lines": 138
+    },
+    {
+      "file": "cantus/protocols/validator.py",
+      "symbols": 11,
+      "lines": 114
+    },
+    {
+      "file": "cantus/core/agent.py",
+      "symbols": 11,
+      "lines": 420
+    },
+    {
+      "file": "cantus/adapters/dspy.py",
+      "symbols": 11,
+      "lines": 146
+    },
+    {
+      "file": "cantus/tui/client.py",
+      "symbols": 10,
+      "lines": 121
+    },
+    {
+      "file": "cantus/serve/channels/googlechat.py",
+      "symbols": 10,
+      "lines": 380
+    },
+    {
+      "file": "cantus/model/loader.py",
+      "symbols": 10,
+      "lines": 151
+    }
+  ],
+  "routes": [
+    {
+      "name": "GET /skills",
+      "file": "cantus/serve/dashboard.py",
+      "line": 55
+    },
+    {
+      "name": "GET /health",
+      "file": "cantus/serve/dashboard.py",
+      "line": 64
+    },
+    {
+      "name": "GET /events",
+      "file": "cantus/serve/dashboard.py",
+      "line": 73
+    },
+    {
+      "name": "GET /introspection/skills",
+      "file": "cantus/serve/introspection.py",
+      "line": 415
+    },
+    {
+      "name": "GET /introspection/sessions",
+      "file": "cantus/serve/introspection.py",
+      "line": 424
+    },
+    {
+      "name": "GET /introspection/permissions",
+      "file": "cantus/serve/introspection.py",
+      "line": 434
+    },
+    {
+      "name": "GET /introspection/queues",
+      "file": "cantus/serve/introspection.py",
+      "line": 443
+    },
+    {
+      "name": "GET /introspection/workflows/{run_id}",
+      "file": "cantus/serve/introspection.py",
+      "line": 452
+    },
+    {
+      "name": "GET /introspection/dataflow",
+      "file": "cantus/serve/introspection.py",
+      "line": 468
+    },
+    {
+      "name": "GET /introspection",
+      "file": "cantus/serve/introspection.py",
+      "line": 477
+    }
+  ],
+  "inheritance": [
+    {
+      "child": "CallSkillAction",
+      "file": "cantus/core/action.py",
+      "parent": "Action"
+    },
+    {
+      "child": "FinalAnswerAction",
+      "file": "cantus/core/action.py",
+      "parent": "Action"
+    },
+    {
+      "child": "RealtimeChannel",
+      "file": "cantus/serve/channel.py",
+      "parent": "Channel"
+    },
+    {
+      "child": "WebhookChannel",
+      "file": "cantus/serve/channel.py",
+      "parent": "Channel"
+    },
+    {
+      "child": "BM25Memory",
+      "file": "cantus/protocols/memory.py",
+      "parent": "Memory"
+    },
+    {
+      "child": "EmbeddingMemory",
+      "file": "cantus/protocols/memory.py",
+      "parent": "Memory"
+    },
+    {
+      "child": "MarkdownMemory",
+      "file": "cantus/protocols/memory_markdown.py",
+      "parent": "Memory"
+    },
+    {
+      "child": "ShortTermMemory",
+      "file": "cantus/protocols/memory.py",
+      "parent": "Memory"
+    },
+    {
+      "child": "MaxIterationsObservation",
+      "file": "cantus/core/observation.py",
+      "parent": "Observation"
+    },
+    {
+      "child": "SkillObservation",
+      "file": "cantus/core/observation.py",
+      "parent": "Observation"
+    },
+    {
+      "child": "ToolErrorObservation",
+      "file": "cantus/core/observation.py",
+      "parent": "Observation"
+    },
+    {
+      "child": "ValidationErrorObservation",
+      "file": "cantus/core/observation.py",
+      "parent": "Observation"
+    },
+    {
+      "child": "NvidiaChatModel",
+      "file": "cantus/model/providers/nvidia.py",
+      "parent": "OpenAIChatModel"
+    },
+    {
+      "child": "OllamaChatModel",
+      "file": "cantus/model/providers/ollama.py",
+      "parent": "OpenAIChatModel"
+    },
+    {
+      "child": "OmlxChatModel",
+      "file": "cantus/model/providers/omlx.py",
+      "parent": "OpenAIChatModel"
+    },
+    {
+      "child": "_MemoryTool",
+      "file": "cantus/protocols/memory_auto.py",
+      "parent": "Skill"
+    },
+    {
+      "child": "_RemoteSkillBase",
+      "file": "cantus/adapters/_remote_skill.py",
+      "parent": "Skill"
+    },
+    {
+      "child": "_CreateTool",
+      "file": "cantus/protocols/memory_auto.py",
+      "parent": "_MemoryTool"
+    },
+    {
+      "child": "_DeleteTool",
+      "file": "cantus/protocols/memory_auto.py",
+      "parent": "_MemoryTool"
+    },
+    {
+      "child": "_StrReplaceTool",
+      "file": "cantus/protocols/memory_auto.py",
+      "parent": "_MemoryTool"
+    },
+    {
+      "child": "_ViewTool",
+      "file": "cantus/protocols/memory_auto.py",
+      "parent": "_MemoryTool"
+    },
+    {
+      "child": "_DspyRemoteSkill",
+      "file": "cantus/adapters/dspy.py",
+      "parent": "_RemoteSkillBase"
+    },
+    {
+      "child": "_HuggingFaceRemoteSkill",
+      "file": "cantus/adapters/huggingface.py",
+      "parent": "_RemoteSkillBase"
+    },
+    {
+      "child": "_LangChainRemoteSkill",
+      "file": "cantus/adapters/langchain.py",
+      "parent": "_RemoteSkillBase"
+    },
+    {
+      "child": "_RemoteSkill",
+      "file": "cantus/adapters/mcp_client.py",
+      "parent": "_RemoteSkillBase"
+    }
+  ],
+  "unreferenced_public_symbols": [
+    {
+      "name": "export_as_mcp_server",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 49
+    },
+    {
+      "name": "import_mcp_server",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 56
+    },
+    {
+      "name": "expose_as_langchain_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 72
+    },
+    {
+      "name": "import_langchain_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 79
+    },
+    {
+      "name": "expose_as_dspy_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 86
+    },
+    {
+      "name": "import_dspy_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 93
+    },
+    {
+      "name": "expose_as_hf_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 100
+    },
+    {
+      "name": "import_hf_tool",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 111
+    },
+    {
+      "name": "expose_as_openhands_action",
+      "kind": "function",
+      "file": "cantus/adapters/__init__.py",
+      "line": 123
+    },
+    {
+      "name": "expose_as_anthropic_memory_tool",
+      "kind": "function",
+      "file": "cantus/adapters/anthropic_memory.py",
+      "line": 69
+    },
+    {
+      "name": "ModelHandle",
+      "kind": "class",
+      "file": "cantus/core/agent.py",
+      "line": 54
+    },
+    {
+      "name": "MLXChatModel",
+      "kind": "class",
+      "file": "cantus/model/providers/mlx.py",
+      "line": 40
+    },
+    {
+      "name": "Opcode",
+      "kind": "class",
+      "file": "cantus/serve/channels/_realtime.py",
+      "line": 38
+    }
+  ],
+  "package_files_without_direct_test_edges": [
+    "cantus/__main__.py",
+    "cantus/adapters/anthropic_memory.py",
+    "cantus/adapters/mcp.py",
+    "cantus/model/providers/mlx.py",
+    "cantus/protocols/_common.py"
+  ]
+}
