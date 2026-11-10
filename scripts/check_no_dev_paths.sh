@@ -93,7 +93,20 @@ scan() {
     fi
 }
 
-scan "${PATTERN}" .
+# The harness-agile tw-emoji sanitizers document the IDE link they strip with a
+# sample home path in their docstrings. Those three scripts are template-owned
+# (a template upgrade would restore the sample), so they are exempt by exact
+# path in both runtime trees; every other file under the skill trees is scanned.
+SANITIZER_EXEMPTIONS=()
+for runtime in .claude .agents; do
+    SANITIZER_EXEMPTIONS+=(
+        ":(exclude)${runtime}/skills/tw-emoji-commit/scripts/sanitize_commit.py"
+        ":(exclude)${runtime}/skills/tw-emoji-pr-note/scripts/sanitize_pr_note.py"
+        ":(exclude)${runtime}/skills/tw-emoji-release-note/scripts/sanitize_release_note.py"
+    )
+done
+
+scan "${PATTERN}" . "${SANITIZER_EXEMPTIONS[@]}"
 PATH_MATCHES="${SCAN_RESULT}"
 scan "${TOKEN_PATTERN}" "${SITE_PATHS[@]}"
 TOKEN_MATCHES="${SCAN_RESULT}"

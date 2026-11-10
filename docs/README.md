@@ -62,6 +62,7 @@ Per-version migration guides live in [`migrations/`](migrations/). Most recent:
 ## Decisions and release process
 
 - [ADRs](adr/) — architecture decision records
+- [Collaboration workflow](agents/README.md) — how coding agents and maintainers deliver changes to this repository (Traditional Chinese)
 - [Docs release sign-off](DOCS_RELEASE_SIGNOFF.md) — manual checklist before a docs release
 
 ## Contributor knowledge base
