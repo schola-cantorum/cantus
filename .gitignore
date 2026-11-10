@@ -113,3 +113,6 @@ docs/site/.vitepress/cache/
 
 # Handoff 文件：本機工作交接用，不進版控
 .proj.handoffs/
+
+# CodeGraph 本機索引（SQLite，機器本地）；可版控的剖析快照在 docs/codegraph/
+.codegraph/
