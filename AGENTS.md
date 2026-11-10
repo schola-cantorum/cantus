@@ -36,8 +36,6 @@ plans, research and change history there. Keep adopted project rules in `docs/`.
 
 **cantus** — A teaching-oriented framework for composing LLM agent harnesses, from a Colab notebook to a student's own laptop.
 
-<!-- DRAFT 2026-11-10: drafted by Claude from README.md, CONTEXT.md and the maintainer's teaching notes; awaiting the maintainer's edits. -->
-
 **Who it serves.** Senior-high-school students in Taiwan learning to build LLM agents: they write
 Skills, Memory and hooks, run them on Google Colab or locally, and finish by connecting an agent to a
 real chat platform (LINE, Telegram, Discord, Google Chat) for a demo. Teachers and administrators who

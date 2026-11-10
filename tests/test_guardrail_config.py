@@ -10,7 +10,7 @@ documentation. They say nothing about how the underlying tools behave: running
 the linter in CI is the check on the linter, not this module's job. They must
 therefore pass regardless of which lint findings happen to exist today.
 
-Feature: unimplemented-guardrails (see .proj.spec/unimplemented-guardrails.md)
+Feature: unimplemented-guardrails (see .proj.specs/_legacy/unimplemented-guardrails.md)
 """
 
 from __future__ import annotations
