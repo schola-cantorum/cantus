@@ -1,7 +1,7 @@
 """Tier 2 ChatModel Protocol — the multi-provider chat-style interface.
 
-This is **Tier 2** of the cantus dual-tier API (see ARCH-1 in
-`openspec/discussions/cantus-framework-shift.md`). Tier 1 is the existing
+This is **Tier 2** of the cantus dual-tier API (decision ARCH-1 of the
+framework-shift discussion in the upstream colab-llm-agent repository). Tier 1 is the existing
 `cantus.core.agent.ModelHandle` Protocol — a minimal `generate(prompt) -> str`
 interface used by `Agent`. Tier 2 introduces chat-style messages with tool use
 and streaming, modeled after the OpenAI Chat Completions shape because every

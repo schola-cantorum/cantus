@@ -133,12 +133,14 @@ Used by `/wayfinder`, which is **not currently installed**. If it is added later
 go to `.proj.maps/<effort>.md` and their child decision tickets follow the ticket rules
 above, with a `Type:` line recording `research` / `prototype` / `grilling` / `task`.
 
-## Two things named "spec" — do not confuse them
+## Spec snapshots
 
-| Path | What it is |
-| --- | --- |
-| `openspec/specs/` | The **capability contract ledger**. Current source of truth. Changed only through Spectra, and only when a change touches the public API surface. |
-| `.proj.spec/` | A **throwaway synthesis** from `to-spec`, for multi-session work that does *not* touch the public API surface. A snapshot with no sync mechanism. |
+`.proj.spec/` holds **throwaway syntheses** from `to-spec`: snapshots with no sync
+mechanism. Never cite them as a requirements authority.
 
-Never cite `.proj.spec/` as a requirements authority, and never treat `openspec/specs/`
-as something `to-spec` may rewrite.
+`.proj.tickets/_legacy/` holds frozen work that is not on any status board. Each entry
+records why it was frozen; reviving one starts again from `/grill-with-docs`.
+
+The former capability contract ledger `openspec/specs/` and the Spectra workflow were
+removed during the harness-agile migration. Read them at the Git tag
+`pre-harness-migration` (`git show pre-harness-migration:openspec/specs/<capability>/spec.md`).

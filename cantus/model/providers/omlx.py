@@ -75,7 +75,7 @@ class OmlxChatModel(OpenAIChatModel):
         # treated as absent so the sentinel is used. Using `is not None` would
         # forward `""` to the parent, whose resolve_api_key falls back to
         # OPENAI_API_KEY — silently re-opening the env consultation this adapter
-        # is meant to avoid (spectra-audit hardening).
+        # is meant to avoid (fixed in the omlx release audit).
         resolved_key = api_key if api_key else OMLX_API_KEY_SENTINEL
         super().__init__(
             model_id=model_id,

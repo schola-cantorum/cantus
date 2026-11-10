@@ -100,9 +100,8 @@ logs/
 # uv
 uv.lock
 
-# Spectra runtime state
-.spectra/
-openspec/.vector-search.db*
+# Local engineering scratch: roadmap / explorer HTML and other throwaway artifacts
+.scratch/
 
 # Documentation site (VitePress) toolchain + generated analysis artifacts
 # (the committed interactive manual under docs/interactive/ stays tracked)
