@@ -51,3 +51,11 @@ If the concept you need isn't in the glossary yet, that's a signal: either you'r
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
+
+## cantus: ADR front matter is checked
+
+The ADR format in the `domain-modeling` skill treats front matter as optional. In cantus it is
+required: `tests/test_guardrail_config.py` (ADR-0003) fails CI unless every ADR declares
+`status: accepted` or `status: proposed`, and every accepted ADR either names a control under
+`tests/`, `scripts/` or `.github/workflows/` that cites it back, or declares `enforcement: manual`
+with an `## Enforcement` section. Number new ADRs after the highest existing one.

@@ -17,8 +17,12 @@ may exist in one tree only; the skills named in the pipeline and hard rules exis
 Read the project copy for the active runtime when a user-level skill has the same
 name; helper paths resolve relative to that loaded SKILL.md. Keep reference files
 and scripts with their skill. Provenance: [skill-sources.json](skill-sources.json).
-`skills-lock.json` records the upstream installer snapshot; local adaptations are
-listed in the provenance file and must be preserved or reapplied during updates.
+cantus keeps no `skills-lock.json` (deleted when it adopted harness-agile). Per-skill upstream
+provenance is in the provenance file (`source`, `prior_mirror_record`, `licensing`), and per-file
+template hashes are in [template-source.json](template-source.json). Template skills are updated
+through `harness-agile migrate`, not `npx skills`; cantus-only skills (`eli5`) are updated from the
+upstream named in their provenance entry. Local adaptations are listed in the provenance file and
+must be preserved or reapplied during updates.
 
 | Upstream wording | Claude Code | Codex |
 | --- | --- | --- |
@@ -148,8 +152,8 @@ Do not transfer credentials or assume conversation history crosses products.
 
 Run `python3 scripts/verify-project.py` before handing a copy to another runtime.
 It checks local structure and portability, not model quality or pipeline completion.
-`python3 -m unittest discover -s tests -v` checks template initialization before the
-initializer removes its own template-only test. Fresh sessions should confirm skills
+In cantus, `tests/` is the product test suite (see `AGENTS.md`); the template's own
+initialization tests are not present. Fresh sessions should confirm skills
 and native roles in their actual host; a long-running session may have an old catalog.
 
 External CLIs (Python 3.11+, Git, agent-browser, gh/glab when used) and MCP account

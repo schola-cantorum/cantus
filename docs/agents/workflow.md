@@ -26,6 +26,11 @@ takes a branch — `tickets/T-0000/walking-skeleton` — rather than committing 
 **Its output is the seams, not the code.** Expect most of the skeleton's implementation to be
 replaced by the epics that follow. That is the plan working, not the plan failing.
 
+> **cantus:** round 0 is complete. The pre-migration codebase is the skeleton
+> ([ADR-0010](../adr/0010-existing-codebase-satisfies-round-zero.md)); there is no `T-0000` branch and
+> global ticket ids start at `T-0001`. "Every ticket has a spec behind it" holds for every epic
+> ticket; lightweight-path tickets (below, ADR-0012) are the only exception.
+
 ## Stage 1 — Converge the requirement
 
 Run `/grill-with-docs`. It is user-invoked; ask the user to run it rather than trying to invoke it
@@ -74,6 +79,11 @@ every layer and is demoable on its own.
 Ticket ids are allocated globally and sequentially (`T-0001`, `T-0002`, …) and never change, because
 branch names embed them. Files live under `.proj.tickets/NNNN-<epic-slug>/`. Layout and frontmatter:
 [issue-tracker.md](issue-tracker.md).
+
+**cantus — where stages 2–4 are committed.** The spec, `traceability.md`, the `review/` records and
+the epic's ticket files are written on one branch, `specs/<NNNN-epic-slug>`, and land on `main`
+through their own PR with the user's approval (ADR-0014) before the first ticket branch is cut.
+Ticket branches then start from a `main` that already holds their ticket file.
 
 **Gate:** the user approves the breakdown — granularity, blocking edges, and what each ticket
 delivers.
@@ -150,12 +160,15 @@ Inspect the actual remote host and intended base first.
   final message. The merge command itself does not generate a separate message
   outside that skill.
 
-Every `git commit` variant uses `tw-emoji-commit`. Committing on a ticket branch needs
-no separate approval, but landing does: open the PR, then stop. Merging into `main`
+Every `git commit` variant uses `tw-emoji-commit`. Committing on a ticket branch (or an
+epic's `specs/` branch) needs no separate approval, but landing does: open the PR, then stop. Merging into `main`
 (a PR merge or a local `--no-ff` merge) happens only on the user's explicit go-ahead
 for that change; an earlier approval does not carry over (cantus override, ADR-0014).
 Report unresolved decisions instead of silently choosing an unexpected remote or base.
-Update ticket status to `done` after landing.
+Because the user, not the agent, performs the merge, the agent sets `status: done` in the ticket
+branch's last commit before opening the PR: the ticket reaches `main` as `done` exactly when it
+lands, and a PR closed without merging leaves `main` untouched. Set `status: review` on the branch
+when stages 6–8 begin.
 
 ## Lightweight path (cantus override)
 
@@ -166,7 +179,11 @@ tutorial pages, notebooks, examples, tests that only add coverage. Rules:
 
 - The ticket lives in `.proj.tickets/0000-maintenance/T-NNNN-<slug>.md`, uses the global
   `T-NNNN` sequence and the `tickets/<ticket-id>/<slug>` branch, and states in
-  `lightweight_reason:` why the criteria apply.
+  `lightweight_reason:` why the criteria apply. The ticket file is committed on its own ticket
+  branch; there is no `specs/` branch for maintenance work.
+- When stage 7 runs for a lightweight ticket, its report goes to
+  `.proj.specs/0000-maintenance/review/security-<ticket-id>.md`. That directory holds only such
+  reports; `0000-maintenance` never has a spec.
 - Stages 1, 4–6, 8 and 9 still run. If the ticket changes test code, the test plan table
   still needs the user's approval.
 - **Security review is not skipped** for changes to `.github/workflows/`, dependency
@@ -181,7 +198,9 @@ See ADR-0012.
 Before publishing a version to PyPI, the release gate in ADR-0013 must pass: a project
 `security-review` over the full diff since the previous tag, a release-level
 `/evidence-report`, the manual checklist in `docs/DOCS_RELEASE_SIGNOFF.md`, and a green
-three-OS install smoke.
+three-OS install smoke. The security report goes to
+`.proj.specs/_reports/release-vX.Y.Z-security.md` and the evidence report to
+`.proj.specs/_reports/release-vX.Y.Z.html`.
 
 ## Epic close-out
 

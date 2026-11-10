@@ -20,7 +20,7 @@
       "report": ".tmpl.docs/history/2026-09-12-codex-prompt-skill-optimization.md",
       "retune_with": "tune-skills (Codex tree, references/gpt-6.md for the GPT-6 family)"
     },
-    "claude_prompt_audit": "2026-09-26: Claude-tree edits from the prompt audit (.tmpl.docs/research/2026-09-26-claude-skill-prompt-audit.md, IDs A1-D12, D5 excluded) and its follow-up review apply to agent-browser, archify, code-review, codebase-design, diagnosing-bugs, evidence-report, grilling, i-have-adhd, improve-codebase-architecture, init-template, prototype, research, security-review, teach, to-spec, to-tickets, tw-emoji-commit, tw-emoji-pr-note, tw-emoji-release-note, wayfinder and writing-for-agents; reapply them after upstream updates. local_adaptations and adaptations entries that name no runtime describe the Codex tree."
+    "claude_prompt_audit": "2026-09-26: Claude-tree edits from the prompt audit (.tmpl.docs/research/2026-09-26-claude-skill-prompt-audit.md, IDs A1-D12, D5 excluded) and its follow-up review apply to agent-browser, code-review, codebase-design, diagnosing-bugs, evidence-report, grilling, i-have-adhd, improve-codebase-architecture, init-template, prototype, research, security-review, teach, to-spec, to-tickets, tw-emoji-commit, tw-emoji-pr-note, tw-emoji-release-note, wayfinder and writing-for-agents; reapply them after upstream updates. local_adaptations and adaptations entries that name no runtime describe the Codex tree."
   },
   "skills": {
     "agent-browser": {
@@ -230,7 +230,11 @@
     "init-template": "Trigger on requested adoption, not placeholder presence alone. Both runtime trees: describe ADR adoption dates by the INIT_DATE placeholder rather than a fixed ADR count (2026-11-01).",
     "research": "Codex tree: the read-only harness-researcher returns cited evidence, observed facts, source claims, inferences, verification date and unresolved questions without nested delegation; the main session saves the Markdown artifact using the existing language and tracker conventions (2026-11-01).",
     "agent-browser": "Compact branch-specific discovery and permit evidence-equivalent native tools. Restore Apache-2.0 text and add a prominent modification notice without changing execution guidance.",
-    "writing-for-agents": "Codex tree: describe manual invocation as host policy rather than zero-cost metadata invisibility. Claude tree: disable-model-invocation keeps the description out of context (Claude Code skills docs, 2026-09-26)."
+    "writing-for-agents": "Codex tree: describe manual invocation as host policy rather than zero-cost metadata invisibility. Claude tree: disable-model-invocation keeps the description out of context (Claude Code skills docs, 2026-09-26).",
+    "domain-modeling": "cantus (2026-11-10): ADR-FORMAT.md in both trees notes that front matter is required and checked by the ADR guard.",
+    "diagnosing-bugs": "cantus (2026-11-10): manual invocation in both trees (Claude disable-model-invocation, Codex allow_implicit_invocation: false).",
+    "tune-skills": "cantus (2026-11-10): Claude tree verification example no longer names archify, which cantus does not import.",
+    "eli5": "cantus-only skill; copied into both trees with agents/openai.yaml for Codex."
   },
   "licensing": {
     "verified_on": "2026-09-13",

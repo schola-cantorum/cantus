@@ -40,12 +40,15 @@ retain their existing format and purpose.
 ### cantus additions
 
 - **`.proj.tickets/0000-maintenance/`** holds lightweight-path tickets (see
-  [workflow.md](workflow.md#lightweight-path-cantus-override) and ADR-0012). It has no spec
-  directory. Its tickets use the same frontmatter plus `lightweight_reason:`.
+  [workflow.md](workflow.md#lightweight-path-cantus-override) and ADR-0012). It never has a spec;
+  `.proj.specs/0000-maintenance/review/` holds only the stage-7 reports of lightweight tickets that
+  need one. Its tickets use the same frontmatter plus `lightweight_reason:`.
 - **`.proj.tickets/_legacy/`** and **`.proj.specs/_legacy/`** hold work frozen during the
   harness-agile migration: tickets kept in the old status-directory layout and throwaway spec
   snapshots. They are not on any status view, carry no `T-NNNN` id, and are not review
-  evidence. Reviving an item starts at stage 1 (or the lightweight path) and gives it a new id.
+  evidence. Reviving an item gives it a new id in the current layout; the revived ticket records
+  its origin in an optional `legacy_source:` frontmatter field (the old path). The procedure is in
+  `.proj.tickets/_legacy/README.md`.
 - The capability contract ledger `openspec/specs/` was removed with Spectra (ADR-0011). Read it
   at the Git tag `pre-harness-migration`:
   `git show pre-harness-migration:openspec/specs/<capability>/spec.md`.
@@ -96,7 +99,7 @@ Five are written to `status:`. One is derived.
 | `todo` | ready to start | `/to-tickets` |
 | `processing` | claimed, work in progress | the agent, before the first edit |
 | `review` | implementation done, in stages 6–8 | the agent |
-| `done` | landed on `main` | the agent, after the merge |
+| `done` | landed on `main` | the agent, in the ticket branch's last commit; true once the user merges it (cantus, ADR-0014) |
 | `pending` | deliberately paused | the user's decision, recorded |
 | `blocked` | **derived**, never written | computed from `blocked_by` |
 

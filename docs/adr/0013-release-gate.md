@@ -14,8 +14,10 @@ a release needs one cross-epic gate.
 Before a version is published, all four must hold:
 
 1. The project `security-review` skill has run over the full diff from the previous release tag to
-   the release commit, and its findings are triaged and resolved.
-2. A release-level `/evidence-report` records what the release contains and the evidence for it.
+   the release commit, and its findings are triaged and resolved. The report is saved as
+   `.proj.specs/_reports/release-vX.Y.Z-security.md`.
+2. A release-level `/evidence-report` records what the release contains and the evidence for it,
+   saved as `.proj.specs/_reports/release-vX.Y.Z.html`.
 3. The manual checklist in `docs/DOCS_RELEASE_SIGNOFF.md` is signed off.
 4. The three-OS install smoke is green.
 

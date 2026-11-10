@@ -32,8 +32,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Control for ADR-0009 (drift diagnosis stays explicitly invoked) and the
-      # structural half of the harness-agile adoption (ADR-0010, ADR-0011).
+      # Control for ADR-0009: drift diagnosis stays explicitly invoked.
       # Checks the shared entrypoints, both runtime skill trees, invocation
       # policies, sanitizers, skill provenance and runtime roles. It uses only
       # the standard library (tomllib, so Python 3.11+); ubuntu-latest's

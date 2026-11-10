@@ -1,6 +1,8 @@
 # 協作指南
 
-在專案目錄開啟 Claude Code 或 Codex，從目前的 spec、ticket 與驗證紀錄接續工作。如果剛完成初始化，先用 `grill-with-docs` 定義 `AGENTS.md` 裡的 Project Charter，再建立 walking skeleton。
+在專案目錄開啟 Claude Code 或 Codex，從目前的 spec、ticket 與驗證紀錄接續工作。
+
+> **cantus 的在地規則**：Charter 已填寫，round 0 由既有程式碼滿足，不建立 walking skeleton（ADR-0010）；不改 `cantus/` 執行行為、也不動公開 API 的變更走輕量路徑（ADR-0012）；agent 可以在 ticket branch 或 epic 的 `specs/` branch 上 commit，但合併進 `main` 每次都要你核准（ADR-0014）；發版前要過 release gate（ADR-0013）。遷移前的舊 ticket 凍結在 `.proj.tickets/_legacy/`。
 
 ## 開始一段工作
 
@@ -18,7 +20,7 @@ Codex 專案設定需在自己的環境信任這個 checkout 後才會套用。�
 
 ## 找到適合的 skill
 
-目前 checkout 初始化後保留 33 個 skills；母範本另外有 `init-template`，共 34 個。固定 tag 的內容可能不同，請以 `python3 scripts/verify-project.py` 檢查所採用版本的數量與結構。
+cantus 有 33 個 skills：範本的 33 個拿掉 archify，再加上 cantus 自有的 `eli5`。請以 `python3 scripts/verify-project.py` 檢查數量與結構。
 
 | 工作 | Skills |
 | --- | --- |
@@ -28,6 +30,7 @@ Codex 專案設定需在自己的環境信任這個 checkout 後才會套用。�
 | 架構與診斷 | `codebase-design`、`domain-modeling`、`diagnosing-bugs`、`improve-codebase-architecture`、`egm-drift-report`（手動觸發） |
 | 審查與驗證 | `code-review`、`security-review`、`agent-browser`、`evidence-report` |
 | Git 文案與協作 | `tw-emoji-commit`、`tw-emoji-pr-note`、`tw-emoji-release-note`、`resolving-merge-conflicts`、`handoff` |
+| 解說（cantus 自有） | `eli5` |
 | 研究與知識傳遞 | `research`、`teach`、`writing-for-agents`、`wait-what`、`i-have-adhd` |
 
 這份專案已設定 `.proj.specs/` 與 `.proj.tickets/`。需要更換 tracker 時才使用 `setup-matt-pocock-skills` 調整，避免重新套入通用 `.scratch/` 預設。標示為手動觸發的 skills 需明確呼叫，包含 `i-have-adhd`。
@@ -91,6 +94,14 @@ npx --yes --package='create-harness-agile@X.Y.Z' create-harness-agile migrate .
 
 寫入途中失敗（例如檔案被其他程式鎖住）時，專案可能停在一半。先用 `git status` 確認，再用 `git restore` 與 `git clean` 回到執行前的 commit，排除原因後重跑。
 
+**cantus 升級時要注意**（採用時的狀態見 `docs/agents/template-source.json`）：
+
+- **ADR 編號**：範本的 ADR 在 cantus 改號為 0005–0009。範本若新增 ADR，migrate 會用範本的編號把它加進 `docs/adr/`，跟 cantus 的編號重複；`tests/test_collaboration_workflow.py` 會在 CI 擋下重複編號。請改號接在 cantus 最新 ADR 之後、補上控制項或 `enforcement: manual`，並刪掉原檔。
+- **被跳過的範本更新**：migrate 計畫裡列在 `skipped_deleted` 的檔案（範本的 `docs/adr/0001`～`0005`、`skills-lock.json`、archify），範本就算改了也**不會**產生旁置檔。每次升級都要拿範本的新版跟 cantus 的 `docs/adr/0005`～`0009` 手動比對，需要的修改自己合併進來。
+- **不帶的檔案**：cantus 不帶 archify 和它的安全說明。範本若新增 `.claude/skills/archify/`、`.agents/skills/archify/` 或 `docs/security/` 底下的檔案，migrate 會把它們加回來；同一個測試會擋下，刪掉即可。
+- **授權與導覽**：`LICENSE`、`docs/README.md`、`THIRD_PARTY_NOTICES.md` 是 cantus 自己的版本（ECL-2.0、產品文件導覽）。出現 `LICENSE.harness-new` 時直接刪除；另外兩份只合併跟 skill 授權有關的段落。
+- **改過的範本檔**：`AGENTS.md`、`docs/agents/workflow.md`、`issue-tracker.md`、`runtime.md`、`language.md`、`skill-sources.json`、`docs/guide.md` 等出現旁置檔時，保留〈cantus〉段落與 ADR-0010～0014 的規則。
+
 ## 規格審查需要獨立上下文
 
 Stage 3 的四軸 review，每個軸與每一輪都使用沒有前面對話的全新子代理。主助理提供當輪 spec、traceability、固定的審查 prompt 與必要專案規範，記錄版本與完成狀態；審查者依這些可見證據找問題。
@@ -107,9 +118,9 @@ Stage 3 的四軸 review，每個軸與每一輪都使用沒有前面對話的�
 python3 scripts/verify-project.py
 ```
 
-這會檢查共用入口、兩套 skills 目錄、觸發政策、sanitizer、來源 checksum 與角色設定。它驗證協作設定，產品的 build／test 命令由 walking skeleton 建立。
+這會檢查共用入口、兩套 skills 目錄、觸發政策、sanitizer、來源 checksum 與角色設定。它驗證協作設定；cantus 產品的 build／test 命令見 `AGENTS.md`〈Build and test commands〉。
 
 瀏覽器功能可用 `agent-browser`，或宿主提供且符合驗證需求的瀏覽器工具；原生應用程式、CLI 與 daemon 需要對應的 e2e harness。GitHub／GitLab CLI、MCP 連線與服務登入按需設定。回報結果時，說明實際驗證了哪個介面。
 
-每次 `git commit`（含 amend）都使用專案的 `tw-emoji-commit` 產生並清理訊息；PR 與 release 文案使用對應的 `tw-emoji-*` skill。若 skill 不可用，停止該動作並回報。沒有 remote 時可在本機合併，有 remote 時依所在平台的流程交付。
+每次 `git commit`（含 amend）都使用專案的 `tw-emoji-commit` 產生並清理訊息；PR 與 release 文案使用對應的 `tw-emoji-*` skill。若 skill 不可用，停止該動作並回報。沒有 remote 時可在本機合併，有 remote 時依所在平台的流程交付；在 cantus，合併進 `main` 每次都要你核准（ADR-0014）。
 

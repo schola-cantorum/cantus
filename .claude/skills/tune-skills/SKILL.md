@@ -80,8 +80,8 @@ Apply the approved patch (`git apply --check` first). Then, in this order:
 
 1. Run the deterministic checks and compare them with a run on the unpatched
    tree: `scripts/verify-project.py`, the template tests if `tests/` exists,
-   and each changed skill's own test suite (for example
-   `node --test` under `.claude/skills/archify`). Any new failure is a
+   and each changed skill's own test suite (when the skill
+   ships one). Any new failure is a
    regression to fix or a hunk to revert.
 2. `grep -rn` each removed or reworded sentence across the repository; every
    other file that quotes or relies on it is updated or the hunk reverted.

@@ -57,7 +57,7 @@ A table of contents for everything under `docs/`. New here? Start with the
 ## Upgrade guides
 
 Per-version migration guides live in [`migrations/`](migrations/). Most recent:
-[v0.4.7 → v0.5.0](migrations/MIGRATION_v0.4.7_to_v0.5.0.md).
+[v0.5.0 → v0.6.0](migrations/MIGRATION_v0.5.0_to_v0.6.0.md).
 
 ## Decisions and release process
 
