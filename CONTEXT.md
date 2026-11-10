@@ -2,8 +2,8 @@
 
 A teaching-oriented agent framework. This glossary holds vocabulary specific to
 how this project talks about itself — not general programming concepts, and not
-terms that already have an authoritative definition in a capability
-specification under `openspec/specs/`. A second definition site is drift waiting
+terms that already have an authoritative definition elsewhere (an epic spec or
+the API reference under `docs/api/`). A second definition site is drift waiting
 to happen.
 
 ## Language
