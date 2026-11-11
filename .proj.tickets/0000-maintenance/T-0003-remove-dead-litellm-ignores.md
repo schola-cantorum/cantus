@@ -2,7 +2,7 @@
 id: T-0003
 title: Remove the litellm acknowledgements from the dependency audit now that no audited group installs a vulnerable litellm
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Removes acknowledged advisory IDs from .github/workflows/supply-chain.yml only; no change to cantus/ runtime behaviour, public API or pyproject dependencies. Stage 7 runs because a workflow changes.
 ---
