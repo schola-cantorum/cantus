@@ -124,6 +124,32 @@ still needs the standards/spec evidence required by the project `code-review` sk
 Either runtime can implement, research or review; task placement follows available
 tools and observed results, not an assumed model ranking.
 
+## CodeGraph MCP
+
+Both runtimes register the [CodeGraph](https://github.com/colbymchenry/codegraph) MCP
+server for this project: Claude Code in `.mcp.json`, Codex in `.codex/config.toml`. Each
+runs `npx -y @colbymchenry/codegraph@1.6.2 serve --mcp` with `DO_NOT_TRACK=1`, the same
+pinned version that produces the `docs/codegraph/` snapshot. Change both entries and that
+snapshot's version together.
+
+- **Build the index once per checkout:** `DO_NOT_TRACK=1 npx -y @colbymchenry/codegraph@1.6.2 init -y .`.
+  Without `.codegraph/codegraph.db` the server still starts, and its tool answers that no
+  project is loaded.
+- **What it adds:** one tool, `codegraph_explore`, that returns relevant symbols' source,
+  call paths and a blast-radius summary. While a session runs, the server watches files and
+  re-syncs the index; on connect it reconciles edits made while it was stopped.
+- **Approval stays per machine.** Claude Code asks before it enables a project MCP server;
+  approve it, or set `enabledMcpjsonServers` in your local `.claude/settings.local.json`.
+  Codex loads the entry only after you trust this checkout.
+- **Native Windows:** if Claude Code cannot launch `npx` directly, override the server in
+  your local scope with `cmd /c npx …` rather than editing the shared `.mcp.json`.
+- **Evidence:** CodeGraph is a static index. Use it to find code; confirm a behaviour by
+  reading the source or running the test, and do not cite a graph answer alone as
+  review evidence.
+
+`init` creates `.codegraph/` with its own `.gitignore`, so the database, daemon socket,
+pid and log files never enter Git.
+
 ## Cross-runtime handoff and concurrent work
 
 One writer owns a ticket checkout. Concurrent implementations use separate ticket
