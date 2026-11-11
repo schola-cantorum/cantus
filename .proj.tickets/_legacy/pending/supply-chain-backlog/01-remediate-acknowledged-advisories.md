@@ -52,3 +52,12 @@ The five packages, and why each is a decision rather than a bump:
   and the entries were removed from the workflow. The acknowledged list is
   now 15 entries, all reached through `dspy` / `langchain` / `openhands`; the
   decision this ticket waits on is unchanged for those.
+- 2026-11-10: `pip-audit (main)` had been red since at least 2026-10-19 with thirteen
+  advisories newly published against litellm 1.80.0 (PYSEC-2026-3861, -4066, -4067, -4069
+  to -4076, GHSA-hhww-mrg2-969h, GHSA-g5ff-637f-6q2m), all in the LiteLLM Proxy server.
+  litellm had stayed on 1.80.0 because every later release requires `openai>=2.8` and the
+  `openai` extra pins `openai<2`. dspy 3.5.0 (released that day) made litellm an optional
+  extra, so the `main` group no longer installs litellm and the `openhands` group's
+  litellm 1.109.0 is outside every range. T-0003 removed the eleven litellm entries instead
+  of adding thirteen. The acknowledged list is now four entries (diskcache, langchain-core,
+  langsmith), all reached through `dspy` / `langchain`.
