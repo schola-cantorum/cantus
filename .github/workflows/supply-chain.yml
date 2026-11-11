@@ -108,7 +108,9 @@ jobs:
       # the supply-chain-backlog ticket (frozen under .proj.tickets/_legacy/pending/
       # until revived with a T-NNNN id) and is deliberately NOT
       # part of the change that introduced this workflow: detection and
-      # remediation are separate decisions.
+      # remediation are separate decisions. Four remain as of T-0003
+      # (2026-11-10), all through `dspy` / `langchain`; the backlog ticket's
+      # log records each removal.
       #
       # Nothing outside this list is acknowledged. A newly published advisory,
       # against any package in any of the three groups, still fails the job.
@@ -122,16 +124,4 @@ jobs:
             --ignore-vuln PYSEC-2026-2193 \
             --ignore-vuln PYSEC-2026-2562 \
             `# langsmith 0.8.5 — via langchain-core; fixed in 0.8.18` \
-            --ignore-vuln GHSA-f4xh-w4cj-qxq8 \
-            `# litellm 1.80.0 — via dspy; fixes span 1.82.0 to 1.84.0` \
-            --ignore-vuln GHSA-69x8-hrgq-fjj8 \
-            --ignore-vuln PYSEC-2026-388 \
-            --ignore-vuln PYSEC-2026-390 \
-            --ignore-vuln PYSEC-2026-2597 \
-            --ignore-vuln PYSEC-2026-2598 \
-            --ignore-vuln PYSEC-2026-2599 \
-            --ignore-vuln PYSEC-2026-2600 \
-            --ignore-vuln PYSEC-2026-3476 \
-            --ignore-vuln PYSEC-2026-3477 \
-            --ignore-vuln PYSEC-2026-3478 \
-            --ignore-vuln PYSEC-2026-3479
+            --ignore-vuln GHSA-f4xh-w4cj-qxq8
