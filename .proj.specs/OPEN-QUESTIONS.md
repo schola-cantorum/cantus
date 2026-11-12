@@ -56,12 +56,26 @@ site; release smoke stays the three-OS install matrix.
 **Revisit when.** The first epic touching the CLI, `cantus serve`, a channel gateway or the TUI
 reaches stage 8.
 
+**Note (2026-11-12).** ADR-0016 adds a fourth surface: notebooks (Jupyter and Colab). Its tests drive
+a real kernel through nbclient, and its stage 8 checks Colab and Windows interrupts by hand.
+
 ---
 
 ## OQ-002 — What common shape do student-overridable seams take, and how does the Charter change to allow them?
 
 **Deferred on:** 2026-11-11
-**Status:** open
+**Status:** resolved (2026-11-12)
+
+**Resolution.** Settled in a `/grill-with-docs` session on 2026-11-11 and 2026-11-12 (T-0005).
+The Charter now states the seam principle instead of listing protocol kinds, adds the small-model
+constraint, and states that channel gateways never run an agent, with the wiring written by
+students (`AGENTS.md`, "What it must do" items 2 and 3). The seam shape is a `Protocol` plus a default class passed to `Agent(...)`,
+with subclassing allowed; hooks observe or intercept, seams replace strategies. The seven seams and
+the lifecycle event list are in ADR-0015; the async core with a synchronous `run()` on one
+persistent background loop is ADR-0016, with evidence in
+`docs/research/2026-11-12-sync-run-wrapper.md`; the Skill to Tool rename and the epic order are
+ADR-0017. All three ADRs are `proposed`. The epic order in ADR-0017 is a delivery order; the order
+in which students learn these concepts is decided separately by the tutorial.
 
 **Reason.** The user's direction (conversation of 2026-11-11) is that cantus stays a lightweight,
 teaching-first agent framework whose defaults align with mainstream agent harnesses, while students
@@ -70,7 +84,8 @@ designs the replacement, in the spirit of FastAPI. OQ-003 to OQ-009 each add suc
 of them is specified, three upstream decisions must settle, and the first is a Charter change that
 goes through `/grill-with-docs`.
 
-1. The Charter limits the public API to "two protocol kinds (Skill, Memory)" (`AGENTS.md:50`).
+1. The Charter limits the public API to "two protocol kinds (Skill, Memory)" (`AGENTS.md:50` at
+   `99dd06b`, before T-0005 rewrote it).
    New seams for context, permissions, sessions and subagents contradict that wording.
 2. One seam shape for all of them — strategy objects injected into `Agent(...)`, `Protocol`
    classes, or hook functions — so the API does not grow a different mechanism per feature.
@@ -134,7 +149,17 @@ of today's tool-style `Skill`, and the loading mechanism.
 
 **Not blocked.** The direction itself (default to the standard, student-overridable loading).
 
-**Revisit when.** OQ-002 settles the seam shape.
+**Partly settled on 2026-11-12.** The callable is renamed **Tool** in two releases: v0.7.0 adds `Tool`,
+`@tool` and `register_tool` with deprecated `Skill` aliases; a later minor release removes the
+aliases and `Skill` names an Agent Skill. `@tool` does not register globally; tools are passed as
+`Agent(tools=[...])`; during the alias period an `Agent` without `tools=` still falls back to the
+global registry with a `DeprecationWarning`. ludus keeps working through the aliases, pins
+`cantus<0.8`, and migrates before the aliases are removed, using an internal migration document
+(ADR-0017). Agent Skill loading is a seam whose default reads `SKILL.md` folders with progressive
+disclosure (ADR-0015). Still open: the disclosure mechanism, and whether cantus ships file-system or
+script-execution tools; both belong to the Agent Skill epic.
+
+**Revisit when.** The Agent Skill loading epic (seventh in ADR-0017's order) reaches stage 1.
 
 ---
 
@@ -162,14 +187,19 @@ onto native tool-call errors; parallel tool calls.
 
 **Not blocked.** The text-JSON path stays.
 
-**Revisit when.** OQ-002 settles how the loop is split into stages.
+**Partly settled on 2026-11-12.** Tool calling is a seam; its default uses native function calling when
+the model reports `supports_tool_use` and the text-JSON protocol otherwise (ADR-0015). The other
+choices listed under Blocks stay open for the tool-calling epic.
+
+**Revisit when.** The tool-calling epic (third in ADR-0017's order) reaches stage 1.
 
 ---
 
 ## OQ-005 — Which lifecycle hook events does cantus expose?
 
 **Deferred on:** 2026-11-11
-**Status:** open — implementation is a future item by the user's decision; the event list is not
+**Status:** open — the event list is settled (ADR-0015); hook implementation is a future item by the
+user's decision
 
 **Reason.** The user wants lifecycle hooks but not urgently. The list of event points should still be
 fixed early: OQ-006, OQ-007 and OQ-008 each need an interception point (before compaction, subagent
@@ -188,7 +218,13 @@ start/stop, permission request). If those are built as one-off seams, hooks woul
 
 **Not blocked.** Implementing hooks can wait; existing per-skill hooks keep working.
 
-**Revisit when.** OQ-002 is decided, or the first of OQ-006/007/008 reaches stage 1, whichever is first.
+**Partly settled on 2026-11-12.** The event list is fixed in ADR-0015: twelve events, of which only
+`PreToolUse` and `PermissionRequest` can intercept; per-tool (today per-skill) `pre_hook` and
+`post_hook` stay. Hook
+implementation remains a future item (ninth in ADR-0017's order).
+
+**Revisit when.** The hook implementation epic reaches stage 1, or a seam epic needs an event the
+list lacks.
 
 ---
 
@@ -215,7 +251,11 @@ set); a default that works on small context windows (Gemma E2B, Colab T4).
 
 **Not blocked.** Inspector and persistence keep reading the full stream.
 
-**Revisit when.** OQ-002 and the OQ-005 event list are settled.
+**Partly settled on 2026-11-12.** Context management is a seam with a sliding window under a token budget
+as its default, and `PreCompact` is its lifecycle event (ADR-0015). The choices under Blocks stay
+open for the context epic.
+
+**Revisit when.** The context epic (fourth in ADR-0017's order) reaches stage 1.
 
 ---
 
@@ -242,7 +282,12 @@ a Soul per subagent; whether a subagent is exposed to its parent as a tool.
 
 **Not blocked.** Single-agent work.
 
-**Revisit when.** OQ-002 is settled; the registry question may need its own ADR.
+**Partly settled on 2026-11-12.** The registry obstacle is removed by the rename: `@tool` no longer
+registers globally and tools are passed as `Agent(tools=[...])` (ADR-0017). Subagents are a seam
+whose default exposes a child agent to its parent as a Tool, with `SubagentStart` and
+`SubagentStop` events (ADR-0015). The other choices under Blocks stay open.
+
+**Revisit when.** The subagent epic (eighth in ADR-0017's order) reaches stage 1.
 
 ---
 
@@ -267,7 +312,12 @@ and a channel plugin (ties to the sync/async point in OQ-002); safety of skill s
 
 **Not blocked.** Students can already block calls with `pre_hook`.
 
-**Revisit when.** OQ-002 and the OQ-005 event list are settled.
+**Partly settled on 2026-11-12.** Tool permissions are a seam whose default allows every call and records
+it. The seam owns the policy; a `PermissionRequest` hook answers only when the seam defers with
+"ask", and `PreToolUse` is the only other intercepting event (ADR-0015). How "ask" reaches a human stays open for the permission
+epic.
+
+**Revisit when.** The permission epic (fifth in ADR-0017's order) reaches stage 1.
 
 ---
 
@@ -292,4 +342,8 @@ out of scope; interaction with context management (OQ-006).
 
 **Not blocked.** Single-query runs.
 
-**Revisit when.** OQ-002 and OQ-006 are settled.
+**Partly settled on 2026-11-12.** Sessions are a seam whose default is an in-memory store, replaceable with
+JSON Lines persistence (ADR-0015). Session identity for channel wiring stays open for the session
+epic.
+
+**Revisit when.** The session epic (sixth in ADR-0017's order) reaches stage 1.

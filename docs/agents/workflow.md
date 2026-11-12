@@ -173,7 +173,7 @@ when stages 6–8 begin.
 ## Lightweight path (cantus override)
 
 A change that alters neither the runtime behaviour of the `cantus/` package nor its public
-API surface (public symbols, CLI flags, HTTP endpoints, settings fields) may skip stage 2
+API surface (public symbols, seam interfaces, CLI flags, HTTP endpoints, settings fields) may skip stage 2
 (spec), stage 3 (adversarial review) and stage 7 (security review). Typical cases: documentation,
 tutorial pages, notebooks, examples, tests that only add coverage. Rules:
 

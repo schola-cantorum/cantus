@@ -13,8 +13,9 @@ text whose six skills carry the same names and parameters as ludus's
 `skills/ludus_skill/skill.py` (`move_to`, `dig`, `place`, `inspect`,
 `get_self`, `submit`), and that no lesson before the capstone connects to a
 broker. A learner reaches the capstone by replacing the practice world with
-the skills that ludus's `register_ludus_skills` installs and changing nothing
-in the agent. The practice world's `submit` calls a separate verifier that
+the tools that ludus's `register_ludus_skills` installs, changing only the
+tools passed to the agent (wording updated for ADR-0017's Skill-to-Tool
+rename). The practice world's `submit` calls a separate verifier that
 judges the grid, so the verdict comes from world state, as it does from the
 ludus broker, and never from the agent's own claim.
 

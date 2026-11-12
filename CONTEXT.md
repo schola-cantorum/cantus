@@ -8,6 +8,30 @@ to happen.
 
 ## Language
 
+### Harness vocabulary
+
+**Tool**:
+A callable the model can ask the agent to invoke, described to the model by
+its name, description and argument schema.
+_Avoid_: Skill (for a callable), function, action
+
+**Agent Skill**:
+A folder of instructions and resources headed by a `SKILL.md` file, in the
+format of the Agent Skills open standard, that an agent loads on demand.
+_Avoid_: bare "Skill" while the legacy `Skill` alias still names a Tool, prompt pack, plugin
+
+**Seam**:
+A named place where the framework lets student code replace one behaviour of
+the harness, shipped with a default implementation that follows mainstream
+agent harnesses.
+_Avoid_: extension point, plugin slot, hook (a hook observes or intercepts an
+event; a seam replaces a strategy)
+
+**Channel gateway**:
+A shipped component that connects one chat platform to cantus: it queues the
+platform's inbound messages and sends replies back.
+_Avoid_: channel plugin, bot, connector
+
 ### Self-verification
 
 **Claimed guardrail**:
@@ -39,8 +63,8 @@ _Avoid_: mock model, fake model, stub LLM
 **Practice world**:
 The pure-Python grid world defined inside the tutorial. It exposes the same six
 actions as a ludus plot (`move_to`, `dig`, `place`, `inspect`, `get_self`,
-`submit`) so a learner can swap it for the skills that ludus's
-`register_ludus_skills` installs without changing the agent.
+`submit`) so a learner can swap it for the tools that ludus's
+`register_ludus_skills` installs by changing only the tools passed to the agent.
 _Avoid_: toy world, sandbox, simulator
 
 **Evidence ledger**:
