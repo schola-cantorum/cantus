@@ -158,3 +158,10 @@
   P0.
 - P1 findings: V2-1–V2-7, C2-F1–F4, C2-F6, K2-F1, R2-1 (R2-1 = V2-7, parent-verified). Under
   review.md, P1 findings travel with the tickets; the spec is not revised after round 2.
+
+## Adjudication and gate
+
+- 2026-11-12, the user graded V2-4 as **P1**. The ticket that writes the migration guide first lists
+  which W and X items need before-and-after code, for the user to approve.
+- With all four axes complete on one snapshot and zero P0, **stage 3 passes** under review.md. The
+  P1 findings of this round travel with the tickets.
