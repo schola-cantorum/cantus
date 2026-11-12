@@ -32,8 +32,10 @@ The rename covers the public API, its docstrings and error messages, `docs/site/
 migration guide, and the tutorial's practice world with its fixture (ADR-0004). The epic's spec
 lists every file a search for the old names finds; ADRs, research notes, past migration guides,
 redirect stubs, superseded snapshots and generated data are left as they are. ludus imports `cantus.protocols.skill.register_skill`
-(`ludus/skills/ludus_skill/skill.py:109` in the sibling repository), so ludus keeps working on v0.7 through the aliases. It pins `cantus<0.8` and must
-migrate before the release that removes the aliases. How `cantus serve` is affected, namely its
+(`ludus/skills/ludus_skill/skill.py:109` in the sibling repository), so ludus keeps working on v0.7 through the aliases. ludus migrates to the new API once v0.7.0
+is published, rather than pinning `cantus<0.8`: the async-core epic is expected to ship as v0.8.0
+with the aliases still present, and such a pin would hold ludus back for no reason. It must have
+migrated before the release that removes the aliases. How `cantus serve` is affected, namely its
 `/skills` HTTP paths, how it discovers tools once `@tool` stops registering globally, and the
 related event names, and in which phase each is renamed or kept, is decided by the rename epic's
 spec. The rename epic writes an internal migration document with an agent prompt for that
