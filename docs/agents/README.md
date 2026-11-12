@@ -37,4 +37,8 @@ cantus 導入 harness-agile 時新增的決策：
 - [ADR-0013](../adr/0013-release-gate.md)：發版前的 release gate（人工把關）。
 - [ADR-0014](../adr/0014-commit-and-landing-authority.md)：agent 可以在 ticket branch 上 commit，合併進 main 每次都要使用者核准（人工把關）。
 
-cantus 原有的 ADR-0001～0004 屬於產品決策，見 [ADR 目錄](../adr/)。
+cantus 原有的 ADR-0001～0004 屬於產品決策，見 [ADR 目錄](../adr/)。2026-11-12 新增三份產品架構決策（目前都是 proposed）：
+
+- [ADR-0015](../adr/0015-seams-with-mainstream-defaults.md)：harness 行為透過 seam 擴充，每個 seam 都附一個對齊主流做法的預設實作；並定下生命週期事件清單。
+- [ADR-0016](../adr/0016-async-core-with-sync-run-wrapper.md)：agent 核心改成 async，同步的 `run()` 交給單一常駐背景 loop 執行，不依賴 nest_asyncio。
+- [ADR-0017](../adr/0017-rename-skill-to-tool.md)：可呼叫的 Skill 分兩階段改名為 Tool，把 Skill 這個名字留給 Agent Skill。

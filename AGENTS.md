@@ -38,8 +38,9 @@ plans, research and change history there. Keep adopted project rules in `docs/`.
 **cantus** — A teaching-oriented framework for composing LLM agent harnesses, from a Colab notebook to a student's own laptop.
 
 **Who it serves.** Senior-high-school students in Taiwan learning to build LLM agents: they write
-Skills, Memory and hooks, run them on Google Colab or locally, and finish by connecting an agent to a
-real chat platform (LINE, Telegram, Discord, Google Chat) for a demo. Teachers and administrators who
+Tools, Agent Skills, Memory and hooks, design harness behaviour by overriding the framework's seams,
+run their agents on Google Colab or locally, and finish by wiring a channel gateway to their own agent for a
+demo on a real chat platform (LINE, Telegram, Discord, Google Chat). Teachers and administrators who
 prepare the environment (mirroring model weights, pinning notebooks). Operators who install
 `cantus-agent` from PyPI.
 
@@ -47,11 +48,15 @@ prepare the environment (mirroring model weights, pinning notebooks). Operators 
 
 1. Run on Windows, macOS (Apple Silicon) and Linux with `uv`; run a local LLM through Ollama, MLX or
    an OpenAI-compatible local server, and 4-bit Gemma on Colab.
-2. Keep the public API small and stable: two protocol kinds (Skill, Memory), hook helpers (Analyzer,
-   Validator), the `cantus.workflows` building blocks, `cantus serve`, the TUI and the channel
-   gateways. Public symbols, CLI flags, HTTP endpoints and settings fields are contract surface:
-   changing them takes the full pipeline plus a CHANGELOG entry and a migration guide.
-3. Keep what students read executable: documentation and tutorial code runs in CI (ADR-0003).
+2. Keep the core small and stable, and extend it through named seams. Each seam ships a default
+   implementation that follows mainstream agent harnesses and runs the full agent loop with 4-bit
+   Gemma E2B on a Colab T4; students replace it in code. The seam inventory and lifecycle events are
+   recorded in an ADR (ADR-0015). Public symbols, seam interfaces, CLI flags, HTTP endpoints and
+   settings fields are contract surface: changing them takes the full pipeline plus a CHANGELOG
+   entry and a migration guide.
+3. Ship channel gateways that queue platform messages but never run an agent: wiring a gateway to an
+   agent is student work.
+4. Keep what students read executable: documentation and tutorial code runs in CI (ADR-0003).
 
 **Out of scope.** Course syllabus, slides, exercises and the assessment platform live outside this
 repository. Multi-tenant serving and teacher dashboards are deferred.
