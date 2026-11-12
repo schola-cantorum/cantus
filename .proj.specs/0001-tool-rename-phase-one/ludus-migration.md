@@ -3,6 +3,10 @@
 Internal document for the ludus maintainer, written by cantus epic 0001 (ADR-0017). It describes a
 change in the sibling repository `schola-cantorum/ludus`; nothing here is applied by cantus.
 
+**When:** after cantus v0.7.0 is published on PyPI, and before the cantus release that removes the
+legacy aliases (ADR-0017 phase two). No `cantus<0.8` pin is needed: the next cantus minor release is
+expected to keep the aliases.
+
 ## 摘要（zh-TW）
 
 cantus v0.7.0 把可被模型呼叫的 `Skill` 改名為 **Tool**：`@tool` 不再註冊到全域 registry，改用
@@ -40,39 +44,42 @@ arguments.
 
 - `skills/ludus_skill/pyproject.toml`: the `cantus` extra requires `cantus-agent>=0.7`.
 - No legacy cantus name remains in ludus. Running
-  `python -W error::DeprecationWarning skills/ludus_skill/tests/test_submit_gate.py` under a cantus
-  v0.7 interpreter passes.
+  `python -W error::cantus.CantusDeprecationWarning skills/ludus_skill/tests/test_submit_gate.py`
+  under a cantus v0.7 interpreter passes. The category filter is limited to cantus's warnings, so a
+  third-party `DeprecationWarning` does not fail the check.
 - The agent receives the six tools explicitly; nothing relies on the global registry.
 
 ## Changes per file
 
 ### `skills/ludus_skill/skill.py`
 
-- Replace the lazy import of `register_skill` from `cantus.protocols.skill` with `tool` from
-  `cantus`, keeping the same `ImportError` handling and message.
-- Build the tools with `tool(fn)` and `tool(submit, pre_hook=submit_pre_hook)` instead of
-  `register_skill(...)`; return the list as today. The function no longer registers anything, so its
-  docstring ("Build and register the six skills in the cantus registry") changes accordingly.
-- Naming is ludus's decision. A suggestion: add `ludus_tools(client, *, self_check=None, gate=True)`
-  returning the six Tools, and keep `register_ludus_skills` as a thin wrapper for one ludus release.
-  If ludus renames it, tell cantus: ADR-0004 and CONTEXT.md name `register_ludus_skills`.
+- Add a function that builds and returns the six Tools without registering them: import `tool` from
+  `cantus` lazily (same `ImportError` handling and message), and build them with `tool(fn)` and
+  `tool(submit, pre_hook=submit_pre_hook)`. Its name is ludus's decision; this document calls it
+  `ludus_tools(client, *, self_check=None, gate=True)`.
+- Do not turn `register_ludus_skills` into a function that only returns tools: existing
+  `register_ludus_skills(...)` + `Agent(model)` code would then get no tools and no warning. Either
+  keep it unchanged, still registering into cantus's global registry through `register_skill` (which
+  warns), for as long as ludus keeps it, or remove it in a ludus release that says so.
+- If ludus renames or removes `register_ludus_skills`, tell cantus: ADR-0004 and CONTEXT.md name it.
 
 ### `skills/ludus_skill/__init__.py`
 
 - Update the module docstring ("cantus `Skill` bindings", "cantus skills") to say Tools, and export
-  the new function if one is added.
+  the new function.
 
 ### `examples/ludus_skill_template/run_agent.py`
 
-- Keep the returned list and pass it to the agent:
-  `tools = register_ludus_skills(client, self_check=my_self_check)` (or the new name), then
+- Call the new function and pass its result to the agent:
+  `tools = ludus_tools(client, self_check=my_self_check)`, then
   `Agent(model=build_model(), tools=tools)`.
 
 ### `skills/ludus_skill/tests/test_submit_gate.py`
 
 - `_ScriptedModel._SUBMIT`: change the action key `skill_name` to `tool_name`.
-- `_check_gate.run`: pass the returned tools to `Agent(model=_ScriptedModel(), tools=...)`. Without
-  this, each `run(...)` call creates tools that never reach the agent.
+- `_check_gate.run` and `_check_registration`: call the new function instead of
+  `register_ludus_skills`, and in `_check_gate.run` pass its result to
+  `Agent(model=_ScriptedModel(), tools=...)`. Without `tools=`, the agent would see no tools.
 - Replace `type(e).__name__ == "SkillObservation"` with `"ToolObservation"` (two places); keep
   `"ToolErrorObservation"`.
 - Replace `getattr(e, "skill_name", "")` with `getattr(e, "tool_name", "")` (three places).
@@ -95,8 +102,8 @@ arguments.
 2. Before the migration, run the submit-gate test: the registration check passes, and the gate checks
    fail only on the `SkillObservation` comparisons (this is the expected v0.7.0 behaviour of the
    unmigrated test).
-3. After the migration, run it again with `python -W error::DeprecationWarning`: every check passes
-   and no deprecation warning is raised.
+3. After the migration, run it again with `python -W error::cantus.CantusDeprecationWarning`: every
+   check passes and no cantus deprecation warning is raised.
 
 ## Agent prompt
 
@@ -114,23 +121,26 @@ Facts:
   warnings.
 
 Do:
-1. In skills/ludus_skill/skill.py, import `tool` from `cantus` lazily (keep the ImportError
-   message), build the six tools with `tool(...)` (submit keeps its pre_hook), return them, and fix
-   the docstring. Do not rename public ludus functions unless the maintainer asks; if asked, add the
-   new name and keep `register_ludus_skills` as a thin wrapper.
-2. In examples/ludus_skill_template/run_agent.py, pass the returned tools with
+1. In skills/ludus_skill/skill.py, add a function (ask the maintainer for its name; default
+   `ludus_tools`) that imports `tool` from `cantus` lazily (keep the ImportError message), builds the
+   six tools with `tool(...)` (submit keeps its pre_hook) and returns them without registering.
+   Leave `register_ludus_skills` unchanged, still registering through `register_skill`, unless the
+   maintainer decides to remove it. Export the new function from skills/ludus_skill/__init__.py.
+2. In examples/ludus_skill_template/run_agent.py, call the new function and pass its result with
    `Agent(model=..., tools=tools)`.
-3. In skills/ludus_skill/tests/test_submit_gate.py, change `skill_name` to `tool_name` in the
-   scripted output and in every getattr, compare with "ToolObservation" instead of
-   "SkillObservation", and pass the tools to Agent in `_check_gate`.
+3. In skills/ludus_skill/tests/test_submit_gate.py, call the new function instead of
+   `register_ludus_skills`, change `skill_name` to `tool_name` in the scripted output and in every
+   getattr, compare with "ToolObservation" instead of "SkillObservation", and pass the tools to Agent
+   in `_check_gate`.
 4. Update skills/ludus_skill/__init__.py docstrings, skills/ludus_skill/pyproject.toml (extra
    `cantus-agent>=0.7`, description, comment) and the READMEs where they show the old usage.
 5. Search the repository for `register_skill`, `skill_name`, `SkillObservation`,
    `CallSkillAction`, `cantus.protocols.skill` and `Agent(model=` without `tools=`; none may remain
-   in code that talks to cantus.
+   in code that talks to cantus, except inside a kept `register_ludus_skills`.
 
 Verify: with a cantus v0.7 interpreter, run
-`python -W error::DeprecationWarning skills/ludus_skill/tests/test_submit_gate.py`; it must exit 0
+`python -W error::cantus.CantusDeprecationWarning skills/ludus_skill/tests/test_submit_gate.py`; it
+must exit 0
 and report every gate check passed. Report the diff summary and the test output. Commit and open a PR
 only as the ludus maintainer's own rules allow.
 ```
