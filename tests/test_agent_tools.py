@@ -80,7 +80,7 @@ def test_tools_as_second_positional_argument(records):
     _assert_no_cantus_warning(records)
 
 
-def test_two_agents_in_one_process_reach_only_their_own_tools():
+def test_two_agents_in_one_process_reach_only_their_own_tools(records):
     a = _make_tool("a", 1)
     b = _make_tool("b", 2)
     model_a = ScriptedModel([call_json("a"), call_json("b"), final_json()])
@@ -93,6 +93,7 @@ def test_two_agents_in_one_process_reach_only_their_own_tools():
     assert tool_results(stream_b) == [("b", 2)]
     assert prompt_tool_names(model_a) == ["a"]
     assert prompt_tool_names(model_b) == ["b"]
+    _assert_no_cantus_warning(records)
 
 
 def test_assigning_a_registry_swaps_the_tools(records):
@@ -163,7 +164,7 @@ def test_replace_with_tools_resolves_a_new_registry(records):
     _assert_no_cantus_warning(records)
 
 
-def test_replace_with_tools_none_is_the_fallback_like_the_constructor():
+def test_replace_with_tools_none_is_the_fallback_like_the_constructor(records):
     import dataclasses
 
     agent = Agent(ScriptedModel([]), tools=[_make_tool("a", 1)])
@@ -171,6 +172,7 @@ def test_replace_with_tools_none_is_the_fallback_like_the_constructor():
     # Every fallback agent holds the one process-wide registry object.
     assert replaced.registry is Agent(ScriptedModel([])).registry
     assert replaced.registry is not agent.registry
+    _assert_no_cantus_warning(records)
 
 
 def test_agent_shape_fields_match_args_repr_and_tools_is_registry():
@@ -187,7 +189,7 @@ def test_agent_shape_fields_match_args_repr_and_tools_is_registry():
     assert isinstance(agent.tools, Registry)
 
 
-def test_assigning_tools_follows_the_constructor_rule():
+def test_assigning_tools_follows_the_constructor_rule(records):
     a = _make_tool("a", 1)
     agent = Agent(ScriptedModel([]))
     agent.tools = [a]
@@ -195,6 +197,7 @@ def test_assigning_tools_follows_the_constructor_rule():
     reg = Registry()
     agent.tools = reg
     assert agent.registry is reg
+    _assert_no_cantus_warning(records)
 
     def undecorated(x: int) -> int:
         return x
@@ -215,9 +218,9 @@ def test_empty_tools_means_no_tools_and_no_fallback(records):
 def test_agent_without_tools_and_an_empty_global_registry_is_silent(records):
     # tests/conftest.py empties the process-wide registry around every test.
     model = ScriptedModel([])
-    Agent(model)
-    Agent(model=model)
-    Agent(model, tools=None)
+    agents = [Agent(model), Agent(model=model), Agent(model, tools=None)]
+    for agent in agents:
+        assert agent.registry.names_for("tool") == []
     _assert_no_cantus_warning(records)
 
 
@@ -249,17 +252,27 @@ def test_agent_tools_with_wrong_elements_raises_type_error():
     model = ScriptedModel([])
     with pytest.raises(TypeError, match="@tool"):
         Agent(model, tools=[undecorated])
-    with pytest.raises(TypeError, match="instance"):
+    with pytest.raises(TypeError, match="instance") as excinfo:
         Agent(model, tools=[MyTool])
+    assert "@tool" not in str(excinfo.value)
 
 
 def test_agent_tools_with_wrong_container_raises_type_error():
     one = _make_tool("one", 1)
     model = ScriptedModel([])
 
-    for bad in (one, "one", {"one": one}):
-        with pytest.raises(TypeError):
+    for bad, fragment in (
+        (one, "single Tool"),
+        ("one", "str"),
+        ({"one": one}, "dict"),
+        (b"x", "bytes"),
+        (5, "int"),
+    ):
+        with pytest.raises(TypeError) as excinfo:
             Agent(model, tools=bad)
+        message = str(excinfo.value)
+        assert fragment in message
+        assert "list" in message and "Registry" in message
 
 
 def test_mutating_the_original_list_after_construction_does_not_change_the_agent():
@@ -290,3 +303,8 @@ def test_dataclass_subclass_resolves_tools_and_falls_back(records):
     plain = _PlainSubclass(ScriptedModel([call_json("a"), final_json()]), tools=[a])
     assert tool_results(plain.run("q").stream) == [("a", 1)]
     _assert_no_cantus_warning(records)
+
+
+def test_a_bare_agent_without_tools_slot_reports_no_tools_attribute():
+    bare = Agent.__new__(Agent)
+    assert hasattr(bare, "tools") is False

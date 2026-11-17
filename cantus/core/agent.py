@@ -35,7 +35,10 @@ from cantus.core.observation import (
 from cantus.core.registry import Registry, _get_global_registry
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from cantus.identity import Soul
+    from cantus.protocols.tool import Tool
 
 
 def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
@@ -77,12 +80,15 @@ class _ToolsField:
     """Descriptor: every write to `Agent.tools` resolves to a Registry."""
 
     def __set_name__(self, owner: type, name: str) -> None:
-        self._slot = "_" + name
+        self._slot = "_cantus_" + name
 
     def __get__(self, obj: Any, objtype: Any = None) -> Any:
         if obj is None:
             return None
-        return obj.__dict__[self._slot]
+        try:
+            return obj.__dict__[self._slot]
+        except KeyError:
+            raise AttributeError(self._slot[len("_cantus_"):]) from None
 
     def __set__(self, obj: Any, value: Any) -> None:
         if value is None:
@@ -94,24 +100,42 @@ class _ToolsField:
         obj.__dict__[self._slot] = value
 
 
+def _both_keywords_allowed(tools: Any, caller: Any) -> bool:
+    """Say whether ``tools`` and ``registry`` may both be given to ``Agent.__init__``.
+
+    Only ``dataclasses.replace`` (Python 3.10-3.12) and ``copy.replace`` (3.13+) do
+    this, because they pass the old agent's ``tools`` along with the new ``registry``.
+    The rule: the calling frame belongs to the ``dataclasses`` module and ``tools`` is
+    the very object the original agent holds (the frame's local ``obj`` or ``self``).
+    Known limit: a subclass whose own ``__init__`` forwards to ``super().__init__`` is
+    not recognised, so ``replace(sub, registry=r2)`` raises there.
+    """
+    if caller.f_globals.get("__name__") != "dataclasses":
+        return False
+    original = caller.f_locals.get("obj", caller.f_locals.get("self"))
+    return isinstance(original, Agent) and tools is original.tools
+
+
 @dataclass(init=False)
 class Agent:
     """Default agent that drives the model + EventStream loop.
 
-    The agent can call only the Tools it was given.
+    The agent can call the Tools passed in ``tools``; ``tools=[]`` means no tools.
+    Leaving ``tools`` out is deprecated and uses the process-wide registry.
     """
 
     model: ModelHandle
+    # mypy rejects the descriptor against the constructor's union, so the field stays Any
     tools: Any = _ToolsField()
     soul: "Soul | None" = field(default=None, kw_only=True)
 
     def __init__(
         self,
         model: ModelHandle,
-        tools: Any = None,
+        tools: "Iterable[Tool] | Registry | None" = None,
         *,
         soul: "Soul | None" = None,
-        registry: Any = None,
+        registry: "Registry | None" = None,
     ) -> None:
         """Create an agent.
 
@@ -130,7 +154,7 @@ class Agent:
                 )
             # dataclasses.replace(agent, registry=r2) passes the old tools along
             # with the new registry; there the registry wins.
-            if tools is not None and sys._getframe(1).f_globals.get("__name__") != "dataclasses":
+            if tools is not None and not _both_keywords_allowed(tools, sys._getframe(1)):
                 raise TypeError(
                     "pass either tools= or registry=, not both; "
                     "registry= is deprecated, use tools="
@@ -143,7 +167,11 @@ class Agent:
 
     @property
     def registry(self) -> Registry:
-        """The agent's tools as a Registry."""
+        """The agent's tools as a Registry.
+
+        Raises:
+            TypeError: When assigning a value that is not a Registry.
+        """
         registry: Registry = self.tools
         return registry
 

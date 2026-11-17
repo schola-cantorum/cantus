@@ -239,14 +239,14 @@ def test_duplicate_tool_name_raises_value_error_naming_name_and_positions():
         Registry(tools=[first, other, second])
     message = str(excinfo.value)
     assert "'add'" in message
-    assert "0" in message and "2" in message
+    assert "positions 0 and 2" in message
     assert "the same Tool twice" not in message
 
     with pytest.raises(ValueError) as excinfo:
         Registry(tools=[first, first])
     message = str(excinfo.value)
     assert "'add'" in message
-    assert "0" in message and "1" in message
+    assert "positions 0 and 1" in message
     assert "the same Tool twice" in message
 
 
@@ -345,3 +345,58 @@ def test_set_frozenset_and_dict_values_are_accepted():
 
     for container in ({a, b}, frozenset([a, b]), {"x": a, "y": b}.values()):
         assert Registry(tools=container).names_for("tool") == ["a", "b"]
+
+
+def test_element_with_an_empty_name_raises_value_error_with_position():
+    class Anon(Tool):
+        """Nameless."""
+
+        name = ""
+
+        def run(self, a: int) -> int:
+            return a
+
+    nameless = Anon()
+    nameless.name = ""  # Tool.__init__ fills an empty name with the class name
+    good = _named_tool("good")
+    with pytest.raises(ValueError) as excinfo:
+        Registry(tools=[good, nameless])
+    message = str(excinfo.value)
+    assert "Cannot register tool without a `name` attribute on the instance" in message
+    assert message.endswith(" (tools[1])")
+
+
+def test_callable_element_messages_never_use_repr_and_match_the_callable_kind():
+    import functools
+
+    def add(x: int, y: int) -> int:
+        return x + y
+
+    class Holder:
+        def method(self, x: int) -> int:
+            return x
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[functools.partial(add, 1)])
+    message = str(excinfo.value)
+    assert "tools[0]" in message and "partial" in message and "@tool" in message
+    assert "cantus.tool(" not in message
+    assert "0x" not in message
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[Holder().method])
+    message = str(excinfo.value)
+    assert "'method'" in message and "cantus.tool(" in message
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[lambda x: x])
+    message = str(excinfo.value)
+    assert "@tool" in message and "cantus.tool(" not in message
+
+
+def test_single_tool_container_message_names_the_tool():
+    one = _named_tool("one")
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=one)
+    message = str(excinfo.value)
+    assert "'one'" in message and "single Tool" in message

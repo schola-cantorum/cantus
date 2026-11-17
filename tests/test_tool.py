@@ -10,15 +10,24 @@ import pytest
 from cantus import Agent, Registry, Result, Tool, register_tool, tool
 from cantus.core.observation import ToolErrorObservation, ValidationErrorObservation
 from cantus.core.registry import _get_global_registry  # approved exception: see the T-0007 ticket, stage-5 readings
-from tests.agent_helpers import ScriptedModel, call_json, final_json, observations, run_agent
+from tests.agent_helpers import ScriptedModel, call_json, final_json, observations
 
 FIXTURE = Path(__file__).parent / "fixtures" / "skill_spec_for_llm_v0_2_1.json"
 
 
 _call_json = call_json
 _final_json = final_json
-_run = run_agent
 _observations = observations
+
+
+def _run(tools, outputs):
+    """Register ``tools`` through ``register_tool`` and run an agent on that registry."""
+    reg = Registry()
+    for t in tools:
+        register_tool(t, registry=reg)
+    model = ScriptedModel(outputs)
+    stream = Agent(model, tools=reg).run("q").stream
+    return stream, model
 
 
 def _global_names():

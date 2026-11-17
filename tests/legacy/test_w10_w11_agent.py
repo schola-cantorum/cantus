@@ -134,6 +134,7 @@ def test_tools_none_with_registry_is_w10_and_registry_none_is_the_fallback():
         fallback = Agent(ScriptedModel([]), registry=None)
     assert fallback.registry is _get_global_registry()
     assert [w for w in cantus_records(caught) if str(w.message) == EXPECTED["W10"]] == []
+    assert cantus_records(caught) == []
 
     with pytest.raises(TypeError, match="Registry"):
         Agent(ScriptedModel([]), registry=[_tool("a", 1)])
@@ -243,16 +244,19 @@ def test_replace_with_registry_swaps_the_tools_and_warns_w10():
     _global_tool("g", 1)
 
     def agents():
-        yield Agent(ScriptedModel([]), tools=[a])
-        yield Agent(ScriptedModel([]), tools=shared)
+        built = [
+            Agent(ScriptedModel([]), tools=[a]),
+            Agent(ScriptedModel([]), tools=shared),
+        ]
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            yield Agent(ScriptedModel([]), registry=shared)
-            yield Agent(ScriptedModel([]))
+            built.append(Agent(ScriptedModel([]), registry=shared))
+            built.append(Agent(ScriptedModel([])))
         reassigned = Agent(ScriptedModel([]), tools=[a])
         reassigned.registry = Registry(tools=[_tool("z", 2)])
-        yield reassigned
-        yield copy.deepcopy(Agent(ScriptedModel([]), tools=[a]))
+        built.append(reassigned)
+        built.append(copy.deepcopy(Agent(ScriptedModel([]), tools=[a])))
+        return built
 
     replacers = [lambda agent, r2: dataclasses.replace(agent, registry=r2)]
     if hasattr(copy, "replace"):  # Python 3.13+
@@ -272,6 +276,28 @@ def test_replace_with_registry_swaps_the_tools_and_warns_w10():
 
     with pytest.raises(TypeError, match="tools= or registry="):
         Agent(ScriptedModel([]), tools=[a], registry=shared)
+
+
+def test_replace_with_both_tools_and_registry_raises_and_records_no_warning():
+    import copy
+    import dataclasses
+
+    import pytest
+
+    a = _tool("a", 1)
+    t = _tool("t", 3)
+    agent = Agent(ScriptedModel([]), tools=[a])
+    r2 = Registry(tools=[_tool("b", 2)])
+
+    replacers = [lambda: dataclasses.replace(agent, tools=[t], registry=r2)]
+    if hasattr(copy, "replace"):  # Python 3.13+
+        replacers.append(lambda: copy.replace(agent, tools=[t], registry=r2))
+    for replace in replacers:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(TypeError, match="tools= or registry="):
+                replace()
+        assert cantus_records(caught) == []
 
 
 # --- Row 31 -----------------------------------------------------------------
@@ -324,11 +350,13 @@ def test_w10_prints_once_under_default_filters(tmp_path):
     proc = _run_helper(tmp_path, _W10_HELPER)
     assert proc.returncode == 0, proc.stderr
     assert proc.stderr.count(EXPECTED["W10"]) == 1
-    assert "helpermod.py" in proc.stderr
+    assert proc.stderr.count("CantusDeprecationWarning") == 1
+    assert "helpermod.py:9:" in proc.stderr
 
 
 def test_w11_prints_once_under_default_filters(tmp_path):
     proc = _run_helper(tmp_path, _W11_HELPER)
     assert proc.returncode == 0, proc.stderr
     assert proc.stderr.count(EXPECTED["W11"]) == 1
-    assert "helpermod.py" in proc.stderr
+    assert proc.stderr.count("CantusDeprecationWarning") == 1
+    assert "helpermod.py:20:" in proc.stderr

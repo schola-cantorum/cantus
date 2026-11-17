@@ -38,12 +38,16 @@ def final_json():
 def run_agent(tools, outputs):
     """Run an agent built with ``tools=`` against the scripted outputs; return (stream, model)."""
     model = ScriptedModel(outputs)
-    stream = Agent(model, tools=list(tools)).run("q").stream
+    stream = Agent(model, tools=tools).run("q").stream
     return stream, model
 
 
 def observations(stream):
-    return [e for e in stream if isinstance(e, (SkillObservation, ValidationErrorObservation))]
+    return [
+        e
+        for e in stream
+        if isinstance(e, (SkillObservation, ValidationErrorObservation))  # T-0009 renames this class
+    ]
 
 
 def tool_results(stream):
@@ -51,7 +55,7 @@ def tool_results(stream):
     return [
         (e.skill_name, e.result)  # T-0009 switches this attribute
         for e in stream
-        if isinstance(e, SkillObservation)
+        if isinstance(e, SkillObservation)  # T-0009 renames this class
     ]
 
 

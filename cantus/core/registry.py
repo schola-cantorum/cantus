@@ -71,7 +71,20 @@ class Registry:
     KINDS = ("tool",)
 
     def __init__(self, tools: Iterable[Any] = ()) -> None:
+        """Create a registry, optionally holding the given Tools.
+
+        Args:
+            tools: Any iterable of Tool instances; omit it for an empty registry.
+
+        Raises:
+            TypeError: ``tools`` is not a list-like container of Tools (a single Tool,
+                a string, a mapping, a Registry, None), or an element is not a Tool
+                instance.
+            ValueError: An element has an empty name, or two Tools share a name.
+        """
         self._by_kind: dict[ProtocolKind, dict[str, Any]] = defaultdict(dict)
+        if isinstance(tools, tuple) and not tools:
+            return
         from cantus.protocols.tool import Tool  # deferred: tool.py imports Registry
 
         if isinstance(tools, Registry):
@@ -83,35 +96,49 @@ class Registry:
             isinstance(tools, (Tool, str, bytes, Mapping))
             or not isinstance(tools, Iterable)
         ):
+            if isinstance(tools, Tool):
+                got = f"a single Tool '{getattr(tools, 'name', '')}'"
+            else:
+                got = type(tools).__name__
             message = (
                 "tools must be a list of Tools (Agent also accepts a Registry), "
-                f"got {type(tools).__name__}"
+                f"got {got}"
             )
             if isinstance(tools, Tool):
                 message += "; write tools=[...]"
             elif tools is None:
                 message += "; omit tools for an empty Registry"
             raise TypeError(message)
-        items = list(tools)
-        for i, item in enumerate(items):
-            if isinstance(item, Tool):
-                continue
-            if isinstance(item, type):
-                if issubclass(item, Tool):
+        items: list[Any] = []
+        for i, item in enumerate(tools):
+            if not isinstance(item, Tool):
+                if isinstance(item, type):
+                    if issubclass(item, Tool):
+                        raise TypeError(
+                            f"tools[{i}] is the class {item.__name__}; "
+                            f"pass an instance: {item.__name__}()"
+                        )
+                    raise TypeError(f"tools[{i}] is the class {item.__name__}, not a Tool")
+                if callable(item):
+                    label = getattr(item, "__name__", None)
+                    if isinstance(label, str) and label.isidentifier():
+                        raise TypeError(
+                            f"tools[{i}] is the function {label!r}, not a Tool. "
+                            f"Decorate it with @tool. If the name tool now means something "
+                            f"else in your code, use cantus.tool({label}) after "
+                            f'"import cantus".'
+                        )
                     raise TypeError(
-                        f"tools[{i}] is the class {item.__name__}; "
-                        f"pass an instance: {item.__name__}()"
+                        f"tools[{i}] is a callable of type {type(item).__name__}, "
+                        "not a Tool. Write a function and decorate it with @tool."
                     )
-                raise TypeError(f"tools[{i}] is the class {item.__name__}, not a Tool")
-            if callable(item):
-                label = getattr(item, "__name__", repr(item))
-                raise TypeError(
-                    f"tools[{i}] is the function {label!r}, not a Tool. "
-                    f"Decorate it with @tool. If the name tool now means something "
-                    f"else in your code, use cantus.tool({label}) after "
-                    f'"import cantus".'
+                raise TypeError(f"tools[{i}] is {type(item).__name__}, not a Tool")
+            if not item.name:
+                raise ValueError(
+                    "Cannot register tool without a `name` attribute on the instance "
+                    f"(tools[{i}])"
                 )
-            raise TypeError(f"tools[{i}] is {type(item).__name__}, not a Tool")
+            items.append(item)
         seen: dict[str, int] = {}
         for i, item in enumerate(items):
             name = item.name
