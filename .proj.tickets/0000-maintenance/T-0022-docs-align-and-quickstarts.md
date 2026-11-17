@@ -2,7 +2,7 @@
 id: T-0022
 title: Realign the VitePress manual with the code and add the model-API and build-an-agent quickstarts
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Changes documentation only (docs/site, the generated docs/api corpus, docs/README.md, the two READMEs) plus the VitePress config; no change to cantus/ runtime behaviour or public API, no workflow, dependency or guard-script change. tests/docs/pages.py gains two IN_SCOPE_PAGES entries (test plan approved by the user on 2026-11-17); no new test function.
 ---
