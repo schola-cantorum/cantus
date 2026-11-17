@@ -2,7 +2,7 @@
 id: T-0025
 title: Assign Claude roles in three layers - session model plans, Opus 5.5 high checks the thinking, Sonnet 5.5 medium executes
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Changes Claude role frontmatter and prompts under .claude/agents/, the collaboration documents docs/agents/claude-orchestration.md and docs/agents/runtime.md, and one line of CLAUDE.md. No change to cantus/ runtime behaviour or public API, no workflow, dependency or guard-script change, no test code.
 ---
@@ -60,6 +60,9 @@ prompt 不必修改。完成的樣子：`verify-project.py` 與協作流程測�
   "Critics", the ban on ruling on reviewer findings, the memory guard, and the executor's
   stop rule. Left as is by the user's decision: Chinese output headings in the role file,
   「計劃」, template-deviation records, `docs/guide.md`.
+- Stage 8 (2026-11-17): the user reported that a new Claude Code session listed both roles and
+  that a delegation to each succeeded. Surface: Claude Code `/agents` and the Agent tool; the
+  agent that wrote this ticket did not observe the run.
 - Codex is deliberately different: `.codex/agents/` has only the reviewer and researcher, and
   `scripts/verify-project.py` forbids a pinned model there.
 - Sonnet 5.5 prompting page read 2026-11-17 (URL in `claude-orchestration.md`).
