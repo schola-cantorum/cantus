@@ -51,6 +51,34 @@ jobs:
             extras: "openhands"
             os: ubuntu-latest
             python: "3.12"
+            # pillow 12.3.0, all 42 fixed in 13.0.0 (T-0021, 2026-11-17).
+            # Unactionable inside `openhands>=1.16,<2`: openhands 1.16.0 (the
+            # newest) pins openhands-tools==1.21.0 -> browser-use>=0.8.0, and
+            # every browser-use 1.0.x, plus the browser-harness 0.1.13 it
+            # pulls, pins pillow==12.3.0. Forcing pillow>=13 falls back to
+            # browser-use 0.11.13 and downgrades anthropic/openai/google-genai
+            # for users. No cantus/ code imports pillow or browser-use, but
+            # users of this extra who run the OpenHands browser tool do reach
+            # pillow through it. Every ID, the CVEs included, is a Pillow-code
+            # advisory (OSV), not a bundled-library one; pip-audit matches IDs
+            # and aliases across all packages. Upstream: browser-use issue 4824.
+            # Scoped to this group so a pillow 12.3.0 in `main` or `mlx` still
+            # fails. `acknowledged_for` fails the job once the installed pillow
+            # is no longer 12.3.0: then delete both fields.
+            acknowledged_for: "pillow==12.3.0"
+            acknowledged: >-
+              PYSEC-2026-4326 PYSEC-2026-4327 PYSEC-2026-4328 PYSEC-2026-4329
+              PYSEC-2026-4330 PYSEC-2026-4331 PYSEC-2026-4332 PYSEC-2026-4333
+              PYSEC-2026-4334 PYSEC-2026-4335 PYSEC-2026-4336 PYSEC-2026-4337
+              PYSEC-2026-4338 PYSEC-2026-4339 PYSEC-2026-4340 PYSEC-2026-4341
+              PYSEC-2026-4342 PYSEC-2026-4343 PYSEC-2026-4363
+              CVE-2026-96638 CVE-2026-96640 CVE-2026-96778 CVE-2026-112390
+              CVE-2026-112391 CVE-2026-112393 CVE-2026-112395 CVE-2026-112399
+              CVE-2026-112400 CVE-2026-112401 CVE-2026-112404 CVE-2026-112406
+              CVE-2026-112891 CVE-2026-112892 CVE-2026-112893 CVE-2026-112894
+              CVE-2026-112895 CVE-2026-112897 CVE-2026-112899 CVE-2026-112900
+              CVE-2026-128066 CVE-2026-128067
+              GHSA-78g4-xqwv-q3g8
           # Its environment marker restricts it to darwin/arm64, so on a Linux
           # runner this group would install nothing and audit nothing.
           - group: mlx
@@ -96,8 +124,10 @@ jobs:
       # the project declares rather than what a user ends up with.
       #
       # A finding fails this job by design. To acknowledge an advisory that
-      # cannot be acted on, append `--ignore-vuln <ID>` below WITH a comment
-      # naming the advisory and why it is unactionable. Do not reach for
+      # cannot be acted on, add its ID WITH a comment naming the advisory and
+      # why it is unactionable: on the matrix entry (`acknowledged`, see below)
+      # when only one group installs the package, otherwise as
+      # `--ignore-vuln <ID>` in the shared list below. Do not reach for
       # `continue-on-error`: a warning nobody reads is not a guardrail, which is
       # the failure this whole workflow exists to correct.
       #
@@ -112,16 +142,53 @@ jobs:
       # (2026-11-10), all through `dspy` / `langchain`; the backlog ticket's
       # log records each removal.
       #
-      # Nothing outside this list is acknowledged. A newly published advisory,
+      # An advisory that only one group installs is acknowledged on that
+      # group's matrix entry instead (`acknowledged`, space-separated IDs, with
+      # its own comment), so it cannot hide the same finding in another group.
+      # It must name the exact version it was written for in
+      # `acknowledged_for` (`<package>==<version>`); the step fails when a
+      # different version is installed, so a lifted pin cannot leave stale
+      # IDs behind. As of T-0021 (2026-11-17) only `openhands` has one: 42
+      # pillow 12.3.0 IDs.
+      #
+      # Nothing outside these lists is acknowledged. A newly published advisory,
       # against any package in any of the three groups, still fails the job.
       # Remove an entry the moment its package is bumped past the fix version.
       - name: Audit installed dependencies
+        env:
+          # Passed through the environment, not interpolated into the script.
+          GROUP_ACKNOWLEDGED: ${{ matrix.acknowledged }}
+          GROUP_ACKNOWLEDGED_FOR: ${{ matrix.acknowledged_for }}
         run: |
-          pip-audit --progress-spinner=off \
+          read -r -a acked <<< "$GROUP_ACKNOWLEDGED"
+          group_ignores=()
+          for id in "${acked[@]}"; do
+            group_ignores+=(--ignore-vuln "$id")
+          done
+          # A stale acknowledgement fails the job, but only after the audit
+          # runs, so new findings in this group stay visible meanwhile.
+          stale=""
+          if [ ${#group_ignores[@]} -gt 0 ]; then
+            pkg="${GROUP_ACKNOWLEDGED_FOR%%==*}"
+            want="${GROUP_ACKNOWLEDGED_FOR#*==}"
+            have="$(python -c 'import sys, importlib.metadata as m; print(m.version(sys.argv[1]))' "$pkg" || echo none)"
+            if [ -z "$GROUP_ACKNOWLEDGED_FOR" ] || [ "$have" != "$want" ]; then
+              stale="Group-scoped acknowledgements are for '${GROUP_ACKNOWLEDGED_FOR}' but ${pkg:-?} ${have} is installed. Delete 'acknowledged' and 'acknowledged_for' from this group's matrix entry (see its comment)."
+            fi
+          fi
+          echo "Group-scoped acknowledgements: $(( ${#group_ignores[@]} / 2 ))"
+          audit_rc=0
+          pip-audit --progress-spinner=off "${group_ignores[@]}" \
             `# diskcache 5.6.3 — via dspy and outlines; no fix version published` \
             --ignore-vuln PYSEC-2026-2447 \
             `# langchain-core 0.3.86 — via langchain; fixed in 1.2.11 / 1.2.22` \
             --ignore-vuln PYSEC-2026-2193 \
             --ignore-vuln PYSEC-2026-2562 \
             `# langsmith 0.8.5 — via langchain-core; fixed in 0.8.18` \
-            --ignore-vuln GHSA-f4xh-w4cj-qxq8
+            --ignore-vuln GHSA-f4xh-w4cj-qxq8 \
+            || audit_rc=$?
+          if [ -n "$stale" ]; then
+            echo "::error::$stale"
+            exit 1
+          fi
+          exit "$audit_rc"
