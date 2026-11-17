@@ -2,7 +2,7 @@
 id: T-0009
 title: Events speak Tool — CallToolAction, ToolObservation, ToolErrorObservation
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0008]
 ---
 
