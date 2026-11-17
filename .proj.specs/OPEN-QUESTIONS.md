@@ -59,6 +59,15 @@ reaches stage 8.
 **Note (2026-11-12).** ADR-0016 adds a fourth surface: notebooks (Jupyter and Colab). Its tests drive
 a real kernel through nbclient, and its stage 8 checks Colab and Windows interrupts by hand.
 
+**Note (2026-11-17).** [ADR-0018](../docs/adr/0018-stage-8-runs-the-real-process.md) (proposed,
+written by T-0006) records the harness epic 0001 uses for five surfaces: a script in a subprocess, a
+notebook kernel and Colab, a real `cantus serve` process, `cantus tui` against it, and a dependent
+package in a fresh environment, each on an installed build. Once accepted it replaces "Ruled in"
+above: the in-process app and pilot tests stay CI tests and are not stage-8 evidence (and
+`tests/cli/` runs mostly in-process, not in a subprocess as the Evidence paragraph says). The epic's close-out
+decides whether the ADR becomes the general rule. This question stays open until then, and for
+channel gateways against a real chat platform (see OQ-011).
+
 ---
 
 ## OQ-002 — What common shape do student-overridable seams take, and how does the Charter change to allow them?

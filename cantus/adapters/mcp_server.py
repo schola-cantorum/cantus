@@ -16,7 +16,7 @@ import re
 import socket
 from typing import Any, Literal
 
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 # Alphanumeric leader followed by alphanumeric, dot, underscore, or hyphen.
 # Matches semantic-versioning and reverse-DNS-style names while blocking
@@ -52,10 +52,10 @@ class McpServer:
     `run()` is called.
     """
 
-    def __init__(self, skills: list[Skill], *, name: str, version: str) -> None:
+    def __init__(self, skills: list[Tool], *, name: str, version: str) -> None:
         self.name = name
         self.version = version
-        self._skills: list[Skill] = list(skills)
+        self._skills: list[Tool] = list(skills)
 
     @property
     def tools(self) -> list[dict[str, Any]]:
@@ -115,7 +115,7 @@ class McpServer:
 
 
 def export_as_mcp_server(
-    skills: list[Skill],
+    skills: list[Tool],
     *,
     name: str,
     version: str,
@@ -129,7 +129,7 @@ def export_as_mcp_server(
             "export_as_mcp_server requires at least one Skill in the input list"
         )
     for sk in skills:
-        if not isinstance(sk, Skill):
+        if not isinstance(sk, Tool):
             raise TypeError(
                 f"export_as_mcp_server expects list[Skill], "
                 f"got element of type {type(sk).__name__}"

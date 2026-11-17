@@ -22,7 +22,7 @@ except ImportError as exc:
     ) from exc
 
 from cantus.adapters._remote_skill import _RemoteSkillBase
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 _JSON_TYPE_TO_PY: dict[str, type] = {
     "string": str,
@@ -58,9 +58,9 @@ class _CantusDspySignature:
         self.input_fields = input_fields
 
 
-def expose_as_dspy_tool(skill: Skill) -> "dspy.Tool":
+def expose_as_dspy_tool(skill: Tool) -> "dspy.Tool":
     """Wrap a cantus Skill as a dspy.Tool instance."""
-    if not isinstance(skill, Skill):
+    if not isinstance(skill, Tool):
         raise TypeError(
             f"expose_as_dspy_tool expects Skill, got {type(skill).__name__}"
         )
@@ -137,7 +137,7 @@ class _DspyRemoteSkill(_RemoteSkillBase):
             ) from exc
 
 
-def import_dspy_tool(tool: "dspy.Tool") -> Skill:
+def import_dspy_tool(tool: "dspy.Tool") -> Tool:
     """Wrap a dspy.Tool as a cantus Skill instance."""
     if not isinstance(tool, dspy.Tool):
         raise TypeError(

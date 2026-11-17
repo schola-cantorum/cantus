@@ -26,7 +26,7 @@ import urllib.parse
 from typing import Any, Literal
 
 from cantus.adapters._remote_skill import _RemoteSkillBase
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 _SHELL_METACHARS: tuple[str, ...] = ("|", ">", "<", "&", ";", "$", "`", "\n", "\r")
 
@@ -128,7 +128,7 @@ def import_mcp_server(
     *,
     transport: Literal["stdio", "http"],
     command_or_url: str,
-) -> list[Skill]:
+) -> list[Tool]:
     """Connect to a remote MCP server and return its tools as cantus Skills."""
     if transport == "stdio":
         _validate_stdio_command(command_or_url)
@@ -147,7 +147,7 @@ def import_mcp_server(
             f"failed during tools/list: {type(exc).__name__}: {exc}"
         ) from exc
 
-    out: list[Skill] = []
+    out: list[Tool] = []
     for t in tools:
         out.append(
             _RemoteSkill(

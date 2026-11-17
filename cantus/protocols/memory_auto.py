@@ -16,10 +16,10 @@ itself as it would any other Skill.
 from __future__ import annotations
 
 from cantus.protocols.memory import Memory, Turn
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 
-class _MemoryTool(Skill):
+class _MemoryTool(Tool):
     """Internal base for AutoMemory tools. Carries the backend privately."""
 
     def __init__(self, backend: Memory) -> None:
@@ -128,7 +128,7 @@ class AutoMemory:
         self._backend = backend
         # Construct the 4 Skill instances eagerly so `tools` returns the
         # identical list object on every access (instance-level cache).
-        self._tools: list[Skill] = [
+        self._tools: list[Tool] = [
             _ViewTool(backend),
             _CreateTool(backend),
             _StrReplaceTool(backend),
@@ -136,7 +136,7 @@ class AutoMemory:
         ]
 
     @property
-    def tools(self) -> list[Skill]:
+    def tools(self) -> list[Tool]:
         """Four LLM-facing memory CRUD tools.
 
         Returns the identical list object on every access (instance-level

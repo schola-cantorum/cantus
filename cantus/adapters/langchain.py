@@ -23,7 +23,7 @@ except ImportError as exc:
     ) from exc
 
 from cantus.adapters._remote_skill import _RemoteSkillBase
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 # Module-level reference so test introspection that imports the package
 # can see the SDK module without re-importing.
@@ -63,9 +63,9 @@ def _build_args_model_from_json_schema(
     return built
 
 
-def expose_as_langchain_tool(skill: Skill) -> BaseTool:
+def expose_as_langchain_tool(skill: Tool) -> BaseTool:
     """Wrap a cantus Skill as a langchain_core BaseTool instance."""
-    if not isinstance(skill, Skill):
+    if not isinstance(skill, Tool):
         raise TypeError(
             f"expose_as_langchain_tool expects Skill, got {type(skill).__name__}"
         )
@@ -131,7 +131,7 @@ class _LangChainRemoteSkill(_RemoteSkillBase):
             ) from exc
 
 
-def import_langchain_tool(tool: BaseTool) -> Skill:
+def import_langchain_tool(tool: BaseTool) -> Tool:
     """Wrap a langchain_core BaseTool as a cantus Skill instance."""
     if not isinstance(tool, BaseTool):
         raise TypeError(

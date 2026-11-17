@@ -33,6 +33,9 @@ registry kind and its JSON key change here too, because `spec_for_llm()` builds 
   serve, workflows) move to non-warning paths; `tests/conftest.py`'s fixture uses the private
   default-registry accessor.
 - `tests/legacy/` with its package file and the global-registry isolation fixture.
+  `tests/test_skill_shim.py` (written by T-0006 outside the directory, because this ticket creates
+  it) moves there, and the shim's eager `Skill` import in `cantus/__init__.py` becomes the module
+  `__getattr__`.
 - Tests broken by X3/X4 updated (for example the key assertions in
   `tests/test_workflows/test_no_registry_mutation.py`, `tests/test_registry.py`,
   `tests/adapters/test_adapters_package.py`).
