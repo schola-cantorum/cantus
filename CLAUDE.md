@@ -7,7 +7,7 @@ Use the shared rules above. Before using runtime-specific tools, read
 `.claude/skills/`, a Claude-tuned copy; `.agents/skills/` belongs to Codex.
 
 Project roles in `.claude/agents/` run on assigned Claude models: `harness-reviewer`
-(red team), `harness-challenger` (devil's advocacy, alternatives), `harness-executor`
+(red team), `harness-challenger` (metacognition: checks plans and reasoning), `harness-executor`
 (applies approved changes) and `harness-researcher` (inherits this session's model).
 Before delegating, read `docs/agents/claude-orchestration.md` for when to use each
 role and how findings reach the user. The parent captures Git diffs and saves
