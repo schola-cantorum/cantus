@@ -2,7 +2,7 @@
 id: T-0023
 title: Make the analyzer page's example run through agent dispatch
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Changes documentation only (docs/site/protocols/analyzer.md, its zh-tw mirror and the generated docs/api copy); no change to cantus/ runtime behaviour or public API, no workflow, dependency or guard-script change, and no test code change (the page is already in IN_SCOPE_PAGES).
 ---
