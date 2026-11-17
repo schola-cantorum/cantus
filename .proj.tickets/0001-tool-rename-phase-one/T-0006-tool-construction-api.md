@@ -2,7 +2,7 @@
 id: T-0006
 title: Tool construction API — Tool, tool and register_tool
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: []
 ---
 
@@ -166,3 +166,19 @@ working and stay silent in this ticket; T-0007 makes them warn. Read the epic ru
 - **Stage 7 (2026-11-17).** Report:
   `.proj.specs/0001-tool-rename-phase-one/review/security-T-0006.md`. Seven candidates, none
   confirmed.
+- **Stage 8 (2026-11-17), surface: Python API in a script, run in a subprocess** (ADR-0018, by the
+  agent, no hand steps). Ticket build: `git archive a46167c` into an empty directory,
+  `uv build --wheel` there (`cantus_agent-0.6.0-py3-none-any.whl`, sha256
+  `6f3bd6e019f6bf60c5f1917196c800f00008d827be744280913d2aeb99af7b5d`; the wheel contains
+  `cantus/protocols/tool.py` and `skill.py`), installed into a new virtual environment. The script
+  ran from a directory outside the checkout with `PYTHONPATH` unset and
+  `-W error::DeprecationWarning`; it printed `cantus.__file__` under that environment's
+  `site-packages`, Python 3.13.11, macOS arm64, and exited 0. What it showed: `@tool(pre_hook=,
+  post_hook=)`, `register_tool(fn, registry=reg)` and a class-first `Tool` instance registered
+  with `register_tool`; `Agent(model, registry=reg).run` with a scripted model dispatched `add`,
+  `multiply` and `shout` (results 7, 42, `'OK'`), the prompt catalog listed exactly those three,
+  and the hook log was pre → body → post; `tool(42)`, `tool(existing, pre_hook=h)`,
+  `tool(SomeToolSubclass)` and `register_tool(fn, registry=None)` each raised `TypeError`;
+  `@tool` left the global registry empty, and `@skill` afterwards registered there with no warning.
+  Not covered by this run: other operating systems and Python 3.10–3.12 (CI covers those through
+  pytest), a notebook kernel, and any real model.
