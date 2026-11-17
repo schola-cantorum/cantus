@@ -2,7 +2,7 @@
 id: T-0024
 title: Record the triage of the runtime findings from the manual audit as OQ-010 to OQ-012
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Adds deferred questions to .proj.specs/OPEN-QUESTIONS.md only; no change to cantus/ runtime behaviour, public API, tests, workflows, pyproject dependencies or guard scripts.
 ---
