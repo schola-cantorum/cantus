@@ -17,10 +17,10 @@ import sys
 from typing import Any
 
 from cantus.protocols.analyzer import Analyzer
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 from cantus.protocols.validator import Validator
 
-_TRACEABLE = (Skill, Analyzer, Validator)
+_TRACEABLE = (Tool, Analyzer, Validator)
 
 
 def debug(target: Any) -> Any:

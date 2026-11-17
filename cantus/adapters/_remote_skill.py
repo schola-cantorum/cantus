@@ -22,10 +22,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 
-class _RemoteSkillBase(Skill):
+class _RemoteSkillBase(Tool):
     """Internal base for cantus Skills that proxy a remote framework tool."""
 
     is_remote = True

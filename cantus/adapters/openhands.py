@@ -24,12 +24,12 @@ except ImportError as exc:
         "Run: pip install cantus[openhands]"
     ) from exc
 
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 
-def expose_as_openhands_action(skill: Skill) -> Action:
+def expose_as_openhands_action(skill: Tool) -> Action:
     """Wrap a cantus Skill as a generic openhands.events.Action instance."""
-    if not isinstance(skill, Skill):
+    if not isinstance(skill, Tool):
         raise TypeError(
             f"expose_as_openhands_action expects Skill, got {type(skill).__name__}"
         )

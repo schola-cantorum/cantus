@@ -37,7 +37,7 @@ from typing import Any
 
 
 try:  # SDK gate.
-    from smolagents import Tool
+    from smolagents import Tool as SmolagentsTool
 except ImportError as exc:
     raise ImportError(
         "cantus.adapters.huggingface requires the smolagents SDK. "
@@ -45,7 +45,7 @@ except ImportError as exc:
     ) from exc
 
 from cantus.adapters._remote_skill import _RemoteSkillBase
-from cantus.protocols.skill import Skill
+from cantus.protocols.tool import Tool
 
 
 # JSON Schema ``type`` -> smolagents authorised input type. Anything outside
@@ -115,7 +115,7 @@ def _validated_input_names(properties: dict[str, Any]) -> list[str]:
     return names
 
 
-def expose_as_hf_tool(skill: Skill) -> Tool:
+def expose_as_hf_tool(skill: Tool) -> SmolagentsTool:
     """Wrap a cantus Skill as a ``smolagents.Tool`` instance.
 
     A dynamically created ``Tool`` subclass carries the Skill's ``name`` /
@@ -126,7 +126,7 @@ def expose_as_hf_tool(skill: Skill) -> Tool:
     code, ``tool.to_dict()`` / ``tool.save()`` / ``tool.push_to_hub()`` are not
     supported on the returned tool; agent ``run()`` paths do not need them.
     """
-    if not isinstance(skill, Skill):
+    if not isinstance(skill, Tool):
         raise TypeError(
             f"expose_as_hf_tool expects Skill, got {type(skill).__name__}"
         )
@@ -155,7 +155,7 @@ def expose_as_hf_tool(skill: Skill) -> Tool:
         "_cantus_skill": staticmethod(skill),
         "__doc__": spec["description"] or None,
     }
-    exported_cls = type("CantusExportedTool", (Tool,), attrs)
+    exported_cls = type("CantusExportedTool", (SmolagentsTool,), attrs)
     return exported_cls()
 
 
@@ -202,7 +202,7 @@ class _HuggingFaceRemoteSkill(_RemoteSkillBase):
     tool raises is wrapped as ``RuntimeError("huggingface_remote_error: ...")``.
     """
 
-    def __init__(self, *, tool: Tool) -> None:
+    def __init__(self, *, tool: SmolagentsTool) -> None:
         super().__init__(
             name=tool.name,
             description=getattr(tool, "description", "") or "",
@@ -222,7 +222,7 @@ class _HuggingFaceRemoteSkill(_RemoteSkillBase):
             ) from exc
 
 
-def import_hf_tool(tool: Tool) -> Skill:
+def import_hf_tool(tool: SmolagentsTool) -> Tool:
     """Wrap a ``smolagents.Tool`` as a cantus Skill instance.
 
     Any ``smolagents.Tool`` instance is accepted — subclasses written by hand as
@@ -232,7 +232,7 @@ def import_hf_tool(tool: Tool) -> Skill:
     into ``args_schema`` with every field required, and calls dispatch through
     ``tool(**kwargs)`` (see :class:`_HuggingFaceRemoteSkill`).
     """
-    if not isinstance(tool, Tool):
+    if not isinstance(tool, SmolagentsTool):
         raise TypeError(
             f"import_hf_tool expects smolagents.Tool, got {type(tool).__name__}"
         )

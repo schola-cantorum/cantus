@@ -41,18 +41,22 @@ from cantus.protocols.memory import (
     Memory,
     ShortTermMemory,
 )
-from cantus.protocols.skill import Skill, register_skill, skill
+from cantus.protocols.skill import Skill, register_skill, skill  # legacy-alias
+from cantus.protocols.tool import Tool, register_tool, tool
 
 __all__ = [
-    # Decorator entries (v0.3.0: Skill + debug only at top level;
+    # Decorator entries (tool + debug only at top level;
     # analyzer/validator are now imported from cantus.hooks)
-    "skill",
+    "tool",
+    "skill",  # legacy-alias
     "debug",
     # Function-pass entries
-    "register_skill",
-    # Class-first base classes (top level: Skill + Memory only;
+    "register_tool",
+    "register_skill",  # legacy-alias
+    # Class-first base classes (top level: Tool + Memory only;
     # Analyzer/Validator are imported from cantus.hooks)
-    "Skill",
+    "Tool",
+    "Skill",  # legacy-alias
     "Memory",
     # Memory implementations (v0.3.1: MarkdownMemory + AutoMemory join)
     "ShortTermMemory",
