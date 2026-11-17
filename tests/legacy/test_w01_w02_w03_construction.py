@@ -9,11 +9,13 @@ import cantus
 from cantus import Agent, Tool
 from cantus.core.registry import _get_global_registry
 from cantus.protocols import skill as skill_module
-from tests.legacy.support import EXPECTED, import_module_from, run_python, write_module
-
-
-def _cantus_records(caught):
-    return [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]
+from tests.legacy.support import (
+    EXPECTED,
+    cantus_records,
+    import_module_from,
+    run_python,
+    write_module,
+)
 
 
 def _record(fn):
@@ -21,7 +23,7 @@ def _record(fn):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = fn()
-    return result, _cantus_records(caught)
+    return result, cantus_records(caught)
 
 
 def _global_names():
@@ -46,9 +48,9 @@ def test_skill_entries_build_tools_register_globally_and_warn_w2_once_each():
             """Bare."""
             return x
 
-        after_bare = len(_cantus_records(caught))
+        after_bare = len(cantus_records(caught))
         decorator = skill(pre_hook=lambda x: {"x": x})
-        creating_decorator_added = len(_cantus_records(caught)) - after_bare
+        creating_decorator_added = len(cantus_records(caught)) - after_bare
 
         @decorator
         def hooked(x: int) -> int:
@@ -61,11 +63,22 @@ def test_skill_entries_build_tools_register_globally_and_warn_w2_once_each():
     assert creating_decorator_added == 0
     for t in (bare, hooked, called_tool):
         assert isinstance(t, Tool)
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert [str(w.message) for w in records] == [EXPECTED["W2"]] * 3
     assert all(w.category is cantus.CantusDeprecationWarning for w in records)
     assert _global_names() == ["bare", "called", "hooked"]
     assert _get_global_registry().lookup("tool", "bare") is bare
+
+    def late(x: int) -> int:
+        """Late."""
+        return x
+
+    decorator, creation_records = _record(lambda: skill(None))
+    assert callable(decorator)
+    assert creation_records == []
+    applied, applied_records = _record(lambda: decorator(late))
+    assert isinstance(applied, Tool)
+    assert [str(w.message) for w in applied_records] == [EXPECTED["W2"]]
 
 
 # --- Row 7 ------------------------------------------------------------------
@@ -77,7 +90,7 @@ def test_register_skill_from_both_modules_is_one_function_and_warns_w3_once():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         from cantus import get_registry, register_skill, skill  # noqa: F401
-    assert _cantus_records(caught) == []
+    assert cantus_records(caught) == []
 
     def first(x: int) -> int:
         """First."""
@@ -243,7 +256,7 @@ def test_w2_is_attributed_to_the_students_decorator_line_or_def_line(tmp_path):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         import_module_from(tmp_path, "w2_helper")
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert [str(w.message) for w in records] == [EXPECTED["W2"]] * 3
     expected_lines = [
         {line_of("@skill"), line_of("def bare")},
@@ -281,7 +294,7 @@ def test_w3_and_w8_are_attributed_to_the_calling_line(tmp_path):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         import_module_from(tmp_path, "w3_helper")
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert [str(w.message) for w in records] == [EXPECTED["W3"], EXPECTED["W8"]]
     assert [(w.filename, w.lineno) for w in records] == [
         (str(path), w3_line),
@@ -343,7 +356,22 @@ def test_w1_is_printed_once_and_points_at_the_import_line(tmp_path, statement):
     assert "main.py:2: CantusDeprecationWarning" in proc.stderr
 
 
+def test_w1_in_a_helper_module_is_printed_once_and_names_the_helper(tmp_path):
+    write_module(tmp_path, "helpermod", "from cantus import Skill\n\nT = Skill\n")
+    write_module(tmp_path, "main", "import helpermod\n\nprint('SENTINEL', helpermod.T.__name__)\n")
+    proc = run_python(["main.py"], cwd=tmp_path)
+    assert proc.returncode == 0, proc.stderr
+    assert "SENTINEL Tool" in proc.stdout
+    assert proc.stderr.count(EXPECTED["W1"]) == 1
+    assert "helpermod.py:1: CantusDeprecationWarning" in proc.stderr
+
+
 # --- Row 15 -----------------------------------------------------------------
+
+
+def test_the_helper_functions_are_not_attributes_of_the_package():
+    assert "warn_legacy" not in vars(cantus)
+    assert "install_default_filter" not in vars(cantus)
 
 
 def test_skill_is_not_in_all():
@@ -459,7 +487,7 @@ def test_legacy_entries_reject_non_callables_and_tool_classes_after_warning(
         with pytest.raises(TypeError) as excinfo:
             function(bad)
     assert needle in str(excinfo.value)
-    assert [str(w.message) for w in _cantus_records(caught)] == [EXPECTED[expected_w]]
+    assert [str(w.message) for w in cantus_records(caught)] == [EXPECTED[expected_w]]
     assert _global_names() == []
 
 

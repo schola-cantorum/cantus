@@ -81,6 +81,8 @@ def warn_legacy(w_id: str, *, variant: str | None = None) -> None:
 
     Raises:
         KeyError: If the id or variant is not in the table.
+        CantusDeprecationWarning: If an active filter turns the warning into an error
+            (never for W13).
     """
     old, new, hint = _TABLE[w_id if variant is None else f"{w_id}:{variant}"]
     message = _TEMPLATE.format(old=old, new=new, hint=hint)
@@ -139,22 +141,34 @@ def _option_covers_cantus(option: str) -> bool:
     action, message, category, module, lineno = [p.strip() for p in parts] + [""] * (5 - len(parts))
     if action and action != "all" and not any(a.startswith(action) for a in _ACTIONS):
         return False
-    if lineno and (not lineno.isdecimal() or int(lineno) != 0):
-        return False
+    if lineno:
+        try:
+            number = int(lineno)
+        except (ValueError, OverflowError):
+            return False
+        if number != 0:  # negative is invalid, positive is scoped to a line
+            return False
     if message or module:
         return False
     if category.startswith("builtins."):
         category = category[len("builtins.") :]
+        if not category:  # "builtins." names nothing
+            return False
     if not category:
         resolved: object = Warning
     elif "." in category:
         return False
     else:
         resolved = getattr(builtins, category, None)
-    return isinstance(resolved, type) and issubclass(CantusDeprecationWarning, resolved)
+    return (
+        isinstance(resolved, type)
+        and issubclass(resolved, Warning)
+        and issubclass(CantusDeprecationWarning, resolved)
+    )
 
 
 def _insert_visible_entry() -> None:
+    """Insert the ``default`` entry for cantus's category in front of the ignore entry."""
     seen_main = False
     for index, entry in enumerate(warnings.filters):
         action, message, category, module, lineno = entry
@@ -171,15 +185,47 @@ def _insert_visible_entry() -> None:
         if not issubclass(CantusDeprecationWarning, category):
             continue
         if action == "ignore" and category is DeprecationWarning and seen_main:
-            warnings.filters.insert(  # type: ignore[attr-defined]
-                index, ("default", None, CantusDeprecationWarning, None, 0)
-            )
-            for name in ("_filters_mutated", "_filters_mutated_lock_held"):
-                mutated = getattr(warnings, name, None)
-                if mutated is not None:
-                    mutated()
-                    break
+            _insert_locked(index)
         return
+
+
+def _insert_locked(index: int) -> None:
+    """Insert the entry at ``index`` and tell the warnings module its filters changed."""
+    lock = getattr(warnings, "_lock", None)
+    held = lock is not None and hasattr(lock, "__enter__")
+    # These names are CPython-private; if neither exists the insert still takes effect on
+    # the next filter lookup or is a no-op for caching interpreters, and the visibility
+    # tests would show it.
+    names = ("_filters_mutated_lock_held", "_filters_mutated") if held else (
+        "_filters_mutated",
+        "_filters_mutated_lock_held",
+    )
+
+    def insert() -> None:
+        warnings.filters.insert(  # type: ignore[attr-defined]
+            index, ("default", None, CantusDeprecationWarning, None, 0)
+        )
+        for name in names:
+            mutated = getattr(warnings, name, None)
+            if mutated is not None:
+                mutated()
+                break
+
+    if held:
+        with lock:  # type: ignore[union-attr]
+            insert()
+    else:
+        insert()
+
+
+_IMPORT_MACHINERY = frozenset(
+    {
+        "importlib._bootstrap",
+        "importlib._bootstrap_external",
+        "_frozen_importlib",
+        "_frozen_importlib_external",
+    }
+)
 
 
 def _is_internal(frame: FrameType) -> bool:
@@ -187,8 +233,7 @@ def _is_internal(frame: FrameType) -> bool:
     name = frame.f_globals.get("__name__")
     if isinstance(name, str) and (name == "cantus" or name.startswith("cantus.")):
         return True
-    filename = frame.f_code.co_filename
-    return "importlib" in filename and "_bootstrap" in filename
+    return name in _IMPORT_MACHINERY
 
 
 def _attributed_frame() -> FrameType:

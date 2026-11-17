@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 
 from cantus import Agent, Registry, Result, Tool, register_tool, tool
-from cantus.core.registry import _get_global_registry  # approved exception: see test-plan D10
 from cantus.core.observation import (
     SkillObservation,  # T-0009 renames this class
     ToolErrorObservation,
     ValidationErrorObservation,
 )
+from cantus.core.registry import _get_global_registry  # approved exception: see the T-0007 ticket, stage-5 readings
 
 FIXTURE = Path(__file__).parent / "fixtures" / "skill_spec_for_llm_v0_2_1.json"
 

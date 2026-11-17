@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import cantus
-from tests.legacy.support import EXPECTED
+from tests.legacy.support import EXPECTED, cantus_records
 
 
 # --- Row 1 ------------------------------------------------------------------
@@ -38,7 +38,7 @@ def test_every_table_id_emits_its_section_2_4_text(key):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warn_legacy(w_id, variant=variant)
-    records = [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]
+    records = cantus_records(caught)
     assert len(records) == 1
     assert records[0].category is cantus.CantusDeprecationWarning
     assert str(records[0].message) == EXPECTED[key]
@@ -47,6 +47,7 @@ def test_every_table_id_emits_its_section_2_4_text(key):
 def test_table_ids_are_exactly_w1_to_w18():
     from cantus import _deprecation
 
+    assert set(_deprecation._TABLE) == set(EXPECTED)
     ids = {key.partition(":")[0] for key in _deprecation._TABLE}
     assert ids == {f"W{n}" for n in range(1, 19)}
 
@@ -79,7 +80,7 @@ def _record(fn):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         fn()
-    records = [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]
+    records = cantus_records(caught)
     assert len(records) == 1
     return records[0]
 
@@ -108,6 +109,12 @@ def test_attribution_skips_importlib_bootstrap_frames():
     assert record.filename == __file__
 
 
+def test_attribution_does_not_skip_a_student_module_named_like_the_bootstrap_file():
+    student = _module("hw", _CALLER_SRC, "/srv/importlib_practice/_bootstrap_hw.py")
+    record = _record(student.go)
+    assert record.filename == "/srv/importlib_practice/_bootstrap_hw.py"
+
+
 def test_attribution_without_an_outside_frame_uses_the_outermost_frame():
     # A raw thread has no threading.py frame below its target, so every frame is cantus.
     outer = _module(
@@ -121,7 +128,7 @@ def test_attribution_without_an_outside_frame_uses_the_outermost_frame():
         warnings.simplefilter("always")
         _thread.start_new_thread(outer.start, ())
         assert outer.done.wait(10)
-    records = [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]
+    records = cantus_records(caught)
     assert len(records) == 1
     assert records[0].filename == "/pkg/cantus/y.py"
 
@@ -172,11 +179,36 @@ def _warn_callables(tree):
 
 
 def _category_name(node):
+    if isinstance(node, ast.Call):  # a category passed as an instance: DeprecationWarning("...")
+        node = node.func
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
         return node.attr
     return None
+
+
+def _emitting_lines(text):
+    """Line numbers of warnings.warn / warn_explicit calls that name a deprecation category."""
+    tree = ast.parse(text)
+    modules, functions = _warn_callables(tree)
+    lines = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_warn = (
+            isinstance(func, ast.Attribute)
+            and func.attr in {"warn", "warn_explicit"}
+            and isinstance(func.value, ast.Name)
+            and func.value.id in modules
+        ) or (isinstance(func, ast.Name) and func.id in functions)
+        if not is_warn:
+            continue
+        args = list(node.args) + [kw.value for kw in node.keywords]
+        if any(_category_name(arg) in _BANNED_CATEGORIES for arg in args):
+            lines.append(node.lineno)
+    return lines
 
 
 def test_helper_is_the_only_emitting_path():
@@ -189,21 +221,6 @@ def test_helper_is_the_only_emitting_path():
             name_users.append(str(path))
         if path == _ROOT / "_deprecation.py":
             continue
-        modules, functions = _warn_callables(ast.parse(text))
-        for node in ast.walk(ast.parse(text)):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            is_warn = (
-                isinstance(func, ast.Attribute)
-                and func.attr in {"warn", "warn_explicit"}
-                and isinstance(func.value, ast.Name)
-                and func.value.id in modules
-            ) or (isinstance(func, ast.Name) and func.id in functions)
-            if not is_warn:
-                continue
-            args = list(node.args) + [kw.value for kw in node.keywords]
-            if any(_category_name(arg) in _BANNED_CATEGORIES for arg in args):
-                emitters.append(f"{path}:{node.lineno}")
+        emitters.extend(f"{path}:{line}" for line in _emitting_lines(text))
     assert name_users == []
     assert emitters == []

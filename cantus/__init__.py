@@ -1,12 +1,12 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
-# ruff: noqa: E402  (install_default_filter() must run before any other import below it)
+# ruff: noqa: E402  (_install_default_filter() must run before any other import below it)
 
 from __future__ import annotations
 
-from cantus._deprecation import install_default_filter
+from cantus._deprecation import install_default_filter as _install_default_filter
 
-install_default_filter()
+_install_default_filter()
 
 from typing import TYPE_CHECKING, Any
 
@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 __version__ = "0.6.0"
 
-from cantus._deprecation import CantusDeprecationWarning, warn_legacy
+from cantus._deprecation import CantusDeprecationWarning
+from cantus._deprecation import warn_legacy as _warn_legacy
 from cantus.core.action import (
     Action,
     CallSkillAction,
@@ -91,8 +92,9 @@ __all__ = [
     "Inspector",
     # Registry
     "Registry",
-    "CantusDeprecationWarning",
     "get_registry",  # legacy-alias
+    # Deprecation warnings (v0.7.0)
+    "CantusDeprecationWarning",
     # Result type
     "Result",
     # Tier 2 ChatModel
@@ -120,10 +122,11 @@ def __getattr__(name: str) -> Any:
     does not require ``fastapi`` / ``uvicorn`` / ``pydantic-settings``.
     Missing extras still surface as ``ImportError`` with the literal
     substring ``"pip install cantus[serve]"`` from the gate inside the
-    target module.
+    target module. It also serves the legacy class name as `Tool`, with a
+    deprecation warning.
     """
     if name == "Skill":  # legacy-alias
-        warn_legacy("W1")
+        _warn_legacy("W1")
         return Tool
     if name in {"serve", "config"}:
         import importlib

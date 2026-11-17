@@ -15,6 +15,8 @@ from cantus.protocols.tool import Tool, _to_tool
 if TYPE_CHECKING:
     from cantus.protocols.tool import Tool as Skill  # noqa: F401  # legacy-alias
 
+__all__ = ["skill", "register_skill"]  # legacy-alias
+
 
 def __getattr__(name: str) -> Any:
     """Serve the old class name as `Tool`, with a warning, without caching it."""
@@ -30,7 +32,20 @@ def skill(  # legacy-alias
     pre_hook: Callable[..., Any] | None = None,
     post_hook: Callable[..., Any] | None = None,
 ) -> Tool | Callable[[Callable[..., Any]], Tool]:
-    """Legacy decorator: wrap a plain function as a Tool and register it globally."""
+    """Legacy decorator: wrap a plain function as a Tool and register it globally.
+
+    Args:
+        fn: The function to wrap. Omit it to get a decorator back, for use with hooks.
+        pre_hook: Called with the arguments before the tool runs.
+        post_hook: Called with the result after the tool runs.
+
+    Returns:
+        The registered Tool, or a decorator that builds it when ``fn`` is omitted.
+
+    Raises:
+        TypeError: If the object is not a callable or a Tool instance, or if a hook is
+            given together with a Tool instance.
+    """
     if fn is None:
 
         def decorator(actual_fn: Callable[..., Any]) -> Tool:
@@ -48,7 +63,20 @@ def register_skill(  # legacy-alias
     pre_hook: Callable[..., Any] | None = None,
     post_hook: Callable[..., Any] | None = None,
 ) -> Tool:
-    """Legacy function-pass entry: same as the legacy decorator, called explicitly."""
+    """Legacy function-pass entry: same as the legacy decorator, called explicitly.
+
+    Args:
+        fn: The function to wrap.
+        pre_hook: Called with the arguments before the tool runs.
+        post_hook: Called with the result after the tool runs.
+
+    Returns:
+        The registered Tool.
+
+    Raises:
+        TypeError: If the object is not a callable or a Tool instance, or if a hook is
+            given together with a Tool instance.
+    """
     warn_legacy("W3")
     return _build_and_register(fn, pre_hook, post_hook)
 

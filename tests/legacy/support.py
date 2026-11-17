@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import cantus
+
 _URL = (
     "See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/"
     "MIGRATION_v0.6.0_to_v0.7.0.md"
@@ -147,3 +149,8 @@ def run_python(
         env=clean,
         timeout=timeout,
     )
+
+
+def cantus_records(caught: list[Any]) -> list[Any]:
+    """The recorded warnings whose category is cantus's (or a subclass of it)."""
+    return [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]

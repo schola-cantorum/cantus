@@ -1,16 +1,15 @@
 """W8 (get_registry) and W9 (kind "skill", spec_for_llm key "skill"): legacy halves."""
 
+import copy
+import pickle
 import warnings
 
 import pytest
 
-import copy
-import pickle
-
 import cantus
 from cantus import register_tool, tool
 from cantus.core.registry import Registry, _get_global_registry
-from tests.legacy.support import EXPECTED
+from tests.legacy.support import EXPECTED, cantus_records
 
 
 def _w(caught, text):
@@ -20,10 +19,6 @@ def _w(caught, text):
         for w in caught
         if w.category is cantus.CantusDeprecationWarning and str(w.message) == text
     ]
-
-
-def _cantus_records(caught):
-    return [w for w in caught if issubclass(w.category, cantus.CantusDeprecationWarning)]
 
 
 class _Dummy:
@@ -46,7 +41,7 @@ def test_kind_skill_is_kind_tool_in_all_three_methods_with_w9_each_time():
     assert found_by_tool is found_by_skill
     assert names_by_skill == ["dummy"]
     assert reg.names_for("tool") == ["dummy"]
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert len(records) == 3
     for record in records:
         assert record.category is cantus.CantusDeprecationWarning
@@ -70,7 +65,7 @@ def test_register_kind_skill_without_a_name_warns_first_then_raises_with_the_too
     assert str(excinfo.value) == (
         "Cannot register tool without a `name` attribute on the instance"
     )
-    assert [str(w.message) for w in _cantus_records(caught)] == [EXPECTED["W9"]]
+    assert [str(w.message) for w in cantus_records(caught)] == [EXPECTED["W9"]]
 
 
 # --- Row 22 -----------------------------------------------------------------
@@ -97,7 +92,7 @@ def test_spec_skill_key_answers_like_tool_with_w9_on_each_use():
     assert by_item is spec["tool"]
     assert by_get is spec["tool"]
     assert has_key is True
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert [str(w.message) for w in records] == [EXPECTED["W9"]] * 3
     assert all(w.category is cantus.CantusDeprecationWarning for w in records)
     assert all(w.filename == __file__ for w in records)
@@ -114,7 +109,7 @@ def test_spec_tool_key_and_unknown_keys_do_not_warn_or_alias():
         assert "nope" not in spec
         with pytest.raises(KeyError):
             spec["nope"]
-    assert _cantus_records(caught) == []
+    assert cantus_records(caught) == []
 
 
 # --- Row 23 -----------------------------------------------------------------
@@ -131,7 +126,7 @@ def test_spec_equality_copies_and_pickle_follow_the_dict_content():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             assert "skill" not in plain
-        assert _cantus_records(caught) == []
+        assert cantus_records(caught) == []
     for clone in (copy.copy(spec), copy.deepcopy(spec), pickle.loads(pickle.dumps(spec))):
         assert clone == content
 
@@ -157,7 +152,7 @@ def test_get_registry_returns_the_global_registry_and_warns_w8_each_call():
     assert first is second
     assert first is _get_global_registry()
     assert "registered" in first.names_for("tool")
-    records = _cantus_records(caught)
+    records = cantus_records(caught)
     assert [str(w.message) for w in records] == [EXPECTED["W8"]] * 2
     assert all(w.category is cantus.CantusDeprecationWarning for w in records)
     assert all(w.filename == __file__ for w in records)

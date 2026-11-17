@@ -230,12 +230,21 @@ def test_pytest_with_unrelated_interpreter_option_and_skill_in_the_test_body(tmp
         "    @skill\n"
         "    def f(x: int) -> int:\n"
         "        'F.'\n"
-        "        return x\n"
+        "        return x\n\n\n"
+        "def test_control_the_legacy_call_still_emits():\n"
+        "    import warnings\n\n"
+        "    with warnings.catch_warnings(record=True) as caught:\n"
+        "        warnings.simplefilter('always')\n\n"
+        "        @skill\n"
+        "        def g(x: int) -> int:\n"
+        "            'G.'\n"
+        "            return x\n\n"
+        "    assert [w.category.__name__ for w in caught] == ['CantusDeprecationWarning']\n"
     )
     proc = _run_pytest(tmp_path, source, env={"PYTHONWARNINGS": "ignore::UserWarning"})
     # characterization: pytest + interpreter option, see C2-F1-c
     assert proc.returncode == 0, proc.stdout
-    assert "1 passed" in proc.stdout
+    assert "2 passed" in proc.stdout
     assert W2 not in proc.stdout
 
 
@@ -261,9 +270,25 @@ def test_filters_set_after_import_cantus_win(tmp_path, after_cantus, expect):  #
     (_assert_not_printed if expect == "hidden" else _assert_raises)(proc)
 
 
+_CONTROL = """\
+with warnings.catch_warnings(record=True) as _caught:
+    warnings.simplefilter("always")
+    from cantus import skill as _skill
+
+    @_skill
+    def _control(x: int) -> int:
+        'Control.'
+        return x
+
+print("EMITTED", sum(w.category.__name__ == "CantusDeprecationWarning" for w in _caught))
+"""
+
+
 def test_first_import_inside_catch_warnings_leaves_no_filter_behind(tmp_path):  # row 41
     before = "with warnings.catch_warnings():\n    import cantus"
-    _assert_not_printed(_run_case(tmp_path, before=before))
+    proc = _run_case(tmp_path, before=before, after_cantus=_CONTROL)
+    _assert_not_printed(proc)
+    assert "EMITTED 1" in proc.stdout  # control: the legacy call did emit, only the filter is missing
 
 
 @pytest.mark.parametrize(
@@ -306,6 +331,10 @@ def test_ipython_style_main_entry_still_attributes_w2_to_the_helper(tmp_path):  
         ("ignore::UserWarning", "printed"),
         ("error::cantus.CantusDeprecationWarning", "printed"),
         ("ignore:some message", "printed"),
+        ("ignore::Exception", "printed"),
+        ("ignore::DeprecationWarning::+0", "hidden"),
+        ("ignore::DeprecationWarning::abc", "printed"),
+        ("ignore::DeprecationWarning:::", "printed"),
     ],
 )
 def test_options_are_read_like_python_reads_them(tmp_path, option, expect):
@@ -335,7 +364,11 @@ def test_cli_serve_prints_w2_and_w8_attributed_to_the_registry_module(tmp_path):
         "    return x\n\n\n"
         "registry = get_registry()\n",
     )
-    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONWARNINGS", "PYTHONDEVMODE"}}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"PYTHONWARNINGS", "PYTHONDEVMODE"} and not k.startswith("CANTUS_SERVE_")
+    }
     env["PYTHONPATH"] = str(tmp_path)  # the CLI imports the module by name
     proc = subprocess.Popen(
         [
@@ -345,6 +378,8 @@ def test_cli_serve_prints_w2_and_w8_attributed_to_the_registry_module(tmp_path):
             "serve",
             "--registry-import",
             "regmod:registry",
+            "--host",
+            "127.0.0.1",
             "--port",
             str(_free_port()),
         ],
@@ -381,6 +416,6 @@ def test_cli_serve_prints_w2_and_w8_attributed_to_the_registry_module(tmp_path):
             proc.wait()
         reader.join(timeout=5)
     text = "".join(chunks)
-    assert W2 in text, text
-    assert EXPECTED["W8"] in text, text
-    assert "regmod.py" in text, text
+    lines = text.splitlines()
+    for expected in (W2, EXPECTED["W8"]):
+        assert any("regmod.py" in line and expected in line for line in lines), text

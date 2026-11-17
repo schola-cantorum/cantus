@@ -28,30 +28,40 @@ def _canonical_kind(kind: ProtocolKind) -> ProtocolKind:
     return kind
 
 
-class ToolSpecMapping(dict[str, Any]):
+def _spec_key(key: Any) -> Any:
+    """Map the key used before v0.7 onto "tool", warning once per call."""
+    if key == "skill":  # legacy-alias
+        warn_legacy("W9")
+        return "tool"
+    return key
+
+
+class ToolSpecMapping(dict[str, list[dict[str, Any]]]):
     """The `spec_for_llm()` result: a dict with one key, "tool".
 
     Reading the key used before v0.7 still answers with the tool list, and warns.
     Nothing else about the dict changes; JSON and iteration show only "tool".
     """
 
-    def __getitem__(self, key: Any) -> Any:
-        if key == "skill":  # legacy-alias
-            warn_legacy("W9")
-            key = "tool"
-        return super().__getitem__(key)
+    def __getitem__(self, key: Any) -> list[dict[str, Any]]:
+        """Return the list for ``key``; the old key answers as "tool"."""
+        return super().__getitem__(_spec_key(key))
 
     def get(self, key: Any, default: Any = None) -> Any:
-        if key == "skill":  # legacy-alias
-            warn_legacy("W9")
-            key = "tool"
-        return super().get(key, default)
+        """Return the list for ``key``, or ``default``; the old key answers as "tool".
+
+        Args:
+            key: The key to read.
+            default: Returned when the key is missing.
+
+        Returns:
+            The tool list, or ``default``.
+        """
+        return super().get(_spec_key(key), default)
 
     def __contains__(self, key: object) -> bool:
-        if key == "skill":  # legacy-alias
-            warn_legacy("W9")
-            key = "tool"
-        return super().__contains__(key)
+        """Report whether ``key`` is present; the old key answers as "tool"."""
+        return super().__contains__(_spec_key(key))
 
 
 class Registry:
@@ -123,6 +133,10 @@ def _get_global_registry() -> Registry:
 
 
 def get_registry() -> Registry:  # legacy-alias
-    """Return the process-wide default registry; warns, because it is deprecated."""
+    """Return the process-wide default registry; warns, because it is deprecated.
+
+    Returns:
+        The default Registry.
+    """
     warn_legacy("W8")
     return _default_registry
