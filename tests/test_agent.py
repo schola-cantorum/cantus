@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 
 from cantus.core.agent import Agent, AgentState
-from cantus.core.registry import Registry, get_registry
+from cantus.core.registry import Registry
 from cantus.identity import Soul
 
 
@@ -22,8 +22,8 @@ class _CapturingModel:
 
 
 def _fresh_registry() -> Registry:
-    """Snapshot the shared registry so tests share the same spec_for_llm result."""
-    return get_registry()
+    """An empty registry, so tests share the same spec_for_llm result."""
+    return Registry()
 
 
 def _make_soul() -> Soul:
@@ -39,7 +39,7 @@ def _make_soul() -> Soul:
 
 def test_no_soul_baseline_byte_identical():
     m = _CapturingModel()
-    agent = Agent(model=m, registry=_fresh_registry())
+    agent = Agent(model=m, tools=_fresh_registry())
     state = AgentState(query="hello")
 
     prompt = agent._build_prompt(state)
@@ -61,8 +61,8 @@ def test_no_soul_baseline_byte_identical():
 def test_soul_prefix_injection():
     m = _CapturingModel()
     soul = _make_soul()
-    baseline_agent = Agent(model=_CapturingModel(), registry=_fresh_registry())
-    soul_agent = Agent(model=m, registry=baseline_agent.registry, soul=soul)
+    baseline_agent = Agent(model=_CapturingModel(), tools=_fresh_registry())
+    soul_agent = Agent(model=m, tools=baseline_agent.registry, soul=soul)
     state = AgentState(query="hello")
 
     baseline = baseline_agent._build_prompt(state)

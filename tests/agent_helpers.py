@@ -1,0 +1,76 @@
+"""Shared helpers for tests that drive an Agent with a scripted model.
+
+The transitional names (the ``skill_name`` action key and attribute, the observation
+class) appear only in this file, each marked with the ticket that renames it.
+"""
+
+import json
+
+from cantus import Agent
+from cantus.core.observation import (
+    SkillObservation,  # T-0009 renames this class
+    ToolErrorObservation,
+    ValidationErrorObservation,
+)
+
+
+class ScriptedModel:
+    """Model stub: returns the scripted outputs in order, records prompts."""
+
+    def __init__(self, outputs):
+        self.outputs = list(outputs)
+        self.prompts = []
+
+    def generate(self, prompt, **kwargs):
+        self.prompts.append(prompt)
+        return self.outputs.pop(0)
+
+
+def call_json(name, **args):
+    action = {"skill_name": name, "args": args}  # T-0010 switches this key
+    return json.dumps({"thought": "t", "action": action})
+
+
+def final_json():
+    return json.dumps({"thought": "d", "action": {"final_answer": "ok"}})
+
+
+def run_agent(tools, outputs):
+    """Run an agent built with ``tools=`` against the scripted outputs; return (stream, model)."""
+    model = ScriptedModel(outputs)
+    stream = Agent(model, tools=tools).run("q").stream
+    return stream, model
+
+
+def observations(stream):
+    return [
+        e
+        for e in stream
+        if isinstance(e, (SkillObservation, ValidationErrorObservation))  # T-0009 renames this class
+    ]
+
+
+def tool_results(stream):
+    """(name, result) for every successful tool observation."""
+    return [
+        (e.skill_name, e.result)  # T-0009 switches this attribute
+        for e in stream
+        if isinstance(e, SkillObservation)  # T-0009 renames this class
+    ]
+
+
+def tool_errors(stream):
+    return [e for e in stream if isinstance(e, ToolErrorObservation)]
+
+
+def parse_errors(stream):
+    return [
+        e
+        for e in stream
+        if isinstance(e, ValidationErrorObservation) and e.validator_name == "action_parse"
+    ]
+
+
+def prompt_tool_names(model, index=0):
+    """The tool names listed in the catalog of the ``index``-th prompt the model saw."""
+    return [t["name"] for t in json.loads(model.prompts[index])["tools"]["tool"]]

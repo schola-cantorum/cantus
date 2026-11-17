@@ -54,7 +54,7 @@ def test_arch2_serve_composes_with_memory_and_agent_without_interference() -> No
     # 2) Memory — v0.3.1 in-process implementation, no external IO.
     memory = ShortTermMemory(n=5)
     # 3) Agent — wired to registry; will not be invoked during this smoke test.
-    agent = Agent(model=_StubModel(), registry=registry)
+    agent = Agent(model=_StubModel(), tools=registry)
     assert agent.registry is registry
 
     # 4) Channel — in-memory FIFO load-bearer.
