@@ -15,6 +15,11 @@ A callable the model can ask the agent to invoke, described to the model by
 its name, description and argument schema.
 _Avoid_: Skill (for a callable), function, action
 
+**Registry**:
+A collection of Tools that student code fills explicitly and hands to an agent
+or to a server; a Tool belongs to a registry only because someone put it there.
+_Avoid_: toolbox, toolkit, global registry (for the collection a student builds)
+
 **Agent Skill**:
 A folder of instructions and resources headed by a `SKILL.md` file, in the
 format of the Agent Skills open standard, that an agent loads on demand.

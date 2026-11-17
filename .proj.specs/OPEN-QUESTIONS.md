@@ -159,6 +159,10 @@ global registry with a `DeprecationWarning`. ludus keeps working through the ali
 disclosure (ADR-0015). Still open: the disclosure mechanism, and whether cantus ships file-system or
 script-execution tools; both belong to the Agent Skill epic.
 
+**Amended on 2026-11-12 (Tool rename epic, stage 1).** ludus does not pin `cantus<0.8`; it migrates
+once v0.7.0 is published, because the async-core epic is expected to ship as v0.8.0 with the aliases
+still present (ADR-0017).
+
 **Revisit when.** The Agent Skill loading epic (seventh in ADR-0017's order) reaches stage 1.
 
 ---
