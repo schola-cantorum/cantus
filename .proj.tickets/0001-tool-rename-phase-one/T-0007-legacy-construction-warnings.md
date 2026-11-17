@@ -2,7 +2,7 @@
 id: T-0007
 title: Legacy construction names warn, visibly
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0006]
 ---
 
