@@ -1,14 +1,23 @@
 """cantus — Polyphonic LLM agent framework with a dual-tier teaching API."""
 
+# ruff: noqa: E402  (_install_default_filter() must run before any other import below it)
+
 from __future__ import annotations
+
+from cantus._deprecation import install_default_filter as _install_default_filter
+
+_install_default_filter()
 
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from cantus.model.loader import ModelHandle
+    from cantus.protocols.tool import Tool as Skill  # noqa: F401  # legacy-alias
 
 __version__ = "0.6.0"
 
+from cantus._deprecation import CantusDeprecationWarning
+from cantus._deprecation import warn_legacy as _warn_legacy
 from cantus.core.action import (
     Action,
     CallSkillAction,
@@ -24,7 +33,7 @@ from cantus.core.observation import (
     ToolErrorObservation,
     ValidationErrorObservation,
 )
-from cantus.core.registry import Registry, get_registry
+from cantus.core.registry import Registry, get_registry  # legacy-alias
 from cantus.core.result import Result
 from cantus.env import CloudOnlyEnvironment, ColabEnvironment, LocalEnvironment
 from cantus.identity import Soul, SoulParseError
@@ -41,7 +50,7 @@ from cantus.protocols.memory import (
     Memory,
     ShortTermMemory,
 )
-from cantus.protocols.skill import Skill, register_skill, skill  # legacy-alias
+from cantus.protocols.skill import register_skill, skill  # legacy-alias
 from cantus.protocols.tool import Tool, register_tool, tool
 
 __all__ = [
@@ -56,7 +65,6 @@ __all__ = [
     # Class-first base classes (top level: Tool + Memory only;
     # Analyzer/Validator are imported from cantus.hooks)
     "Tool",
-    "Skill",  # legacy-alias
     "Memory",
     # Memory implementations (v0.3.1: MarkdownMemory + AutoMemory join)
     "ShortTermMemory",
@@ -84,7 +92,9 @@ __all__ = [
     "Inspector",
     # Registry
     "Registry",
-    "get_registry",
+    "get_registry",  # legacy-alias
+    # Deprecation warnings (v0.7.0)
+    "CantusDeprecationWarning",
     # Result type
     "Result",
     # Tier 2 ChatModel
@@ -112,8 +122,12 @@ def __getattr__(name: str) -> Any:
     does not require ``fastapi`` / ``uvicorn`` / ``pydantic-settings``.
     Missing extras still surface as ``ImportError`` with the literal
     substring ``"pip install cantus[serve]"`` from the gate inside the
-    target module.
+    target module. It also serves the legacy class name as `Tool`, with a
+    deprecation warning.
     """
+    if name == "Skill":  # legacy-alias
+        _warn_legacy("W1")
+        return Tool
     if name in {"serve", "config"}:
         import importlib
 

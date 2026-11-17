@@ -31,7 +31,7 @@ from cantus.core.observation import (
     ToolErrorObservation,
     ValidationErrorObservation,
 )
-from cantus.core.registry import Registry, get_registry
+from cantus.core.registry import Registry, _get_global_registry
 
 if TYPE_CHECKING:
     from cantus.identity import Soul
@@ -77,7 +77,7 @@ class Agent:
     """Default agent that drives the model + EventStream loop."""
 
     model: ModelHandle
-    registry: Registry = field(default_factory=get_registry)
+    registry: Registry = field(default_factory=_get_global_registry)
     soul: "Soul | None" = field(default=None, kw_only=True)
 
     def step(self, state: AgentState) -> Union[Action, Observation]:
@@ -296,7 +296,7 @@ class Agent:
                 ),
             )
 
-        registered = self.registry.names_for("skill")
+        registered = self.registry.names_for("tool")
         if registered and skill_name not in registered:
             return ValidationErrorObservation(
                 validator_name="action_parse",
@@ -348,9 +348,9 @@ class Agent:
         """
         from cantus.core.result import Result
 
-        instance = self.registry.lookup("skill", action.skill_name)
+        instance = self.registry.lookup("tool", action.skill_name)
         if instance is None:
-            available = self.registry.names_for("skill")
+            available = self.registry.names_for("tool")
             return ToolErrorObservation(
                 skill_name=action.skill_name,
                 message=f"skill '{action.skill_name}' not registered. Available: {available}",

@@ -223,8 +223,8 @@ class SessionTracker:
 def collect_skills(registry: Registry) -> list[SkillEntry]:
     """Project each registered Skill's ``spec_for_llm()`` (mirrors dashboard)."""
     out: list[SkillEntry] = []
-    for name in registry.names_for("skill"):
-        instance = registry.lookup("skill", name)
+    for name in registry.names_for("tool"):
+        instance = registry.lookup("tool", name)
         if instance is None:
             continue
         spec: dict[str, Any] = instance.spec_for_llm()
@@ -317,7 +317,7 @@ def collect_dataflow(
         DataflowEdge(source="serve", target="event_stream", label="emits"),
     ]
 
-    for name in registry.names_for("skill"):
+    for name in registry.names_for("tool"):
         skill_id = f"skill:{name}"
         nodes.append(DataflowNode(id=skill_id, kind="skill", label=name))
         edges.append(DataflowEdge(source="serve", target=skill_id, label="dispatch"))

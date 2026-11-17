@@ -1,4 +1,4 @@
-"""Building blocks SHALL NOT mutate the registry — top-level spec stays {'skill': [...]}."""
+"""Building blocks SHALL NOT mutate the registry — top-level spec stays {'tool': [...]}."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from cantus.workflows import (
 
 def test_spec_for_llm_top_level_only_skill_after_building_blocks_instantiated():
     """After instantiating every building block, registry.spec_for_llm() top-level
-    keys SHALL contain only "skill" — none of the building block class names leak."""
+    keys SHALL contain only "tool" — none of the building block class names leak."""
 
     @skill
     def a(x: str) -> str:
@@ -39,10 +39,10 @@ def test_spec_for_llm_top_level_only_skill_after_building_blocks_instantiated():
     EvaluatorOptimizer(generator=a, evaluator=b, max_iters=1)
 
     spec = get_registry().spec_for_llm()
-    assert set(spec.keys()) == {"skill"}, (
+    assert set(spec.keys()) == {"tool"}, (
         f"building blocks polluted spec_for_llm: {set(spec.keys())}"
     )
-    skill_names = {s["name"] for s in spec["skill"]}
+    skill_names = {s["name"] for s in spec["tool"]}
     for forbidden in (
         "PromptChain",
         "Router",

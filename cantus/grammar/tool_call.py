@@ -25,7 +25,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from cantus.core.registry import Registry, get_registry
+from cantus.core.registry import Registry, _get_global_registry
 
 
 @dataclass
@@ -47,8 +47,8 @@ def build_schema(registry: Registry | None = None) -> dict[str, Any]:
     skills; the agent calls this each turn so newly-registered skills
     appear immediately.
     """
-    reg = registry or get_registry()
-    skill_names = reg.names_for("skill")
+    reg = registry or _get_global_registry()
+    skill_names = reg.names_for("tool")
     return {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "ToolCall",
@@ -101,7 +101,7 @@ def parse_tool_call(raw: str, registry: Registry | None = None) -> ParsedToolCal
     action = data["action"]
     if not isinstance(action, dict):
         raise GrammarError("action must be an object")
-    reg = registry or get_registry()
+    reg = registry or _get_global_registry()
 
     if "final_answer" in action:
         if not isinstance(action["final_answer"], str):
@@ -120,10 +120,10 @@ def parse_tool_call(raw: str, registry: Registry | None = None) -> ParsedToolCal
     skill_name = action.get("skill_name")
     if not isinstance(skill_name, str):
         raise GrammarError("skill_name must be a string")
-    if reg.names_for("skill") and skill_name not in reg.names_for("skill"):
+    if reg.names_for("tool") and skill_name not in reg.names_for("tool"):
         raise GrammarError(
             f"skill_name '{skill_name}' not registered; "
-            f"available: {reg.names_for('skill')}"
+            f"available: {reg.names_for('tool')}"
         )
     args = action.get("args", {})
     if not isinstance(args, dict):

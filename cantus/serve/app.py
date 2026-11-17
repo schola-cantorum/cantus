@@ -152,7 +152,7 @@ def serve(
         [Depends(require_auth)] if apply_auth else []
     )
 
-    skill_names: list[str] = registry.names_for("skill")
+    skill_names: list[str] = registry.names_for("tool")
     for name in skill_names:
         if name in RESERVED_CHANNEL_NAMES:
             raise ValueError(_RESERVED_CHANNEL_VALUE_ERROR.format(name=name))
@@ -162,7 +162,7 @@ def serve(
             raise ValueError(_RESERVED_DASHBOARD_VALUE_ERROR.format(name=name))
 
     for name in skill_names:
-        skill_instance = registry.lookup("skill", name)
+        skill_instance = registry.lookup("tool", name)
         if skill_instance is None:
             # registry.names_for guarantees presence; this is defensive only.
             continue
