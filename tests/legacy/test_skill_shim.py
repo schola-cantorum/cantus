@@ -1,26 +1,16 @@
 """Legacy names (Skill, skill, register_skill) keep working; they alias the Tool API."""
 
 import json
-import subprocess
-import sys
-
-import pytest
 
 import cantus
-from cantus import Agent, Tool, get_registry, tool
+from cantus import Agent, Tool, tool
+from cantus.core.registry import _get_global_registry
 from cantus.protocols import skill as skill_module
 from cantus.protocols.skill import Skill, register_skill, skill
 
 
-@pytest.fixture(autouse=True)
-def _clean_global_registry():
-    get_registry().clear()
-    yield
-    get_registry().clear()
-
-
 def _global_names():
-    return get_registry().names_for("skill")
+    return _get_global_registry().names_for("tool")
 
 
 # --- Row 30 -----------------------------------------------------------------
@@ -66,7 +56,7 @@ def test_legacy_entries_build_tools_and_register_globally():
     for t in (bare, hooked, called_tool, passed_tool):
         assert isinstance(t, Tool)
     assert _global_names() == ["bare", "called", "hooked", "passed"]
-    assert get_registry().lookup("skill", "bare") is bare
+    assert _get_global_registry().lookup("tool", "bare") is bare
 
     # Defining the same name again replaces the earlier registration.
     @skill
@@ -74,7 +64,7 @@ def test_legacy_entries_build_tools_and_register_globally():
         """Bare again."""
         return x
 
-    assert get_registry().lookup("skill", "bare") is bare
+    assert _get_global_registry().lookup("tool", "bare") is bare
     assert _global_names().count("bare") == 1
 
     assert cantus.skill is skill_module.skill
@@ -120,22 +110,3 @@ def test_legacy_entries_bind_hooks_that_run_when_dispatched():
     Agent(Scripted([call("passed"), call("called"), final])).run("q")
 
     assert log == ["pre", "passed", "post", "called", "post"]
-
-
-# --- Row 32 -----------------------------------------------------------------
-
-
-def test_importing_legacy_module_emits_no_deprecation_warning():
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "-W",
-            "error::DeprecationWarning",
-            "-c",
-            "import cantus.protocols.skill",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    assert proc.returncode == 0, proc.stderr

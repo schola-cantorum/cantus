@@ -85,8 +85,8 @@ def register_dashboard_routes(
 
 def _list_skill_specs(registry: Registry) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    for name in registry.names_for("skill"):
-        instance = registry.lookup("skill", name)
+    for name in registry.names_for("tool"):
+        instance = registry.lookup("tool", name)
         if instance is None:
             continue
         spec: dict[str, Any] = instance.spec_for_llm()

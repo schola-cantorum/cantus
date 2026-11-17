@@ -5,27 +5,27 @@ import re
 import pytest
 
 
-# --- Skill and core entries (top-level) ---------------------------------
+# --- Tool and core entries (top-level) ---------------------------------
 
 
-def test_skill_decorator_importable():
-    from cantus import skill, debug
+def test_tool_decorator_importable():
+    from cantus import debug, tool
 
-    assert callable(skill)
+    assert callable(tool)
     assert callable(debug)
 
 
-def test_register_skill_importable():
-    from cantus import register_skill
+def test_register_tool_importable():
+    from cantus import register_tool
 
-    assert callable(register_skill)
+    assert callable(register_tool)
 
 
 def test_class_first_base_classes_importable():
-    """v0.3.0: only Skill and Memory are top-level; Analyzer/Validator moved to cantus.hooks."""
-    from cantus import Memory, Skill
+    """Only Tool and Memory are top-level; Analyzer/Validator moved to cantus.hooks."""
+    from cantus import Memory, Tool
 
-    for cls in (Skill, Memory):
+    for cls in (Tool, Memory):
         assert isinstance(cls, type)
 
 
@@ -224,6 +224,7 @@ def test_v031_all_includes_new_names():
         "Soul",
         "SoulParseError",
         "JsonLinesPersistence",
+        "CantusDeprecationWarning",
     ):
         assert name in cantus.__all__, f"{name} missing from cantus.__all__"
 
@@ -232,11 +233,12 @@ def test_v030_names_still_in_all():
     """v0.3.1 is additive; the v0.3.0 public surface must not regress."""
     import cantus
 
+    # The legacy functions that stay in __all__ are asserted under tests/legacy/.
     for name in (
-        "skill",
+        "tool",
         "debug",
-        "register_skill",
-        "Skill",
+        "register_tool",
+        "Tool",
         "Memory",
         "ShortTermMemory",
         "BM25Memory",
@@ -254,7 +256,6 @@ def test_v030_names_still_in_all():
         "AgentState",
         "Inspector",
         "Registry",
-        "get_registry",
         "Result",
         "ChatModel",
         "Message",

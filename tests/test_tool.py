@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from cantus import Agent, Registry, Result, Tool, get_registry, register_tool, tool
+from cantus import Agent, Registry, Result, Tool, register_tool, tool
+from cantus.core.registry import _get_global_registry  # approved exception: see test-plan D10
 from cantus.core.observation import (
     SkillObservation,  # T-0009 renames this class
     ToolErrorObservation,
@@ -52,7 +53,7 @@ def _observations(stream):
 
 
 def _global_names():
-    return get_registry().names_for("skill")  # T-0007 switches this accessor
+    return _get_global_registry().names_for("tool")
 
 
 def _reg_lookup(reg, name):

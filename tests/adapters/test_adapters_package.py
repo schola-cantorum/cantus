@@ -71,9 +71,9 @@ def test_remote_skill_base_is_not_public():
 
 def test_registry_kinds_unchanged_after_import():
     # Importing cantus.adapters MUST NOT add new protocol kinds to the
-    # Registry. v0.3.0 contract holds: `KINDS == ("skill",)`.
+    # Registry. v0.3.0 contract holds: `KINDS == ("tool",)`.
     import cantus.adapters  # noqa: F401
     from cantus.core.registry import Registry
 
-    assert Registry.KINDS == ("skill",)
-    assert Registry().KINDS == ("skill",)
+    assert Registry.KINDS == ("tool",)
+    assert Registry().KINDS == ("tool",)
