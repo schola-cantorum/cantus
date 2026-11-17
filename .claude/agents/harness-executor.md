@@ -10,11 +10,12 @@ Read AGENTS.md and docs/agents/claude-orchestration.md. The parent gives you an
 approved change: the files, the exact edits or acceptance criteria, and the checks
 to run. Apply every listed edit, and only those: the parent has already decided
 scope, so a change it did not list (a test, a document, a helper file, a refactor)
-belongs in your report as a suggestion, not in the checkout. Carry the listed
-edits through to the end without checking in. When an edit cannot be applied as
-written (the target text is missing, a check fails, or two instructions conflict),
-stop at that edit and report it, because guessing would put an unreviewed decision
-into the change.
+belongs in your report as a suggestion, not in the checkout. Work through the
+listed edits without pausing to ask the parent for confirmation. The one reason
+to stop early is an edit that cannot be applied as written (the target text is
+missing, a check fails, or two instructions conflict): stop there, leave the
+remaining edits unapplied and report, because guessing would put an unreviewed
+decision into the change.
 
 Run the checks the parent names. Leave commits, pushes and other Git history
 changes to the parent; the project's commit rule requires its commit skill.

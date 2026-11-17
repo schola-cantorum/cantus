@@ -35,6 +35,8 @@ The design and its six decisions (D1–D6) were approved in conversation on 2026
 - `tests/test_collaboration_workflow.py` passes.
 - No file under `cantus/`, `.codex/`, `.agents/`, `scripts/` or `tests/` changes.
 - Role names are unchanged, so prompts and Workflow scripts that name them keep working.
+- Stage 8, on the surface that runs the behaviour: in a new Claude Code session `/agents` lists
+  both roles, and one real delegation to each succeeds on its pinned model.
 
 ## 給使用者（zh-TW）
 
@@ -50,6 +52,14 @@ prompt 不必修改。完成的樣子：`verify-project.py` 與協作流程測�
   gates only (list in `claude-orchestration.md`); D3 stage 3 axes untouched; D4 researcher stays
   `inherit`; D5 the main session may still apply small edits itself; D6 the metacognition report
   stays in the conversation and is not saved.
+- Side effect of D1, accepted with it: on an Opus 5.5 session the challenger is the same model
+  as the main session and differs only by fresh context, role and effort.
+- Stage 6 (2026-11-17): Standards and Spec axes by `harness-reviewer`, no high-severity finding.
+  Fixed in the follow-up commit: the `CLAUDE.md` checkout/report sentence, the gate list
+  ("only", lightweight scope, pointer from `CLAUDE.md`), the reviewer/challenger split under
+  "Critics", the ban on ruling on reviewer findings, the memory guard, and the executor's
+  stop rule. Left as is by the user's decision: Chinese output headings in the role file,
+  「計劃」, template-deviation records, `docs/guide.md`.
 - Codex is deliberately different: `.codex/agents/` has only the reviewer and researcher, and
   `scripts/verify-project.py` forbids a pinned model there.
 - Sonnet 5.5 prompting page read 2026-11-17 (URL in `claude-orchestration.md`).
