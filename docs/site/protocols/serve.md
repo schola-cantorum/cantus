@@ -1,29 +1,29 @@
 # `cantus.serve` core
 
-`cantus.serve` is the HTTP entry point for cantus. It takes the Skill registry you have already built and exposes it over plain HTTP/JSON. Call `cantus.serve(registry)` and you get back a configured FastAPI app, ready to run under uvicorn (or any ASGI server).
+`cantus.serve` is the HTTP entry point for cantus. It takes the Skill registry you have already built and exposes it over plain HTTP/JSON. Call `serve(registry)` and you get back a configured FastAPI app, ready to run under uvicorn (or any ASGI server).
 
 This page covers four public surfaces: Quick start, the `cantus.config.Settings` 12-factor configuration, the read-only dashboard endpoints, and the Channel Protocol abstraction together with `LocalMockReceiver`.
 
-> An opt-in auth gate and `SecretStr` token loading are described below under [Authentication](#authentication). The real channel implementations (LINE / Telegram / Discord / Google Chat) ship as part of the channel-gateway work; see each cookbook for the wiring details ([`../cookbook-line-channel.md`](../cookbook-line-channel.md), [`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md), [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md), [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md)). The read-only runtime observability layer is described under [Introspection endpoints](#introspection-endpoints). Terminating HTTPS is still left to an upstream reverse proxy or tunnel.
+> An opt-in auth gate and `SecretStr` token loading are described below under [Authentication](#authentication). The real channel implementations (LINE / Telegram / Discord / Google Chat) ship as part of the channel-gateway work; see each cookbook for the wiring details ([`../channels/line.md`](../channels/line.md), [`../channels/telegram.md`](../channels/telegram.md), [`../channels/discord.md`](../channels/discord.md), [`../channels/google-chat.md`](../channels/google-chat.md)). The read-only runtime observability layer is described under [Introspection endpoints](#introspection-endpoints). Terminating HTTPS is still left to an upstream reverse proxy or tunnel.
 
 ## Quick start
 
 Install the serve extras. FastAPI, uvicorn, and pydantic-settings sit behind a lazy import gate, so if they are not installed, `import cantus.serve` raises `ImportError("... pip install cantus[serve]")`:
 
 ```bash
-pip install cantus[serve]
+pip install "cantus-agent[serve]"
 ```
 
-Here is a minimal example. Register a Skill, call `cantus.serve(registry)`, and start the server with uvicorn:
+Here is a minimal example. Register a Skill, call `serve(registry)`, and start the server with uvicorn:
 
 ```python
-import cantus
 import uvicorn
 from cantus.core.registry import Registry
+from cantus.serve import serve
 
 registry = Registry()
-registry.register(my_skill)             # my_skill is any Skill instance
-app = cantus.serve(registry)
+registry.register("skill", my_skill)             # my_skill is any Skill instance
+app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
 
@@ -50,6 +50,8 @@ Every Skill registered in the registry is automatically mounted at `POST /skills
 | `host` | `str` | `"127.0.0.1"` | Host that uvicorn binds to; the default opens localhost only |
 | `port` | `int` | `8765` | Port that uvicorn binds to |
 | `dashboard` | `bool` | `True` | Whether to enable the `/skills`, `/health`, and `/events` dashboard endpoints |
+| `introspection` | `bool` | `True` | Whether to mount the read-only `/introspection/*` endpoints |
+| `introspection_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether `/introspection/*` also requires auth |
 | `docs_url` | `str \| None` | `"/docs"` | Mount path for the Swagger UI; set to `None` to disable |
 | `openapi_url` | `str \| None` | `"/openapi.json"` | Path for the OpenAPI JSON; set to `None` to disable |
 | `redoc_url` | `str \| None` | `"/redoc"` | Path for ReDoc; set to `None` to disable |
@@ -57,6 +59,8 @@ Every Skill registered in the registry is automatically mounted at `POST /skills
 | `api_key` | `SecretStr \| None` | `None` | Token for api-key mode (loaded from env and wrapped in `SecretStr`, so `repr`, JSON dumps, and the OpenAPI schema never leak it) |
 | `bearer_token` | `SecretStr \| None` | `None` | Token for bearer mode; same `SecretStr` behavior as above |
 | `dashboard_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether the `/skills`, `/health`, and `/events` dashboard endpoints also require auth. Set `False` to let a monitoring system poll them anonymously |
+
+`Settings` also carries one `channel_*` field per platform credential (LINE, Telegram, Discord, Google Chat); each channel page lists the ones it reads.
 
 In the default case you do not need to pass any arguments:
 
@@ -87,7 +91,7 @@ assert settings.dashboard is False  # bool, not "false"
 Pass `settings` to `cantus.serve`:
 
 ```python
-app = cantus.serve(registry, settings=Settings())
+app = serve(registry, settings=Settings())
 uvicorn.run(app, host=settings.host, port=settings.port)
 ```
 
@@ -113,13 +117,13 @@ export CANTUS_SERVE_BEARER_TOKEN=$(openssl rand -hex 32)
 ```
 
 ```python
-import cantus
 import uvicorn
 from cantus.core.registry import Registry
+from cantus.serve import serve
 
 registry = Registry()
-registry.register(my_skill)
-app = cantus.serve(registry)
+registry.register("skill", my_skill)
+app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
 
@@ -166,7 +170,7 @@ With it off, `/skills`, `/health`, and `/events` return 200 to anonymous request
 
 ### Fail-fast on a missing token
 
-If you set `CANTUS_SERVE_AUTH_MODE=bearer` but forget to set `CANTUS_SERVE_BEARER_TOKEN` (or set api-key mode but forget `CANTUS_SERVE_API_KEY`), `cantus.serve()` raises `ValueError` while building the app. The message contains the literal `BEARER_TOKEN` / `API_KEY`, so you never end up thinking auth is on while every request actually passes through.
+If you set `CANTUS_SERVE_AUTH_MODE=bearer` but forget to set `CANTUS_SERVE_BEARER_TOKEN` (or set api-key mode but forget `CANTUS_SERVE_API_KEY`), `serve()` raises `ValueError` while building the app. The message contains the literal `BEARER_TOKEN` / `API_KEY`, so you never end up thinking auth is on while every request actually passes through.
 
 > ⚠️ **Production warning**: `auth_mode` defaults to `NONE` to keep the upgrade path backward compatible, **not** because that is a sensible production default. Once you expose cantus serve beyond loopback (binding `0.0.0.0`, attaching a tunnel, deploying to a cloud VM), you **must** switch `auth_mode` to `bearer` or `api-key` and set a high-entropy token (at least 32 random bytes). A future tunnel helper is expected to act as a second line of defense by warning loudly, or refusing to run, if it spawns a tunnel while `auth_mode=NONE`.
 
@@ -175,11 +179,11 @@ If you set `CANTUS_SERVE_AUTH_MODE=bearer` but forget to set `CANTUS_SERVE_BEARE
 - **Constant-time compare**: token comparison uses `hmac.compare_digest` to prevent a timing oracle from guessing a token prefix. A plain `==` comparison can short-circuit in some Python implementations and leak the length difference.
 - **401 does not distinguish a missing token from a wrong one**: every authentication failure (missing header, wrong token, malformed format, unknown mode) returns HTTP 401 with the byte-identical body `{"detail": "Authentication required"}`. A differentiated error message would help an attacker tell "did I find the right header name?" from "did I guess the token content?", which is the analog of username enumeration.
 - **`SecretStr` does not leak**: the `api_key` and `bearer_token` fields are typed as `pydantic.SecretStr`. pydantic's built-in masking guarantees that `repr(settings)`, `settings.model_dump_json()`, `serve(registry).openapi()`, and any log line `cantus.serve` produces never contain the plaintext token (tests verify this with a chain of four `assert "<token>" not in <surface>` assertions).
-- **`cantus[security]` extras**: a documentary alias whose dependency closure is identical to `cantus[serve]` (no new third-party packages, and no break to the existing `[tool.uv]` `conflicts` pairs). Downstream can write `pip install cantus[security]` to express install intent.
+- **`cantus-agent[security]` extras**: a documentary alias whose dependency closure is identical to `cantus-agent[serve]` (no new third-party packages, and no break to the existing `[tool.uv]` `conflicts` pairs). Downstream can write `pip install "cantus-agent[security]"` to express install intent.
 
 ## Dashboard endpoints
 
-When `Settings.dashboard is True` (the default), `cantus.serve()` mounts three extra read-only endpoints:
+When `Settings.dashboard is True` (the default), `serve()` mounts three extra read-only endpoints:
 
 ### `GET /skills`
 
@@ -238,7 +242,7 @@ Pass `Settings(dashboard=False)` and all three endpoints become `404`, while eve
 ```python
 from cantus.config import Settings
 
-app = cantus.serve(registry, settings=Settings(dashboard=False))
+app = serve(registry, settings=Settings(dashboard=False))
 # GET /skills  -> 404
 # GET /health  -> 404
 # GET /events  -> 404
@@ -247,14 +251,14 @@ app = cantus.serve(registry, settings=Settings(dashboard=False))
 
 ### Reserved paths: Skill names cannot collide
 
-The names `skills`, `health`, and `events` are reserved for the dashboard. If any Skill in the registry has a `spec_for_llm()["name"]` equal to one of these three, `cantus.serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`:
+The names `skills`, `health`, and `events` are reserved for the dashboard. If any Skill in the registry has a `spec_for_llm()["name"]` equal to one of these three, `serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`. Two more names are reserved the same way: `channels` (`"reserved channel path"`) and `introspection` (`"reserved introspection path"`).
 
 ```python
 # Suppose bad_skill.spec_for_llm()["name"] == "health"
 registry = Registry()
-registry.register(bad_skill)
+registry.register("skill", bad_skill)
 
-cantus.serve(registry)
+serve(registry)
 # ValueError: ... reserved dashboard path ...
 ```
 
@@ -262,7 +266,7 @@ This guard **fires in both** the `dashboard=True` and `dashboard=False` cases �
 
 ## Introspection endpoints
 
-When `Settings.introspection is True` (the default), `cantus.serve()` mounts an extra group of read-only `/introspection/*` endpoints that project cantus's existing runtime state (the Skill registry, auth configuration, attached channels, and EventStream) into a stable JSON read-model. It **observes only** and never changes any registry, settings, session, channel, or event-stream state. It runs in parallel with the dashboard and each toggles **independently**.
+When `Settings.introspection is True` (the default), `serve()` mounts an extra group of read-only `/introspection/*` endpoints that project cantus's existing runtime state (the Skill registry, auth configuration, attached channels, and EventStream) into a stable JSON read-model. It **observes only** and never changes any registry, settings, session, channel, or event-stream state. It runs in parallel with the dashboard and each toggles **independently**.
 
 | Endpoint | Contents |
 | --- | --- |
@@ -281,7 +285,7 @@ When `Settings.introspection is True` (the default), `cantus.serve()` mounts an 
 - `introspection` (default `True`): whether to mount the whole group of endpoints. With `Settings(introspection=False)`, they all return `404`, while the dashboard and Skill invoke endpoints are unaffected.
 - `introspection_requires_auth` (default `True`): when `auth_mode != NONE`, whether the whole `/introspection/*` group (**including** `/introspection/workflows/{run_id}`) is wrapped with `require_auth`. Set `False` to allow anonymous reads, matching the behavior of `dashboard_requires_auth`.
 
-> ⚠️ **The `auth_mode=none` config cliff**: when `auth_mode` is `none` (the default), there is no authentication to apply, so `introspection_requires_auth` (and `dashboard_requires_auth`) **are ignored** and `/introspection` is readable by anyone who can reach the server. In this situation (`auth_mode=none` and `introspection` enabled), `cantus.serve()` emits a `UserWarning` during app build stating that `/introspection` is currently accessible without authentication (the message **contains no** token). Once you expose the server beyond loopback (binding `0.0.0.0`, attaching a tunnel), switch `auth_mode` to `bearer` or `api-key` and introspection is protected along with everything else.
+> ⚠️ **The `auth_mode=none` config cliff**: when `auth_mode` is `none` (the default), there is no authentication to apply, so `introspection_requires_auth` (and `dashboard_requires_auth`) **are ignored** and `/introspection` is readable by anyone who can reach the server. In this situation (`auth_mode=none` and `introspection` enabled), `serve()` emits a `UserWarning` during app build stating that `/introspection` is currently accessible without authentication (the message **contains no** token). Once you expose the server beyond loopback (binding `0.0.0.0`, attaching a tunnel), switch `auth_mode` to `bearer` or `api-key` and introspection is protected along with everything else.
 
 ### The workflow-trace summary redaction contract
 
@@ -289,7 +293,7 @@ When `Settings.introspection is True` (the default), `cantus.serve()` mounts an 
 
 - `CallSkillAction` → the skill name plus a sorted list of argument **key names** (no argument values)
 - `SkillObservation` → the skill name plus the result **type name** (no result value)
-- `ToolErrorObservation` → the exception type name (no original exception message)
+- `ToolErrorObservation` → the skill name only (no exception type, no exception message)
 - other types → the event type name (no field values)
 
 Argument values, result values, and raw exception messages can carry secrets or PII, so none of them are projected; the step's `kind`, `type`, and ordering stay intact. An unknown `run_id` returns `404`. The TUI Inspector (`cantus tui`, see [`docs/tui.md`](../tui.md)) is a pure render of this server data, so it likewise shows only the redacted summary.
@@ -311,7 +315,7 @@ Any class that provides both methods automatically conforms; it does **not** nee
 
 ### `LocalMockReceiver` — in-process FIFO test stub
 
-The tree ships exactly one Channel implementation: `cantus.serve.channel.LocalMockReceiver`, a pure in-memory `collections.deque[dict]` FIFO queue with no external dependencies and no network I/O. It exists for smoke tests: pytest uses it to check that `cantus.serve(...)` composes with the Memory protocol and the agent layer without one stepping on another. It is **not for production use**.
+`cantus.serve.channel` ships one in-process stub: `LocalMockReceiver`, a pure in-memory `collections.deque[dict]` FIFO queue with no external dependencies and no network I/O. It exists for smoke tests: pytest uses it to check that `serve(...)` composes with the Memory protocol and the agent layer without one stepping on another. It is **not for production use**.
 
 ```python
 from cantus.serve.channel import LocalMockReceiver
@@ -331,13 +335,13 @@ Passing `send()` a non-dict (including `None`, `str`, or a list) raises `TypeErr
 
 ### `app.state.channels` — getting the channel list
 
-When you pass channels via the `channels=[...]` keyword to `cantus.serve(...)`, they are stored as-is on the FastAPI app's `app.state.channels`. Host code can inspect them or wire up an out-of-band consumer after the server starts, with no need to re-run `cantus.serve(...)`:
+When you pass channels via the `channels=[...]` keyword to `serve(...)`, they are stored as-is on the FastAPI app's `app.state.channels`. Host code can inspect them or wire up an out-of-band consumer after the server starts, with no need to re-run `serve(...)`:
 
 ```python
 from cantus.serve.channel import LocalMockReceiver
 
 ch = LocalMockReceiver()
-app = cantus.serve(registry, channels=[ch])
+app = serve(registry, channels=[ch])
 
 assert app.state.channels == [ch]
 ```
@@ -346,8 +350,8 @@ assert app.state.channels == [ch]
 
 The real channel implementations for LINE, Telegram, Discord, and Google Chat ship as part of the channel-gateway work (the earlier serve release defined only the Protocol plus the in-memory stub). For each platform's wiring (webhook / WebSocket / Pub/Sub, signature verification, outbound replies) and operational steps, see the matching cookbook:
 
-- [`../cookbook-line-channel.md`](../cookbook-line-channel.md), [`../cookbook-telegram-channel.md`](../cookbook-telegram-channel.md) (webhook gateway)
-- [`../cookbook-discord-channel.md`](../cookbook-discord-channel.md) (WebSocket Gateway + Ed25519 interactions)
-- [`../cookbook-google-chat-channel.md`](../cookbook-google-chat-channel.md) (Pub/Sub)
+- [`../channels/line.md`](../channels/line.md), [`../channels/telegram.md`](../channels/telegram.md) (webhook gateway)
+- [`../channels/discord.md`](../channels/discord.md) (WebSocket Gateway + Ed25519 interactions)
+- [`../channels/google-chat.md`](../channels/google-chat.md) (Pub/Sub)
 
 All four adapters satisfy the same two-method `Channel` Protocol shown above — the shape has not changed since the first serve release. Adding a new adapter means writing a class with `receive` and `send`; it never touches the Protocol.

@@ -60,7 +60,7 @@ The teaching progression maps neatly onto four levels: data structure (deque) â†
 cantus splits Memory into two tiers: the lower tier of four explicit `Memory` implementations, and the upper-tier `AutoMemory` that exposes four LLM-facing tools.
 
 - **Lower tier**: host code calls `mem.recall(query)` and `mem.remember(turn)` itself. The student controls exactly when each retrieval and each write happens, which suits teaching and deterministic flows.
-- **Upper tier**: `AutoMemory(backend=mem)` wraps any lower-tier memory into four cantus `Skill`s (`view`, `create`, `str_replace`, `delete`), aligned with the Anthropic Memory tool spec. Feed `auto.tools` into an agent and the LLM decides for itself when to do CRUD.
+- **Upper tier**: `AutoMemory(backend=mem)` wraps any lower-tier memory into four cantus `Skill`s (`view`, `create`, `str_replace`, `delete`), aligned with the Anthropic Memory tool spec. Register `auto.tools` in the agent's registry and the LLM decides for itself when to read and write.
 
 ```python
 from cantus.protocols.memory import MarkdownMemory, AutoMemory, Turn
@@ -92,14 +92,14 @@ Every rejection completes **before** the file is opened. A rejected path is neve
 
 ## `AutoMemory`: autonomous LLM CRUD, and a production warning
 
-The four `Skill`s returned by `AutoMemory.tools` **expose full CRUD to the LLM by default**, with no built-in content filter. In a teaching setting that is intentional: students need to see the trade-offs of letting an LLM write and delete on its own. **Before any production use**, wrap them with a filter using cantus's existing hook mechanism:
+The four `Skill`s returned by `AutoMemory.tools` **let the LLM read and write memory by default**, with no built-in content filter. In a teaching setting that is intentional: students need to see the trade-offs of letting an LLM write on its own. The base `Memory` protocol has no hard delete, so `delete` only reports how many turns matched, and `str_replace` remembers a corrected copy next to the original. **Before any production use**, wrap them with a filter using cantus's existing hook mechanism:
 
 ```python
 from cantus import skill
 from cantus.protocols.memory import AutoMemory, MarkdownMemory
 
 def block_secrets(result):
-    # post_hook example: reject the write if it detects a sensitive string
+    # post_hook example: inspect what the tool returned, after the write happened
     return result  # ... your filtering logic
 
 backend = MarkdownMemory("memo.md")
@@ -109,7 +109,10 @@ auto = AutoMemory(backend=backend)
 create_skill = auto.tools[1]
 create_skill._post_hook = block_secrets
 
-agent_tools = list(auto.tools)
+from cantus.core.registry import get_registry
+
+for tool in auto.tools:
+    get_registry().register("skill", tool)  # the agent now offers all four
 ```
 
 ## EventStream JSON-Lines persistence

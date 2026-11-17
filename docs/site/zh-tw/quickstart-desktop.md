@@ -8,7 +8,7 @@
 
 - Python 3.10 以上
 - 裝好 [`uv`](https://docs.astral.sh/uv/)：macOS 上用 `brew install uv`，多數系統用 `pipx install uv`，或是走[官方安裝程式](https://docs.astral.sh/uv/getting-started/installation/)
-- 一把來自 Chat Completions 供應商的 API key。這份教學用 OpenAI；Anthropic、Google、Groq 都是同一套用法，透過 `load_chat_model("<provider>/<model>")` 就行。
+- 一把來自模型供應商的 API key。這份教學用 OpenAI；其他每一家（雲端與本機）的同一套步驟，請看 [Quickstart（模型 API）](./quickstart-providers.md)。
 
 ## 五分鐘走一遍
 
@@ -101,7 +101,7 @@ pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-它會開出五個分頁——**Dashboard**、**Skills**、**Permissions**、**Dataflow**、**Inspector**——用按鍵 `1`–`5` 切換；在 Sessions 清單的某一列上按 `Enter`，就能跳到那次執行的 step trace（在 Inspector 裡看）。`--auth-mode` 要跟伺服器對上：用 `--auth-mode bearer` 時，它會從環境變數讀 `CANTUS_SERVE_BEARER_TOKEN`；用 `--auth-mode api-key` 時則讀 `CANTUS_SERVE_API_KEY`——兩者都當成機密看待，絕對別記進 log，也別分享出去。workflow 的 step trace 只會顯示去敏化後的摘要（skill 名稱、參數的 key 名稱，以及結果／例外的型別名稱，永遠不會是它們的值），所以就算對方是走 tunnel 的伺服器，觀測起來也很安全。完整的 pane 說明請見 [`docs/tui.md`](./tui.md)。
+它會開出五個分頁——**Dashboard**、**Skills**、**Permissions**、**Dataflow**、**Inspector**——用按鍵 `1`–`5` 切換；在 Sessions 清單的某一列上按 `Enter`，就能跳到那次執行的 step trace（在 Inspector 裡看）。`--auth-mode` 要跟伺服器對上：用 `--auth-mode bearer` 時，它會從環境變數讀 `CANTUS_SERVE_BEARER_TOKEN`；用 `--auth-mode api-key` 時則讀 `CANTUS_SERVE_API_KEY`——兩者都當成機密看待，絕對別記進 log，也別分享出去。workflow 的 step trace 只會顯示去敏化後的摘要（skill 名稱、參數的 key 名稱，以及結果／例外的型別名稱，永遠不會是它們的值），所以就算對方是走 tunnel 的伺服器，觀測起來也很安全。完整的 pane 說明請見 [Terminal UI](./tui.md)。
 
 ## 透過 Ollama 跑本機 LLM
 
@@ -174,6 +174,8 @@ print(response.message.content)
 ## 接下來往哪走
 
 - [`quickstart.md`](./quickstart.md) — Colab 優先的快速上手，透過 Google Drive 快取載入 4-bit Gemma。
-- [`cookbook/`](./cookbook/) — 一系列可直接跑的食譜，涵蓋 workflows、多供應商路由、retrieval，以及 `cantus.serve` 的 FastAPI app。
+- [Quickstart（模型 API）](./quickstart-providers.md) — 同一個 agent，換上八種 provider 各跑一次。
+- [Quickstart（建置 Agent）](./quickstart-agent.md) — 一塊一塊加上身分、防護與記憶。
+- [Cookbook：patterns](./cookbook/patterns.md) — 可直接跑的食譜，示範怎麼組合 skill、hook、workflow 與 memory。
 - `cantus-agent[serve]` — 把你的 agent 包進一個 FastAPI HTTP 端點背後（`from cantus.serve import serve`）。
-- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — 為什麼這份教學選了 `cloudflared` 而不是 `ngrok`（免費隨機子網域、不會留下 auth token、`Ctrl-C` 收得乾淨俐落）。
+- repository 裡的 `docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md` — 為什麼這份教學選了 `cloudflared` 而不是 `ngrok`（免費隨機子網域、不會留下 auth token、`Ctrl-C` 收得乾淨俐落）。

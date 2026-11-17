@@ -1,4 +1,4 @@
-# `Soul` 身份 Protocol（v0.5.0）
+# `Soul` 身份 Protocol
 
 ## 這是什麼、什麼時候用
 
@@ -101,7 +101,7 @@ agent = Agent(model=m, soul=soul)
 如果你想完全接管 system prompt 的組裝，就傳 `soul=None`（或乾脆省略），然後在你自己的 host code 裡控制要送給 model 的 prompt：
 
 ```python
-from cantus import Agent
+from cantus import Agent, AgentState
 from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")

@@ -60,7 +60,7 @@ print(len(mem.recall("Tainan snacks")))
 cantus 把 Memory 拆成兩層：底層是四個 explicit 的 `Memory` 實作，上層則是暴露四個 LLM-facing tool 的 `AutoMemory`。
 
 - **底層**：由 host code 自己去呼叫 `mem.recall(query)` 跟 `mem.remember(turn)`。每一次檢索、每一次寫入發生的時機，都由學生精準掌控，很適合教學跟需要 deterministic 的流程。
-- **上層**：`AutoMemory(backend=mem)` 把任何一個底層 memory 包成四個 cantus `Skill`（`view`、`create`、`str_replace`、`delete`），對齊 Anthropic Memory tool spec。把 `auto.tools` 餵進 agent，LLM 就會自己決定什麼時候做 CRUD。
+- **上層**：`AutoMemory(backend=mem)` 把任何一個底層 memory 包成四個 cantus `Skill`（`view`、`create`、`str_replace`、`delete`），對齊 Anthropic Memory tool spec。把 `auto.tools` 註冊進 agent 的 registry，LLM 就會自己決定什麼時候讀、什麼時候寫。
 
 ```python
 from cantus.protocols.memory import MarkdownMemory, AutoMemory, Turn
@@ -92,14 +92,14 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 ## `AutoMemory`：LLM 自主 CRUD 與正式應用警告
 
-`AutoMemory.tools` 回傳的四個 `Skill`，**預設就把完整的 CRUD 暴露給 LLM**，而且沒有內建任何內容過濾。在教學情境下這是刻意的：學生需要親眼看到「讓 LLM 自己寫入、自己刪除」會帶來什麼樣的權衡。但是在**任何正式應用之前**，請用 cantus 既有的 hook 機制把它們包一層過濾起來：
+`AutoMemory.tools` 回傳的四個 `Skill`，**預設就讓 LLM 讀寫 memory**，而且沒有內建任何內容過濾。在教學情境下這是刻意的：學生需要親眼看到「讓 LLM 自己寫入」會帶來什麼樣的權衡。基礎的 `Memory` protocol 沒有硬刪除，所以 `delete` 只回報有幾筆符合，`str_replace` 則是在原本那筆旁邊再記一筆修正後的版本。但是在**任何正式應用之前**，請用 cantus 既有的 hook 機制把它們包一層過濾起來：
 
 ```python
 from cantus import skill
 from cantus.protocols.memory import AutoMemory, MarkdownMemory
 
 def block_secrets(result):
-    # post_hook 範例：偵測到敏感字串就拒絕這次寫入
+    # post_hook 範例：在寫入發生之後，檢查這個工具回傳了什麼
     return result  # ... 你的過濾邏輯
 
 backend = MarkdownMemory("memo.md")
@@ -109,7 +109,10 @@ auto = AutoMemory(backend=backend)
 create_skill = auto.tools[1]
 create_skill._post_hook = block_secrets
 
-agent_tools = list(auto.tools)
+from cantus.core.registry import get_registry
+
+for tool in auto.tools:
+    get_registry().register("skill", tool)  # the agent now offers all four
 ```
 
 ## EventStream 的 JSON-Lines 持久化

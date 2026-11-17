@@ -1,4 +1,4 @@
-# `Soul` Identity Protocol (v0.5.0)
+# `Soul` Identity Protocol
 
 ## What it is and when to use it
 
@@ -101,7 +101,7 @@ The `soul` is **not** registered as a `Skill` and does **not** appear in `regist
 If you want to take over system-prompt construction entirely, pass `soul=None` (or omit it) and control the prompt sent to the model in your own host code:
 
 ```python
-from cantus import Agent
+from cantus import Agent, AgentState
 from cantus.identity import Soul
 
 soul = Soul.from_file("SOUL.md")

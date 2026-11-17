@@ -22,7 +22,7 @@ When the reply is not valid JSON — or when it parses but fails a check — `st
 
 - malformed JSON → `validator_name="action_parse"`, `error_type: json_syntax`
 - the `action` object is missing both `skill_name` and `final_answer` → `validator_name="action_parse"`, `error_type: missing_field`
-- a `skill_name` is present but not in the current registry → `validator_name="action_parse"`, `error_type: unknown_skill`
+- a `skill_name` is present but not in the current (non-empty) registry → `validator_name="action_parse"`, `error_type: unknown_skill`
 - a `final_answer` is present but empty after `str.strip()` → `validator_name="non_empty_final_answer"`
 
 Because `step` can return either branch, callers must handle both an `Action` and an `Observation`. The run loop appends whichever one it gets straight onto the EventStream.
@@ -51,17 +51,17 @@ The first positional parameter is named `workflow_or_query` for forward compatib
 1. Call `step()` to get an `Action` (or `Observation`) and append it to the stream.
 2. If it is a `FinalAnswerAction` → return immediately.
 3. If it is a `CallSkillAction` → dispatch it through the registry, wrap the return value as an `Observation`, and append that to the stream.
-4. If the result is a `ValidationErrorObservation` and retries remain → don't reset the counter; the next round shows the LLM the feedback so it can self-correct.
+4. If the result is a `ValidationErrorObservation` → nothing is re-run automatically; the observation stays on the stream, and the next round shows the LLM the feedback so it can correct itself.
 5. If `max_iterations` is reached without a `FinalAnswerAction` → append a `MaxIterationsObservation` and return.
 
-The default budgets are `max_iterations=8` and `max_retries=3`. Small models such as Gemma 4 E2B often short-circuit to an empty `final_answer`; for those, callers may pass `max_iterations=12` to give the loop more room to converge. That is a caller-supplied override, not a framework default.
+The default budgets are `max_iterations=8` and `max_retries=3`. Only `max_iterations` bounds the loop today: `max_retries` is accepted, but every validation failure simply uses up one iteration, so changing it does not change a run. Small models such as Gemma 4 E2B often short-circuit to an empty `final_answer`; for those, callers may pass `max_iterations=12` to give the loop more room to converge. That is a caller-supplied override, not a framework default.
 
 ## Three error-closing loops
 
 | Observation                    | Triggered when                          | Message the LLM sees                                  |
 | ------------------------------ | --------------------------------------- | ----------------------------------------------------- |
-| `ToolErrorObservation`         | a skill raises, or the skill name is unknown | the error message plus the list of available skills   |
-| `ValidationErrorObservation`   | a validator returns `Result(ok=False)`  | the `feedback` string; the previous action is retried next round |
+| `ToolErrorObservation`         | a skill or one of its hooks raises, or the arguments fail validation | the exception type and message |
+| `ValidationErrorObservation`   | a validator returns `Result(ok=False)`, or the model's reply fails to parse (including an unknown skill name) | the `feedback` string; the model decides what to do next round |
 | `MaxIterationsObservation`     | `max_iterations` is reached             | `iterations`, `last_action_summary`, and a deep-copied `partial_state`; the loop ends |
 
 Every error goes onto the stream; none of them escapes as an exception. This is a hard guarantee of the framework: `agent.run` either returns an `AgentState`, or it raises only because of a caller bug (such as `model=None`).

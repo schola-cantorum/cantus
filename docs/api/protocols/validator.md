@@ -80,13 +80,13 @@ The class-first form suits cases where the validator needs to carry state of its
 
 - Like an analyzer, a validator does **not** appear directly in the LLM's system prompt. It is attached to a skill, and that skill's spec JSON keeps the same shape — still just the three keys `{"name", "description", "args_schema"}`.
 - The post-hook runs after the skill body returns successfully, taking the skill's return value as its input.
-- `Result(ok=True, value=v)` produces `SkillObservation(result=v)`. `Result(ok=True)` with no `value` falls back to the skill's original return value. `Result(ok=False, feedback=...)` produces `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)` and emits **no** `SkillObservation`.
-- A return value that is not a `Result` is written straight into `SkillObservation` as the skill's new `result`. So a post-hook can also tidy up formatting in passing. When you want a strict pass/fail decision, always return a `Result`.
+- `Result(ok=True, value=v)` produces `SkillObservation(result=v)`. `Result(ok=True)` with no `value` produces `SkillObservation(result=None)`, so always pass the value along: `Result.success(v)`. `Result(ok=False, feedback=...)` produces `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)` and emits **no** `SkillObservation`.
+- A `@validator` (or a `Validator` subclass) must return a `Result`. Anything else raises `TypeError`, which reaches the model as `ToolErrorObservation(message="post_hook TypeError: ...")`. A plain callable passed as `post_hook` is not checked: whatever it returns becomes the skill's new `result`.
 - If the post-hook raises, you get `ToolErrorObservation(message="post_hook <ExcType>: <msg>")`.
 
 ## Common mistakes
 
-- **Forgetting to return a `Result`.** A post-hook that returns `True`, `book`, or `None` has that value passed through as the new result. To get a strict decision, you must return `Result.success(...)` or `Result.failure(...)`.
+- **Forgetting to return a `Result`.** A validator that returns `True`, `book`, or `None` raises `TypeError`, and the model sees a `ToolErrorObservation` instead of your verdict. Return `Result.success(...)` or `Result.failure(...)`.
 - **Writing feedback like an engineer.** `"AssertionError at line 42"` means nothing to the LLM. Write an instruction the model can act on, such as `"An ISBN must be 13 digits; only 10 are present, so add the missing digits."`
 - **Using a validator as a fixer.** Quietly patching the value inside the post-hook and then returning `Result.success(...)` is an anti-pattern. Move data repair into an analyzer or a new skill.
 - **Trying `from cantus import validator` or `register_validator(fn)`.** Both raise `ImportError`. Use `from cantus.hooks import validator` together with `@skill(post_hook=fn)`.

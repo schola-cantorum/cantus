@@ -28,11 +28,11 @@ You write the top layer: plain Python functions registered as protocols through 
 | ------------------------- | --------------------------------------------------------------------------------- | ------------------ |
 | `skill` (protocol kind)   | A single atomic capability, such as a table lookup or an API call                 | Any value          |
 | `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, plus the AutoMemory wrapper) | The relevant memory interface |
-| `analyzer` (hook helper)  | Reads the input before the agent loop starts and produces a structured insight    | dataclass / dict   |
-| `validator` (hook helper) | Checks whether the agent output is acceptable, and can trigger a retry            | `Result(ok, ...)`  |
+| `analyzer` (hook helper)  | A skill's `pre_hook`: turns the skill's arguments into a structured value before its body runs | dataclass / dict   |
+| `validator` (hook helper) | A skill's `post_hook`: judges the skill's return value and can send feedback to the model | `Result(ok, ...)`  |
 | `cantus.workflows`        | A namespace of building blocks for composing skills and hooks into a flow         | Any value          |
 
-cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they run around the agent loop instead of being dispatched inside it. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Skill's `spec_for_llm()`; there is no separate `tool` category.
+cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they are attached to one skill and run around that skill's body, rather than being dispatched on their own. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Skill's `spec_for_llm()`; there is no separate `tool` category.
 
 ## Model Providers
 
@@ -68,13 +68,16 @@ cantus can serve an agent over four messaging channels:
 - **smolagents**: the decorator-first ergonomics come from here, but we do not adopt the CodeAgent approach of executing LLM-written code directly. We use explicit dispatch instead.
 - **LangGraph**: we skip the graph compilation step, but we keep the replay promise at the core. `Inspector(stream).replay()` reconstructs the full history at any point.
 
-The core runtime is under 800 lines of Python with no extra runtime dependencies, so it drops straight into a notebook with a single `pip install`.
+The core runtime is under 800 lines of Python and its only runtime dependency is `pydantic`, so it drops straight into a notebook with a single `pip install`.
 
 ## Documentation Map
 
 - `overview.md` (this page): the four-layer architecture, the two protocol kinds plus hook helpers and workflow building blocks, and the comparison to related projects.
-- `quickstart.md`: from `import` to your first agent run in about 30 seconds.
+- `quickstart.md`: from `import` to your first agent run on Colab.
+- `quickstart-desktop.md`: the same on Windows, macOS or Linux, plus serving and tunnelling.
+- `quickstart-providers.md`: the same agent against each of the eight model APIs.
+- `quickstart-agent.md`: build an agent piece by piece — tools, identity, guardrail, memory.
 - `protocols/{skill,analyzer,validator,memory,debug}.md`: three entry-point examples and common pitfalls for the two protocol kinds (`skill` / `memory`) and the hook helpers (`analyzer` / `validator`); composition templates live in the `cantus.workflows` building blocks.
 - `core/{agent,event-stream,inspector}.md`: the internal data structures of the runtime.
 - `cookbook/{patterns,errors,tips}.md`: common combinations and troubleshooting.
-- `llms-txt.md`: what `docs/llms.txt` is, why it exists, and how to use it as a teacher-side feasibility test.
+- `llms.txt` (repository root): a priming document for external LLMs, explained in `docs/llms-txt.md` in the repository (not part of this site).

@@ -80,4 +80,4 @@ The `args_schema` is a JSON schema reflected from the function signature (or fro
 - **Never registered**: you forgot `@skill`, or you forgot to import the module that defines it, so the agent never sees the tool.
 - **No type annotation**: `def search_book(title)` (with no `: str`) collapses the args schema to `Any`, which makes it easy for the LLM to pass garbage.
 - **Pydantic validation fails**: if the caller passes `title=123`, `validate_args()` raises a `ValidationError`, and the agent hands that error back to the model to retry.
-- **Return value isn't JSON-serializable**: serializing the observation falls back to `repr()`, and the model ends up reading something messy.
+- **Return value with a messy `repr()`**: the model reads every observation as its `repr()`, so return a string, a number, or a small dict rather than a large object.

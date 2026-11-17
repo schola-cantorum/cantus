@@ -1,14 +1,14 @@
-# `cantus.adapters` — bridges to MCP and Anthropic Memory (v0.3.2)
+# `cantus.adapters` — bridges to MCP, Anthropic Memory and other frameworks
 
 ## Package overview
 
-`cantus.adapters` is the bridge layer introduced in v0.3.2. It exposes cantus Skill and Memory objects to existing agent ecosystems (MCP, the Anthropic Memory tool), and in the other direction pulls external tools into cantus. v0.3.2 ships three public callables:
+`cantus.adapters` is the bridge layer introduced in v0.3.2. It exposes cantus Skill and Memory objects to existing agent ecosystems (MCP, the Anthropic Memory tool), and in the other direction pulls external tools into cantus. This first section covers the three callables that arrived in v0.3.2; the cross-framework adapters (LangChain, DSPy, HuggingFace smolagents, OpenHands) are covered in the batch2 and batch3a sections below.
 
 | Function | Direction | Dependency |
 | --- | --- | --- |
 | `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install (no external SDK) |
-| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus[mcp]` |
-| `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus[mcp]` |
+| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
+| `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus-agent[mcp]` |
 
 Design principles:
 
@@ -71,7 +71,7 @@ t = threading.Thread(
 t.start()
 ```
 
-With `port=0` the actual port is chosen by the SDK. If you need to read back the assigned port and hand it to another service, see the server-info hook the mcp SDK provides. Production-grade graceful shutdown is left to the v0.4.0 `cantus-serve-core` work.
+With `port=0` the actual port is chosen by the SDK. If you need to read back the assigned port and hand it to another service, see the server-info hook the mcp SDK provides. `McpServer` has no graceful-shutdown API.
 
 ## `import_mcp_server` five-line example (stdio)
 
@@ -86,7 +86,7 @@ for s in skills:
 
 ### Trust boundary (important)
 
-Under the stdio transport, `command_or_url` is launched as a **child process**. cantus always uses the list form `subprocess.Popen(args=[...])`, **never** `shell=True`, and it rejects input containing a shell metacharacter (`|` `>` `<` `&` `;` `$`, backtick, newline). That only stops accidental injection; **do not feed it an untrusted `command_or_url`** — doing so is equivalent to granting permission to run arbitrary programs.
+Under the stdio transport, `command_or_url` is launched as a **child process**. cantus rejects input containing a shell metacharacter (`|` `>` `<` `&` `;` `$`, backtick, newline, carriage return) and hands the command string to the mcp SDK, which launches the child process. That only stops accidental injection; **do not feed it an untrusted `command_or_url`** — doing so is equivalent to granting permission to run arbitrary programs.
 
 The `http` transport uses `urllib.parse.urlparse` to check that the scheme is in `{"http", "https"}` and the netloc is non-empty; other schemes (`file://`, `ftp://`, `javascript:`) are rejected. It does **not** validate the trustworthiness of the remote server's content — whatever schema the server returns, cantus wraps. In production, keep an allowlist over the source of `command_or_url`.
 
@@ -124,7 +124,7 @@ Errors from `cantus.adapters` fall into two categories:
 | When | Exception type | Substring marker |
 | --- | --- | --- |
 | Handshake / connection (synchronous setup phase) | `RuntimeError` (or `ValueError` / `OSError` / `ImportError` as appropriate) | `<adapter>_handshake_failed` |
-| Call-time (already connected, a single tool call fails) | cantus `ToolErrorObservation` (wrapped automatically by the Agent dispatcher) | `<adapter>_remote_error` or `<adapter>_call_failed` |
+| Call-time (already connected, a single tool call fails) | cantus `ToolErrorObservation` (wrapped automatically by the Agent dispatcher) | `<adapter>_remote_error` |
 
 `<adapter>` is the lowercase short name of the adapter family (`mcp`, `langchain`, `dspy`, `huggingface`, and so on). The v0.3.2 `mcp_handshake_failed` / `mcp_remote_error` follow this convention, and the four cross-framework adapters added in v0.3.3 reuse it (for example `langchain_handshake_failed`).
 
@@ -144,18 +144,9 @@ except RuntimeError as exc:
 
 For call-time errors, the Agent loop already wraps them into a `ToolErrorObservation` on the EventStream, so when a student sees `mcp_remote_error: ...` in the Inspector they know the failure happened during the remote tool call.
 
-## Looking ahead to v0.3.3: cross-framework adapters
+## Cross-framework adapters
 
-v0.3.2 ships only the three MVP pieces: MCP in both directions plus the Anthropic Memory tool. The v0.3.3 `cantus-adapter-layer-batch2` work is scheduled to deliver:
-
-- `cantus[langchain]` extras plus a bidirectional LangChain `Tool` / `Runnable` adapter
-- `cantus[dspy]` extras plus a DSPy `Tool` adapter
-- `cantus[huggingface]` extras plus a HuggingFace tool adapter (originally `transformers.Tool`; now targets `smolagents.Tool`, see the note under the example below)
-- `cantus[openhands]` extras plus an OpenHands action adapter
-
-Each one follows the `<adapter>_handshake_failed` / `<adapter>_remote_error` naming rules defined in the "Error naming convention" section above, and this page will keep growing the matching sections.
-
-If your v0.3.2 environment needs these cross-framework hooks today, the workaround is to write the glue by hand (call a LangChain Tool from inside a cantus Skill, for example). Switch over to the framework adapter once v0.3.3 ships.
+The LangChain, DSPy, HuggingFace (`smolagents`) and OpenHands adapters have shipped. Their sections follow below; each one uses the `<adapter>_handshake_failed` / `<adapter>_remote_error` naming rules defined in the "Error naming convention" section above.
 
 
 <!-- merged: adapters-batch2 -->
@@ -166,16 +157,16 @@ If your v0.3.2 environment needs these cross-framework hooks today, the workarou
 
 ## Package overview
 
-On top of the three v0.3.2 MVP pieces (MCP server, MCP client, Anthropic Memory), v0.3.3 adds bridges to four mainstream agent stacks: LangChain, DSPy, HuggingFace, and OpenHands. That is six new callables, each tied to a `cantus[<name>]` extras:
+On top of the three v0.3.2 MVP pieces (MCP server, MCP client, Anthropic Memory), v0.3.3 adds bridges to four mainstream agent stacks: LangChain, DSPy, HuggingFace, and OpenHands. That is six new callables, each tied to a `cantus-agent[<name>]` extras:
 
 | Function | Direction | Dependency |
 | --- | --- | --- |
-| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus[langchain]` |
-| `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus[langchain]` |
-| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus[dspy]` |
-| `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool` (export only in v0.3.3; import added in v0.3.4) | `pip install cantus[huggingface]` |
-| `expose_as_openhands_action(skill)` | cantus → OpenHands (export only) | `pip install cantus[openhands]` |
+| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
+| `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus-agent[langchain]` |
+| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
+| `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus-agent[dspy]` |
+| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool` (export only in v0.3.3; import added in v0.3.4) | `pip install cantus-agent[huggingface]` |
+| `expose_as_openhands_action(skill)` | cantus → OpenHands (export only) | `pip install cantus-agent[openhands]` (Python 3.12 only) |
 
 The design principles carry over from the v0.3.2 `adapters.md`: pure wrapper layer, `Skill.spec_for_llm()` shape unchanged, `Registry.KINDS` unchanged, and no `Adapter` ABC. Error naming reuses the `<framework>_handshake_failed` / `<framework>_remote_error` convention.
 
@@ -238,7 +229,7 @@ def translate(text: str, target: str) -> str:
 hf_tool = expose_as_hf_tool(translate)  # feed to smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**smolagents, not transformers.** `transformers.Tool` was removed in transformers 4.53, so `cantus[huggingface]` now installs [`smolagents`](https://github.com/huggingface/smolagents) (HuggingFace's successor package for agents) and `expose_as_hf_tool` returns a `smolagents.Tool` instance: a dynamically created subclass whose `forward` names each Skill argument explicitly and whose `output_type` is `"any"`. JSON Schema types outside `string / integer / number / boolean / array / object` are exported as `any`. **Known limitation:** the exported tool has no source code, so `tool.to_dict()`, `tool.save()` and `tool.push_to_hub()` raise; `CodeAgent` / `ToolCallingAgent` `run()` paths do not need them.
+**smolagents, not transformers.** `transformers.Tool` was removed in transformers 4.53, so `cantus-agent[huggingface]` now installs [`smolagents`](https://github.com/huggingface/smolagents) (HuggingFace's successor package for agents) and `expose_as_hf_tool` returns a `smolagents.Tool` instance: a dynamically created subclass whose `forward` names each Skill argument explicitly and whose `output_type` is `"any"`. JSON Schema types outside `string / integer / number / boolean / array / object` are exported as `any`. **Known limitation:** the exported tool has no source code, so `tool.to_dict()`, `tool.save()` and `tool.push_to_hub()` raise; `CodeAgent` / `ToolCallingAgent` `run()` paths do not need them.
 
 **HF import direction deferred to v0.3.4** (v0.3.3-era note, written against the transformers interface): a HuggingFace `Tool` leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Skill for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
 
@@ -377,7 +368,7 @@ action = expose_as_openhands_action(my_cantus_skill)
 
 ## SDK gate
 
-`import_hf_tool` uses the existing `cantus[huggingface]` extras (now `smolagents>=1.26,<2`; transformers is no longer a dependency of this group) and introduces **no new dependency** beyond that group. Without smolagents installed, importing `cantus.adapters.huggingface` raises `ImportError("pip install cantus[huggingface]")`; the `cantus.adapters` package itself (no extras) still imports fine, and the lazy stub only resolves on the first call.
+`import_hf_tool` uses the existing `cantus-agent[huggingface]` extras (now `smolagents>=1.26,<2`; transformers is no longer a dependency of this group) and introduces **no new dependency** beyond that group. Without smolagents installed, importing `cantus.adapters.huggingface` raises `ImportError("pip install cantus[huggingface]")`; the `cantus.adapters` package itself (no extras) still imports fine, and the lazy stub only resolves on the first call.
 
 ## Relationship to the batch2 section
 

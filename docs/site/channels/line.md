@@ -1,6 +1,6 @@
 # Cookbook: connect cantus to the LINE Messaging API (echo bot)
 
-This walkthrough takes you from zero to a LINE official account wired into `cantus serve`, running an echo bot: a student sends a message, the bot sends one back. Every command assumes you have already worked through the "Serve via CLI" and "Expose via Cloudflare Tunnel" sections of [`docs/quickstart-desktop.md`](./quickstart-desktop.md).
+This walkthrough takes you from zero to a LINE official account wired into `cantus serve`, running an echo bot: a student sends a message, the bot sends one back. Every command assumes you have already worked through the "Serve via CLI" and "Expose via Cloudflare Tunnel" sections of [`docs/quickstart-desktop.md`](../quickstart-desktop.md).
 
 ## 0. What you'll need
 
@@ -152,4 +152,4 @@ You should get `HTTP/1.1 200 OK` with the body `{"ok":true}`. Corrupt `SIG` and 
 ## Next steps
 
 - Wrap the worker loop in an Agent or Workflow so the LLM decides how to reply.
-- Connect a Telegram bot: see [`docs/cookbook-telegram-channel.md`](./cookbook-telegram-channel.md).
+- Connect a Telegram bot: see [Telegram](./telegram.md).

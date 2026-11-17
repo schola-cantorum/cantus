@@ -28,7 +28,7 @@ cantus tui --url http://127.0.0.1:8765
 | 鍵 | 分頁 | 顯示內容 |
 | --- | --- | --- |
 | `1` | **Dashboard** | 主總覽。左側是 Sessions 清單（最近被 dispatch 的那幾個 run），右側由上到下堆疊著 Queue（各 channel 的 queue 深度）與 Health（server 是否連得上，外加 `cantus_version`） |
-| `2` | **Skills** | 列出每個已註冊 Skill 的 `name`、`description` 與 `args_schema`；若有 run 正在進行、且當下用到某個 skill，那個 skill 會被標記出來 |
+| `2` | **Skills** | 列出每個已註冊 Skill 的名稱、說明與引數名稱；若有 run 正在進行、且當下用到某個 skill，那個 skill 會被標記出來 |
 | `3` | **Permissions** | 目前生效的認證設定：`auth_mode`、`dashboard_requires_auth` / `introspection_requires_auth` 這兩個 flag，以及被 auth gate 擋住的路徑清單。token 值**永遠不會**顯示 |
 | `4` | **Dataflow** | 由 registry 與 channels 推導出來的靜態元件拓樸（節點與邊：serve、event stream、各個 skill、各個 channel） |
 | `5` | **Inspector** | 單一 run 的 Action/Observation 步驟軌跡（從某一列 Sessions 鑽進去看，詳見下方） |
@@ -43,7 +43,7 @@ cantus tui --url http://127.0.0.1:8765
 | `p` | 暫停 / 恢復自動刷新（暫停時標題列顯示 `PAUSED`） |
 | `q` | 離開 |
 
-Inspector 裡顯示的 workflow 步驟 `summary` 是一份**結構投影**，而且 server 端早就先幫你去敏感過了。它只保留 skill 名稱、引數的**鍵名**，以及結果或例外的**型別名稱**；引數值、結果值、原始例外訊息則**一律不收**。也因為這樣，就算你連的是一台對外曝光的 server，Inspector 也不會把 secret 或 PII 漏出來。
+Inspector 裡顯示的 workflow 步驟 `summary` 是一份**結構投影**，而且 server 端早就先幫你去敏感過了。它只保留 skill 名稱、引數的**鍵名**，以及結果的**型別名稱**；引數值、結果值、原始例外訊息則**一律不收**。也因為這樣，就算你連的是一台對外曝光的 server，Inspector 也不會把 secret 或 PII 漏出來。
 
 ## 三種認證模式
 

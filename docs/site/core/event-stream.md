@@ -61,12 +61,12 @@ Action (base, thought: str)
 ```
 Observation (base, frozen)
 ├── SkillObservation(skill_name, result)              # Success
-├── ToolErrorObservation(skill_name, message)         # Skill failed, or the name does not exist
-├── ValidationErrorObservation(validator_name, feedback)  # Triggers a retry
-└── MaxIterationsObservation(iterations, last_action_summary)  # Loop ran to its bound
+├── ToolErrorObservation(skill_name, message)         # Skill, hook or argument validation failed
+├── ValidationErrorObservation(validator_name, feedback)  # Feedback for the model's next turn
+└── MaxIterationsObservation(iterations, last_action_summary, partial_state)  # Loop ran to its bound
 ```
 
-Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, `ToolErrorObservation.message` lists the available skill names so the model can correct its own typo.
+Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, when the model names a skill that is not registered, the `ValidationErrorObservation.feedback` lists the available skill names so the model can correct its own typo.
 
 ## Why frozen
 
