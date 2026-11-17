@@ -28,6 +28,9 @@ against the code before any edit) found about 45 places where the manual contrad
   debug,workflows,memory,identity}.md`, `channels/{line,discord}.md`.
 - Sidebar, home-page actions, `docs/README.md`, `README.md`, `README.zhTW.md` point at the new
   pages; `docs/api/` regenerated.
+- `changelog.md` in both locales: includes the repository's `CHANGELOG.md` (single source); a
+  markdown-it rule in the VitePress config points its `docs/...` links at GitHub. Linked from the
+  sidebar ("Project") and the nav "Links" menu.
 - `ignoreDeadLinks` set to `false`: every relative link now resolves, so a dead one fails
   `npm run docs:build`.
 
@@ -53,6 +56,12 @@ agent 換上八個 provider 各跑一次）與「建置 Agent 版」（不需要
   `load_chat_model(...)` lines themselves are not executed by the runner.
 - Held for approval (test code): adding `quickstart-providers.md` and `quickstart-agent.md` to
   `IN_SCOPE_PAGES` in `tests/docs/pages.py`. Until then CI does not run the two pages.
+- CHANGELOG sync check (2026-11-17): the newest entry is `[0.6.0]` (2026-09-06) and there is no
+  `[Unreleased]` section. `main` is 13 commits past `v0.6.0`; the only `cantus/` change is two
+  comment/docstring edits, so nothing user-visible in the package is unrecorded. Unrecorded
+  repository-level work: the executable-docs harness (#37), the harness-agile migration (#39 to
+  #41), Charter and ADR-0015 to 0017 (#47), supply-chain audit changes (#44, #49), and this
+  ticket. No entry was written: a CHANGELOG entry goes through `/tw-emoji-release-note`.
 - Found, not fixed here (code or tutorial design, outside the lightweight path):
   - `Agent.run(max_retries=...)` does not bound anything (`cantus/core/agent.py`, both
     `ValidationErrorObservation` branches `continue` either way). The pages now say so.

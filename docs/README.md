@@ -58,6 +58,8 @@ A table of contents for everything under `docs/`. New here? Start with the
 
 ## Upgrade guides
 
+The [changelog](../CHANGELOG.md) is also published on the site as [`site/changelog.md`](site/changelog.md), which includes the root file rather than copying it.
+
 Per-version migration guides live in [`migrations/`](migrations/). Most recent:
 [v0.5.0 → v0.6.0](migrations/MIGRATION_v0.5.0_to_v0.6.0.md).
 

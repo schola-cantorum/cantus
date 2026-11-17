@@ -60,6 +60,10 @@ function sidebar(base: string) {
         { text: 'Google Chat', link: `${base}/channels/google-chat` },
       ],
     },
+    {
+      text: 'Project',
+      items: [{ text: 'Changelog', link: `${base}/changelog` }],
+    },
   ]
 }
 
@@ -72,12 +76,15 @@ function nav(base: string) {
     {
       text: 'Links',
       items: [
+        { text: 'Changelog', link: `${base}/changelog` },
         { text: 'GitHub', link: 'https://github.com/schola-cantorum/cantus' },
         { text: 'PyPI', link: 'https://pypi.org/project/cantus-agent/' },
       ],
     },
   ]
 }
+
+const REPO_BLOB = 'https://github.com/schola-cantorum/cantus/blob/main'
 
 export default defineConfig({
   title: 'Cantus',
@@ -86,6 +93,23 @@ export default defineConfig({
   cleanUrls: true,
   // Every relative link resolves (T-0022), so a dead link fails the build.
   ignoreDeadLinks: false,
+  markdown: {
+    config(md) {
+      // changelog.md includes the repository's CHANGELOG.md, whose links to
+      // docs/... are relative to the repository root, not to the site. Point
+      // them at GitHub so one CHANGELOG serves both places.
+      md.core.ruler.push('repo-relative-links', (state) => {
+        for (const token of state.tokens) {
+          for (const child of token.children ?? []) {
+            if (child.type !== 'link_open') continue
+            const href = child.attrGet('href')
+            const match = href?.match(/^(?:\.\/)?(docs\/.+)$/)
+            if (match) child.attrSet('href', `${REPO_BLOB}/${match[1]}`)
+          }
+        }
+      })
+    },
+  },
   // The interactive manual is mirrored into docs/site/public/interactive/ and
   // served verbatim at /interactive/; it is not a VitePress page.
   locales: {
