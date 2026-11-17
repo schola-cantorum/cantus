@@ -4,7 +4,7 @@ title: Realign the VitePress manual with the code and add the model-API and buil
 epic: 0000-maintenance
 status: review
 blocked_by: []
-lightweight_reason: Changes documentation only (docs/site, the generated docs/api corpus, docs/README.md, the two READMEs) plus the VitePress config; no change to cantus/ runtime behaviour or public API, no workflow, dependency or guard-script change. Registering the two new pages in tests/docs is held for the user's test plan approval.
+lightweight_reason: Changes documentation only (docs/site, the generated docs/api corpus, docs/README.md, the two READMEs) plus the VitePress config; no change to cantus/ runtime behaviour or public API, no workflow, dependency or guard-script change. tests/docs/pages.py gains two IN_SCOPE_PAGES entries (test plan approved by the user on 2026-11-17); no new test function.
 ---
 
 ## Context
@@ -54,8 +54,9 @@ agent 換上八個 provider 各跑一次）與「建置 Agent 版」（不需要
   in a subprocess with a scripted model. No provider API, Ollama daemon, MLX runtime or chat
   platform was contacted; the provider blocks run with the model hook substituted, so the
   `load_chat_model(...)` lines themselves are not executed by the runner.
-- Held for approval (test code): adding `quickstart-providers.md` and `quickstart-agent.md` to
-  `IN_SCOPE_PAGES` in `tests/docs/pages.py`. Until then CI does not run the two pages.
+- Test plan (approved 2026-11-17): `quickstart-providers.md` and `quickstart-agent.md` added to
+  `IN_SCOPE_PAGES` in `tests/docs/pages.py`, so the existing well-formedness, run-and-compare,
+  zh-tw parity and install-name tests cover both. Skip baseline unchanged at 13.
 - CHANGELOG sync check (2026-11-17): the newest entry is `[0.6.0]` (2026-09-06) and there is no
   `[Unreleased]` section. `main` is 13 commits past `v0.6.0`; the only `cantus/` change is two
   comment/docstring edits, so nothing user-visible in the package is unrecorded. Unrecorded

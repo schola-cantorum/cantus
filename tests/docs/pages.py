@@ -27,6 +27,8 @@ SITE = ROOT / "docs" / "site"
 # and the piece-by-piece page join this list in the tickets that create them.
 IN_SCOPE_PAGES: tuple[str, ...] = (
     "quickstart-desktop.md",
+    "quickstart-providers.md",
+    "quickstart-agent.md",
     "core/agent.md",
     "core/event-stream.md",
     "core/inspector.md",
