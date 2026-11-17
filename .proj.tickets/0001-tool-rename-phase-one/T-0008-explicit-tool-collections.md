@@ -2,7 +2,7 @@
 id: T-0008
 title: Explicit tool collections — Registry(tools=) and Agent(tools=)
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0007]
 ---
 
