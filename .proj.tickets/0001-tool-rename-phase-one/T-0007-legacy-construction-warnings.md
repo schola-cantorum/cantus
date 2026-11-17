@@ -2,7 +2,7 @@
 id: T-0007
 title: Legacy construction names warn, visibly
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0006]
 ---
 
@@ -127,8 +127,11 @@ registry kind and its JSON key change here too, because `spec_for_llm()` builds 
     resolves the name twice); it is asserted in a subprocess, not under an `always` filter. A W2 is
     attributed to the `def` line on Python 3.10 and to the decorator line from 3.11; tests accept
     either and require the file name.
-  - `tests/test_tool.py` reads the global registry through the private accessor, because no public
-    read is left that does not warn (known exception to "tests use public interfaces").
+  - Tests read the global registry through the private accessor (`tests/conftest.py`,
+    `tests/test_tool.py`, `tests/legacy/`), because no public read is left that does not warn; and
+    `tests/legacy/test_warning_helper.py` compares the helper's private table keys with the
+    expected-text table. Both are known exceptions to "tests use public interfaces" (AC-19 closes
+    TR-71 at the helper level).
 
 ## Review findings carried
 
@@ -146,6 +149,15 @@ registry kind and its JSON key change here too, because `spec_for_llm()` builds 
 C2-F1（filter 規則的各種分支）、C2-F2（IPython、`cantus serve --registry-import` 的可見性）都在這裡
 寫成測試案例；其中 `-W error::cantus.CantusDeprecationWarning` 在 Python 啟動時會被丟掉，本票決定
 cantus 把它當成不存在、照樣顯示警告。這些案例會出現在 stage 5 的 test plan table 給你核准。
+
+Stage 5 核准後的讀法（2026-11-17）：`-W`／`PYTHONWARNINGS` 照 Python 的語法解析，只有不帶範圍、
+category 為空或是 `Warning`／`DeprecationWarning` 的選項會讓 cantus 不插入 filter；帶 module、message
+或行號的選項不算（這比 spec 的 rule 1 字面寬）。Python 預設的那筆 `ignore::DeprecationWarning` 以位置
+辨認，所以 import cantus 前自己設的 `simplefilter("ignore", DeprecationWarning)` 會被尊重。
+`skill(既有的 Tool)` 會註冊同一個物件；非 callable 與 Tool 子類別本身改為 `TypeError`。
+`spec.get("skill")` 與 `"skill" in spec` 都會回應並發 W9。已知限制：第一次 import 發生在
+`warnings.catch_warnings()` 內時，離開後警告又會被藏起來；pytest 加上任何直譯器層級的警告選項時就是
+這個情況。命令列上沒有只關掉 cantus 警告的寫法，要在 import 之後用程式設 filter。
 
 ## Comments
 
@@ -208,7 +220,9 @@ cantus 把它當成不存在、照樣顯示警告。這些案例會出現在 sta
     (`SkillObservation`).
   - T-0010: `cantus/grammar/tool_call.py` and `cantus/core/agent.py` (`skill_name`, texts);
     `tests/test_tool.py` and `tests/test_internal_paths_silent.py` (the `skill_name` action key,
-    each in one helper).
+    each in one helper; in the latter also the `parsed.skill_name` read and the schema path
+    through `skill_name`). T-0009: the event classes and `o.skill_name` in
+    `tests/test_internal_paths_silent.py`.
   - T-0008: `Agent(model, registry=reg)` in `tests/test_internal_paths_silent.py`.
   - T-0012: everything in `cantus/serve/{app,dashboard,introspection}.py` except the kind passed
     to the registry (routes, names, payload value `kind="skill"`, docstrings); the `/skills` and
@@ -226,24 +240,82 @@ cantus 把它當成不存在、照樣顯示警告。這些案例會出現在 sta
   `get_registry` is no longer an attribute of `cantus.core.agent`, `cantus.grammar.tool_call` or
   `cantus.protocols.skill`; `Skill` is served by
   module `__getattr__` on `cantus` and `cantus.protocols.skill` and is in neither `__dict__`.
-  New names: `cantus.core.registry.ToolSpecMapping`, `cantus._deprecation` (private).
+  New names: `cantus.core.registry.ToolSpecMapping` (public, as traceability 2.1 writes the return
+  type), `cantus._deprecation` (private); `warn_legacy` is now an incidental attribute of
+  `cantus.core.registry` and `cantus.protocols.skill`. `cantus.protocols.skill` gained
+  `__all__ = ["skill", "register_skill"]`, so a star import of it no longer binds `Skill` (import
+  it by name) or `get_registry`.
 - **For later tickets.** `cantus._deprecation.warn_legacy(w_id, *, variant=None)` is the one
   emitting call (variants: W12 `build_schema` / `parse_tool_call`, W18 `skill` / `skills`); W13
-  never raises. `tests/legacy/support.py` holds the expected texts (`W_TEXTS`), a module writer
-  and `run_python` (clean environment); `tests/legacy/conftest.py` clears the global registry.
+  never raises. `tests/legacy/support.py` holds the expected texts (`EXPECTED`), a module writer,
+  `cantus_records` and `run_python` (clean environment); `tests/legacy/conftest.py` clears the global registry.
   The W2 and W8 hints name `Agent(model, tools=[...])`, which arrives with T-0008. No command-line
   option silences only cantus's warnings (they are attributed to the student's module); the
   migration guide (T-0019) should show the in-code filter. A library that sets a blanket
   `ignore` after `import cantus` hides later warnings (T-0010's Colab run can print
   `warnings.filters`).
-- **Coverage report** (stage 5 close, full suite `1363 passed, 3 skipped`; the skips need
+- **Coverage report** (counts after the stage-6 fixes, full suite `1370 passed, 3 skipped`; the skips need
   `mlx_lm`, `rank_bm25` and `sentence_transformers`):
 
   | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
-  | S7 internal helper | `tests/legacy/test_warning_helper.py` rows 1–5 (30 tests) | `cantus/_deprecation.py` 56% lines in-process; `warn_legacy` and the stack walk are fully covered | AC-19 (TR-70, TR-71); supporting TR-77, TR-78 | the filter rule (lines 122–181) runs at import, before coverage starts, and is exercised only in subprocesses, which coverage does not measure |
-  | S4 legacy entries, S5 exports, S1 attribution | `tests/legacy/test_w01_w02_w03_construction.py` rows 6–15, 24–26 (32 tests); `tests/legacy/test_skill_shim.py` | `cantus/protocols/skill.py` 100%; `cantus/__init__.py` 88% | AC-14 (TR-53–56); W1–W3 supporting rows; C2-F13-a to c; X9 | `cantus/__init__.py` 129–133 are the lazy `serve` / `config` loader's rarely hit branch and the `mount_drive_and_load` wrappers (unchanged) |
-  | S3 registry and mapping | `tests/test_registry.py` rows 17, 19–21, 23 (19 tests); `tests/legacy/test_w08_w09_registry.py` rows 16, 18, 20, 22, 23 (9 tests) | `cantus/core/registry.py` 100% | AC-08 (TR-21–23); V2-9; C2-F11; C2-F8, R2-8; X3, X4 | writing `"skill"` into the mapping is undefined by decision |
-  | S2 process boundary | `tests/legacy/test_warning_visibility.py` rows 27–44 (44 tests, about 6 s) | not measured (subprocess); every branch of both rules has a mutation that turns a row red | AC-19 (TR-72–76); C2-F1-a to d; R2-2; C2-F2; V2-16 | a real IPython kernel (stage 8); Windows; a debug build of Python (no default ignore entries: nothing to insert, warnings show anyway) |
+  | S7 internal helper | `tests/legacy/test_warning_helper.py` rows 1–5 (31 tests) | `cantus/_deprecation.py` 56% lines in-process (measured before the stage-6 fixes); `warn_legacy` and the stack walk are fully covered | AC-19 (TR-70, TR-71); supporting TR-77, TR-78 | the pytest process has no warn options and cantus is imported once, so the option parser and the insertion branch run only in subprocesses, which coverage does not measure |
+  | S4 legacy entries, S5 exports, S1 attribution | `tests/legacy/test_w01_w02_w03_construction.py` rows 6–15, 24–26 (30 tests); `tests/legacy/test_skill_shim.py` (3 tests) | `cantus/protocols/skill.py` 100%; `cantus/__init__.py` 88% | AC-14 (TR-53–56); W1–W3 supporting rows; C2-F13-a to c; X9 | `cantus/__init__.py` 129–133 are the lazy `serve` / `config` loader's rarely hit branch and the `mount_drive_and_load` wrappers (unchanged) |
+  | S3 registry and mapping | `tests/test_registry.py` rows 17, 19–21 (18 tests); `tests/legacy/test_w08_w09_registry.py` rows 16, 18, 20, 22, 23 (6 tests) | `cantus/core/registry.py` 100% | AC-08 (TR-21–23); V2-9; C2-F11; C2-F8, R2-8; X3, X4 | writing `"skill"` into the mapping is undefined by decision |
+  | S2 process boundary | `tests/legacy/test_warning_visibility.py` rows 27–44 (48 tests, about 6 s) | not measured (subprocess); the mutation check covers the insertion, rule 1 as a whole, the position condition, the scoped skip in each rule and action prefixes | AC-19 (TR-72–76); C2-F1-a to d; R2-2; C2-F2; V2-16 | an empty action and `all` (not observable from outside: the warning is printed either way); a real IPython kernel (stage 8); Windows; a free-threaded or context-aware-warnings Python 3.14; a debug build of Python (no default ignore entries: nothing to insert, warnings show anyway) |
   | S6 CLI | row 45 (1 test) | not measured (subprocess) | C2-F2 | — |
   | new-API paths | `tests/test_internal_paths_silent.py` row 46 (3 tests) | `cantus/core/agent.py`, `grammar/tool_call.py`, `serve/*`: call sites only | deliverable; X4 prompt half | the TUI and adapters make no registry call with a kind literal |
+- **Stage 6 (2026-11-17).** `/code-review` on the committed change at `362b842` (base `ab582c4`),
+  two `harness-reviewer` passes (Standards 27 findings, Spec 13). Fixed here: rule 1 now requires
+  a `Warning` subclass and parses the line number as Python does (`ignore::Exception` no longer
+  blocks the insertion; `::+0` counts); import-machinery frames are recognised by module name,
+  not by a file-name substring; the insertion holds `warnings._lock` where it exists; the two
+  helper functions are no longer attributes of `cantus`; the shim has `__all__`; docstrings on
+  the public names; `ToolSpecMapping` keeps its value type; the new-API guard records warnings
+  and asserts a successful observation (an `error` filter was swallowed by dispatch); the source
+  scan also catches a category passed as an instance; added cases for `skill(None)`, W1 printed
+  once from a helper module, separate W2 / W8 attribution in the CLI row, controls in the two
+  characterization tests, four more option spellings in row 44; this ticket's counts, names and
+  zh-TW summary. Left as they are, shown to the user: the approved test plan table itself is
+  not committed (the row list above is); the file-level `noqa: E402` in `cantus/__init__.py`;
+  `Registry.KINDS[0]` in `tool.py` next to the literal elsewhere; duplicated scripted-model
+  helpers across four test modules; the name of the test in
+  `tests/test_workflows/test_no_registry_mutation.py` (T-0014's file); the thread-based test
+  of "no external frame" (a free-threaded 3.14 may not record it). For T-0019: under pytest with
+  any interpreter-level warning option, W2 from code imported during collection is not shown
+  (C2-F1-c).
+- **Stage 7 (2026-11-17).** Report:
+  `.proj.specs/0001-tool-rename-phase-one/review/security-T-0007.md`. Eight candidates, none
+  confirmed. Taken as hardening: the line-number parse, the frame recognition, the lock, and the
+  CLI test binds `127.0.0.1` and drops `CANTUS_SERVE_*`. For T-0012 and T-0019: with an `error`
+  filter set by the operator, `cantus serve --registry-import` on a module that uses a legacy
+  name ends in a traceback, not in the CLI's error format. For T-0010: whether a swallowed W13
+  should leave a trace.
+- **Stage 8 (2026-11-17), surfaces: Python API in a script run in a subprocess, and a Jupyter
+  kernel** (ADR-0018, by the agent, no hand steps). Ticket build: `git archive 6897c8a` into an
+  empty directory, `uv build --wheel` there (`cantus_agent-0.6.0-py3-none-any.whl`, sha256
+  `5dee78b2de23f36dfd0b70b2d6d9e89a2295c36311a5022766af6642e88b0617`; the wheel contains
+  `cantus/_deprecation.py`, `cantus/protocols/skill.py` and `tool.py`), installed into a new
+  virtual environment that also got `ipykernel` 7.4.0 and `nbclient` 0.11.0 (IPython 9.18.1; not
+  added to any project extra). Working directory and scripts outside the checkout, `PYTHONPATH`
+  and `PYTHONWARNINGS` unset; `cantus.__file__` under that environment's `site-packages`, Python
+  3.13.11, macOS arm64.
+  - Script surface, the AC-19 matrix (a script importing a helper module that applies `@skill`):
+    no options → W2 on stderr, attributed to the helper's decorator line, exit 0;
+    `-W ignore::UserWarning` → printed; `-W error::DeprecationWarning` → the legacy call raises
+    `CantusDeprecationWarning`, exit 1; `PYTHONWARNINGS=ignore::DeprecationWarning` → not printed;
+    `simplefilter("ignore")` before the import → not printed;
+    `-W error::cantus.CantusDeprecationWarning` → printed, nothing raised;
+    `PYTHONWARNINGS=ignore::DeprecationWarning:torch` → printed. All seven as expected.
+  - Notebook surface (a real `python3` kernel started from that environment, driven by nbclient):
+    before `import cantus` the kernel's filters were, in order, an `ignore` for a Trio
+    `RuntimeWarning` message, `error::ProvisionalCompleterWarning`,
+    `default::DeprecationWarning:__main__`, then Python's four default `ignore` entries, with no
+    warn options; so rule 2 inserts. A cell importing the helper module showed W2 in its stderr
+    output, attributed to the helper file and line, with the source line; a cell applying
+    `@skill` itself showed W2 attributed to the cell.
+  - Not covered by this run: Colab (T-0010's protocol), other operating systems, Python
+    3.10–3.12 and 3.14 on an installed build (the test modules pass on them from the source tree),
+    `cantus serve --registry-import` on the installed build (row 45 runs it from the source tree),
+    and any real model. The W2 and W8 hints point at `Agent(model, tools=[...])`, which this build
+    does not have yet (T-0008).
