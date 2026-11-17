@@ -16,13 +16,17 @@ the blocking graph is acyclic, and the surviving adversarial findings were folde
 
 ## 1. The frozen spec stays frozen
 
-`spec.en.md`, `spec.zh-TW.md`, `traceability.md`, `review/*` are not edited. A carried round-2
+`spec.en.md`, `spec.zh-TW.md`, `traceability.md` and the three review records (`review/prompt.md`,
+`review/round-1.md`, `review/round-2.md`) are not edited. A carried round-2
 finding that says a case "has no row" is resolved inside the ticket: the decided behaviour goes in
 the ticket's Acceptance criteria, tagged with the finding id (for example `C2-F1-a`), and becomes a
 row of the stage-5 test plan table, which the user approves (hard rule 2). Where a P1 resolution
 changes how an AC's wording is read, the ticket states the reading and the AC is judged against it
 at stages 6 and 8. The spec-folder files a ticket edits are `ludus-migration.md`, the AC-39
 deliverable (T-0016), and this rules file when a later decision changes a rule.
+Each ticket's stage-7 report is a new file, `review/security-T-NNNN.md`, written by the main
+session as the security-review skill specifies; the freeze does not cover these reports (clarified
+on 2026-11-17 in T-0006, as the stage-5 handoff asked; no rule changed).
 
 ## 2. Expand, migrate, contract
 
@@ -103,7 +107,7 @@ epic 2's grilling, not work here.
 ## 給使用者（zh-TW）
 
 本檔是 epic 0001 的 15 張票（`.proj.tickets/0001-tool-rename-phase-one/` 的 T-0006～T-0020）共用的規則，
-stage 4 才新增，不屬於已審查的 spec（票的資料夾只允許放票檔，所以放在這裡）：凍結的 spec 不改，
+stage 4 才新增，不屬於已審查的 spec；各票 stage 7 的報告另存為 `review/security-T-NNNN.md`，不在凍結範圍（票的資料夾只允許放票檔，所以放在這裡）：凍結的 spec 不改，
 review finding 的解法寫進票裡並列入 test plan table；改名採 expand → migrate → contract，每張票只
 處理自己範圍、單獨合入也要讓 CI（含 docs 頁面執行與 zh-tw parity）全綠；舊名稱的測試集中在
 `tests/legacy/`；最後由 T-0020 加上 sweep 測試，並在「branch build」上重跑 stage 8 的四項真實環境驗證（含 Colab）。

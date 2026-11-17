@@ -56,6 +56,10 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
   schema.
 - **R2-17** (test-plan case): `PYTHONWARNINGS=error::DeprecationWarning` with `cantus serve
   --registry-import` of a module using `@skill`: the exit code and message are decided and asserted.
+- **C2-F12 (HTTP half)** (test-plan case, added 2026-11-17 with the user's approval at T-0006's
+  stage 5): a tool built with `pre_hook=` and `post_hook=` and invoked through `POST /tools/{name}`
+  (and its alias) runs the body only; neither hook runs (spec "Hooks still run only in `Agent`
+  dispatch").
 
 ## Review findings carried
 
@@ -67,7 +71,7 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
   `GET /introspection/tools`, `GET /introspection/skills`, `/openapi.json`), how the `cantus.serve`
   log is captured under uvicorn (a logging config that routes the logger to the captured stream),
   and the TUI's auth settings for T-0013.
-- P2: K2-F11, R2-16, C2-F5, V2-11, V2-12, C2-F16, R2-17.
+- P2: K2-F11, R2-16, C2-F5, V2-11, V2-12, C2-F16, R2-17, C2-F12 (HTTP half; the rest is T-0006's).
 
 ## 給使用者（zh-TW）
 
@@ -76,6 +80,8 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
 被呼叫時寫一筆 log。round-2 的 V2-1 在這裡定案：log 以路由「樣板」計算（`/skills/add` 與
 `/skills/multiply` 合計一筆）；C2-F4 要求連 401／403／422／500 的回應也帶 header；V2-6 要求真實
 `cantus serve` 行程的驗證流程先寫好（也給 T-0013 的 TUI 用）。
+另外（2026-11-17，T-0006 stage 5 經使用者同意加入）：帶 hook 的工具經 HTTP 呼叫時只執行本體、不跑 hook，
+這一項也在這張票寫成測試。
 
 ## Comments
 
