@@ -60,8 +60,9 @@ Project roles in `.claude/agents/`:
   the parent supplies the spec packet defined in [review.md](review.md). For code
   or security review, it supplies exact Git base/HEAD, captured diffs and requested
   pending/untracked contents.
-- `harness-challenger`: devil's advocacy and alternative analysis on plans,
-  decisions and findings; returns evidence only.
+- `harness-challenger`: metacognition. Examines the main session's plans,
+  decisions and findings and the reasoning behind them; returns evidence and an
+  advisory verdict, and edits nothing.
 - `harness-executor`: applies an approved, fully specified change and runs the
   named checks; it has no Skill tool, so the parent transcribes any skill steps.
 - `harness-researcher`: primary-source research with native web and file tools;

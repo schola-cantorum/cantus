@@ -1,32 +1,61 @@
 # Claude model orchestration
 
-This project assigns Claude models by role. The main session decides; critics on
-other models challenge; an executor applies approved changes. Codex has its own
+This project assigns Claude models by role, in three layers. The main session
+plans, reasons and talks with the user; a metacognition role examines that
+thinking; an executor applies approved changes. Reviewers and a researcher sit
+beside the three layers. Codex has its own
 settings in [codex.md](codex.md); nothing here applies to it.
 
 | Role | Where | Model | Used for |
 |---|---|---|---|
-| Main session | the conversation | the user's selection (usually Claude Opus 5.5) | understanding, planning, decisions, synthesis, user communication; loads the project skills |
+| Main session | the conversation | the session's current model (the user's selection; no model ID is fixed here) | planning, cognition, discussion: understanding, decisions, synthesis, user communication; loads the project skills |
 | `harness-reviewer` | `.claude/agents/` | `claude-opus-5-5`, effort `high` | red teaming: spec-review axes (stage 3), code-review axes (stage 6), security candidate and false-positive passes (stage 7) |
-| `harness-challenger` | `.claude/agents/` | `claude-opus-4-8` | devil's advocacy, alternative analysis and reasoning checks on plans, decisions and findings |
-| `harness-executor` | `.claude/agents/` | `claude-sonnet-5` | applying an approved, fully specified change and running the named checks |
+| `harness-challenger` | `.claude/agents/` | `claude-opus-5-5`, effort `high` | metacognition: examines the main session's plans, decisions and findings and the reasoning behind them; does none of the work |
+| `harness-executor` | `.claude/agents/` | `claude-sonnet-5-5`, effort `medium` | applying an approved, fully specified change and running the named checks |
 | `harness-researcher` | `.claude/agents/` | inherit | primary-source research that feeds the main session |
 
 This split is the user's choice for this project. The reviewer runs Opus 5.5
 because its prompting page reports stronger code review than Opus 5 (more bugs
 caught, fewer false alarms); effort `high` sits above the Opus 5.5 default of
-`medium`. Model diversity between author and critic comes from the challenger.
-None of this has been measured here; revisit it with evidence from real runs.
+`medium`. The challenger runs Opus 5.5 at `high` because its job is to examine
+reasoning. The executor runs Sonnet 5.5 at `medium`, the level its prompting page
+suggests for well-specified agentic work. The main session and the challenger
+are the same model whenever the session runs Opus 5.5; the challenger then
+differs by fresh context, role and its fixed effort, not by model. None of
+this has been measured here; revisit it with evidence from real runs.
 
 ## Delegating
 
-- **Critics.** Use `harness-reviewer` where a stage prescribes independent review.
-  Use `harness-challenger` when a plan or decision is expensive to reverse, or when
-  the user asks for devil's advocacy. Resolve small questions in the main session.
+- **Reviewer.** Use `harness-reviewer` where a stage prescribes independent review.
+  It reviews artefacts (a spec, a diff); the challenger reviews the main session's
+  thinking. Keep them separate.
+- **Metacognition gates.** Run `harness-challenger` only at these points, and
+  resolve everything else in the main session:
+  - stage 1, after the requirement converges and before the user confirms it;
+  - stage 4, before the ticket breakdown goes to the user;
+  - stage 5, before the test plan table goes to the user;
+  - before a decision that is expensive to reverse (an ADR, contract surface);
+  - when the main session has failed twice on the same problem;
+  - whenever the user asks.
+
+  A lightweight-path ticket skips the stage 1 and stage 5 gates; the other four
+  apply to it unchanged.
+- **Position packet.** Hand the challenger the goal, the plan or decision, paths
+  to the evidence, the alternatives already rejected and the known assumptions.
+  Start a new invocation each time and do not forward the conversation, so it is
+  not led by the reasoning it is checking. The host may still load project
+  instructions and memory into it; the role file tells it to rely on the packet.
+- **Metacognition reaches the user in full.** Show the user the challenger's
+  report as returned, followed by a table of each objection, whether the main
+  session accepts it, and why. An objection the main session would set aside is
+  listed too; the user decides. Do not deduplicate or rank the report itself;
+  the challenger gives confidence, not severity. The report stays in the
+  conversation and is not saved as a review record.
 - **Stage 3 stays four axes.** The challenger is not a fifth reviewer and does not
-  arbitrate. Review disagreements go to the user with both positions and their
+  arbitrate: do not hand it reviewer findings from stage 3, 6 or 7 to rule on.
+  Review disagreements go to the user with both positions and their
   evidence, as [review.md](review.md) requires.
-- **Findings reach the user unfiltered.** Critics report every finding with
+- **Findings reach the user unfiltered.** Reviewers report every finding with
   confidence and severity. The main session may deduplicate, rank and annotate
   them, but it shows the user any finding it proposes to drop, so no P0 can
   disappear before the gate.
@@ -36,7 +65,7 @@ None of this has been measured here; revisit it with evidence from real runs.
   (for example the `/tdd` loop required by hard rule 2), put that skill's steps
   and gates into the handoff. Commits stay with the main session and the commit
   skill.
-- **Nesting.** Critics and the executor do not start subagents.
+- **Nesting.** The reviewer, the challenger and the executor do not start subagents.
 
 ## Writing for the reader
 
@@ -54,6 +83,7 @@ Official prompting pages:
 - Claude Opus 5.5: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5>
 - Claude Opus 5: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5>
 - Claude Opus 4.8: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-4-8>
+- Claude Sonnet 5.5: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5-5>
 - Claude Sonnet 5: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-sonnet-5>
 - All current models: <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices>
 
@@ -70,6 +100,11 @@ The differences that most often change the text:
 - **Frontend direction:** for Opus 5.5, name the default styles to avoid. For
   Opus 4.8 and Sonnet 5, give a concrete alternative spec or ask for several
   directions for the user to choose from.
+- **Executor handoffs** (Sonnet 5.5, read 2026-11-17): its page treats Sonnet 5
+  patterns as a starting point and says effort levels were recalibrated. It
+  tends to add tests, documentation and small supporting files nobody asked
+  for, and at `medium` it sometimes stops to ask before the work is done; the
+  role file tells it to do neither, so list every file a handoff expects.
 - **Delegation** matters only for a model that can delegate. The main session
   on Opus 5 delegates readily and needs damping; on Opus 4.8 it delegates rarely.
 
