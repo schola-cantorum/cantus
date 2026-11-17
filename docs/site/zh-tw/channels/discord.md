@@ -53,7 +53,7 @@ export CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY="<public key hex string from step
 export CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID="<application id from step 1>"
 ```
 
-cantus v0.5.0 仍**不**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己的腳本。
+cantus **不會**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己的腳本。
 
 ## 4. 啟動 cantus serve
 

@@ -33,7 +33,7 @@ TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validat
 Registration prints a confirmation line right away:
 
 ```
-[debug] registered Skill 'search_book'
+[debug] registered SearchBook 'search_book'
 [debug] spec={"name": "search_book", "description": "Search the library catalog.", "args_schema": {...}}
 ```
 
@@ -43,13 +43,15 @@ At call time, each invocation prints one line:
 [debug] search_book thought='look up by title' args=[]/{"title": "三體"} result="《三體》劉慈欣 / 9787536692930"
 ```
 
-If an exception is raised:
+If the skill body raises:
 
 ```
-[debug] search_book thought='' args=[]/{"title": 123} raised ValidationError: 1 validation error for SearchBookArgs
+[debug] search_book thought='' args=[]/{"title": "Dune"} raised KeyError: 'Dune'
 ```
 
-The `thought` comes from the caller's `_debug_thought` keyword argument. The agent loop fills it in automatically from the LLM's reasoning. When you call a skill by hand and leave it out, that's fine — it prints as an empty string.
+Argument validation happens in the agent's dispatcher before the wrapped `run` is called, so a wrong argument type never shows up as a `[debug]` line; it becomes a `ToolErrorObservation` on the stream.
+
+The `thought` comes from the caller's `_debug_thought` keyword argument. The agent loop does not pass it today, so inside `Agent.run` it prints as an empty string; pass it yourself when you call a skill by hand and want the line labelled.
 
 ## Memory cannot be wrapped with `@debug` directly
 

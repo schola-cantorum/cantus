@@ -1,6 +1,6 @@
 # Cookbook: connecting Discord with cantus (echo bot + slash command)
 
-This walkthrough takes you from an empty Discord application to a working `cantus serve` deployment that runs an echo bot (a member types in a server, the bot replies) plus a `/ping` slash command. Discord carries one extra layer of complexity compared with LINE or Telegram: cantus needs both a **Gateway WebSocket** (a long-lived connection that streams events in) and an **Interactions HTTP** endpoint (Ed25519-signature verification for slash-command and button callbacks). Every command below assumes you have already worked through the "Serve via CLI" and "Expose via Cloudflare Tunnel" sections of [`docs/quickstart-desktop.md`](./quickstart-desktop.md).
+This walkthrough takes you from an empty Discord application to a working `cantus serve` deployment that runs an echo bot (a member types in a server, the bot replies) plus a `/ping` slash command. Discord carries one extra layer of complexity compared with LINE or Telegram: cantus needs both a **Gateway WebSocket** (a long-lived connection that streams events in) and an **Interactions HTTP** endpoint (Ed25519-signature verification for slash-command and button callbacks). Every command below assumes you have already worked through the "Serve via CLI" and "Expose via Cloudflare Tunnel" sections of [`docs/quickstart-desktop.md`](../quickstart-desktop.md).
 
 ## 0. What you'll need
 
@@ -53,7 +53,7 @@ export CANTUS_SERVE_CHANNEL_DISCORD_PUBLIC_KEY="<public key hex string from step
 export CANTUS_SERVE_CHANNEL_DISCORD_APPLICATION_ID="<application id from step 1>"
 ```
 
-cantus v0.5.0 still does **not** read `.env` automatically. Either use `direnv` or `source` your own script.
+cantus does **not** read `.env` automatically. Either use `direnv` or `source` your own script.
 
 ## 4. Start cantus serve
 

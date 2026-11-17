@@ -211,5 +211,5 @@ attempt 2: Argue for solar over wind
 
 - 五個 building block **不**註冊到 registry：實例化前後 `get_registry().names_for("skill")` 內容不變，`registry.spec_for_llm()` 的 top-level keys 永遠只有 `"skill"`。
 - LLM agent 看不到 building block — 它們是 host code 自己寫的編排層；如果你要 agent 看到入口，把整段編排再包成一個 `@skill` 函式（agent 看到的就是那個 skill）。
-- building block 本身不會留 trace 進 `EventStream`，但組成元件若是 registered Skill，個別 Skill 呼叫**仍會**被 `_dispatch_skill` trace。要紀錄編排層次請手動加 `@debug` 到組成的 Skill 上。
+- building block 不會留 trace 進 `EventStream`：它直接呼叫各個步驟，不經過 agent 的 dispatcher，就算步驟是 registered Skill 也一樣。想看各步驟怎麼跑，請在組成的 Skill 上加 `@debug`；想在 stream 上留一筆事件，就把整段編排包成一個 `@skill`。
 - 五個類別都是 plain Python class、沒有非同步介面；`.run` 是同步方法，concurrency 一律由 host code 負責。

@@ -1,6 +1,6 @@
 # Quickstart: Your First Agent in One Colab Cell
 
-> **Desktop users (Win / macOS / Linux):** This page targets the Colab environment, where `mount_drive_and_load` pulls a 4-bit Gemma model. If you run on a local desktop instead, read [`quickstart-desktop.md`](./quickstart-desktop.md), which covers the API-key path on all three platforms.
+> **Not on Colab?** This page targets the Colab environment, where `mount_drive_and_load` pulls a 4-bit Gemma model. On a desktop, read the [Desktop quickstart](./quickstart-desktop.md). To use a hosted or local model API, read [Quickstart (Model APIs)](./quickstart-providers.md). To build an agent step by step with no model at all, read [Quickstart (Build an Agent)](./quickstart-agent.md).
 
 The cell below goes from `import` to a printed answer. It loads Gemma 4 by default, but the model is swappable: anything that satisfies the `ModelHandle` protocol works, which means anything with a `generate(prompt) -> str` method.
 
@@ -48,7 +48,7 @@ Inspector(state.stream).summary()     # print action / observation statistics
 ## Defaults Worth Knowing
 
 - `max_iterations=8`: the loop runs at most 8 steps, so a confused model stops instead of looping indefinitely.
-- `max_retries=3`: when a validator returns `Result(ok=False)`, the agent retries the failed action up to 3 times.
-- An exception raised by any skill or `cantus.workflows` building block becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
+- `max_retries=3`: accepted, but it does not bound the loop today. When a validator returns `Result(ok=False)`, the feedback goes back to the model, which decides what to try next; each attempt uses one of the `max_iterations`.
+- An exception raised by a skill (including a workflow you call from inside a skill) becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
 
 That single cell is the whole loop in miniature. Read it, then the channels, serving, and memory chapters are variations on the same three pieces: a model handle, a skill, and an EventStream you can replay.

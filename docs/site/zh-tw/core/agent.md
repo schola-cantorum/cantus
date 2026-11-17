@@ -23,7 +23,7 @@ class Agent:
 
 - JSON 格式錯誤 → `validator_name="action_parse"`、`error_type: json_syntax`
 - `action` 物件裡 `skill_name` 與 `final_answer` 兩者都缺 → `validator_name="action_parse"`、`error_type: missing_field`
-- 有給 `skill_name`，但它不在目前的 registry 裡 → `validator_name="action_parse"`、`error_type: unknown_skill`
+- 有給 `skill_name`，但它不在目前（非空）的 registry 裡 → `validator_name="action_parse"`、`error_type: unknown_skill`
 - 有給 `final_answer`，但經過 `str.strip()` 後是空字串 → `validator_name="non_empty_final_answer"`
 
 正因為 `step` 可能回傳兩種分支，呼叫端必須同時處理 `Action` 與 `Observation`。run 迴圈不管拿到哪一種，都會直接把它 append 到 EventStream 上。
@@ -52,17 +52,17 @@ FinalAnswerAction
 1. 呼叫 `step()` 取得一筆 `Action`（或 `Observation`），append 進 stream。
 2. 如果它是 `FinalAnswerAction` → 立刻 return。
 3. 如果它是 `CallSkillAction` → 透過 registry 把它 dispatch 出去，把回傳值包成一筆 `Observation`，再 append 進 stream。
-4. 如果結果是 `ValidationErrorObservation` 且還有 retry 額度 → 不要重設計數器；下一輪會把 feedback 攤給 LLM 看，讓它自己修正。
+4. 如果結果是 `ValidationErrorObservation` → 不會自動重跑任何東西；這個 observation 留在 stream 上，下一輪會把 feedback 攤給 LLM 看，讓它自己修正。
 5. 如果跑滿 `max_iterations` 都還沒收到 `FinalAnswerAction` → append 一筆 `MaxIterationsObservation` 後 return。
 
-預設額度是 `max_iterations=8` 與 `max_retries=3`。像 Gemma 4 E2B 這類小模型常常會短路成一個空的 `final_answer`；遇到這種情況，呼叫端可以傳 `max_iterations=12`，給迴圈多一點空間收斂。這是呼叫端自行覆寫的設定，不是框架的預設值。
+預設額度是 `max_iterations=8` 與 `max_retries=3`。目前真正限制迴圈的只有 `max_iterations`：`max_retries` 會被接受，但每次驗證失敗都只是用掉一次 iteration，所以改它不會改變一次 run 的結果。像 Gemma 4 E2B 這類小模型常常會短路成一個空的 `final_answer`；遇到這種情況，呼叫端可以傳 `max_iterations=12`，給迴圈多一點空間收斂。這是呼叫端自行覆寫的設定，不是框架的預設值。
 
 ## 三種錯誤閉環
 
 | Observation                    | 觸發時機                          | LLM 會看到的訊息                                  |
 | ------------------------------ | --------------------------------------- | ----------------------------------------------------- |
-| `ToolErrorObservation`         | 某個 skill 拋出例外，或 skill 名稱不存在 | 錯誤訊息，外加一份可用 skill 的清單   |
-| `ValidationErrorObservation`   | 某個 validator 回傳 `Result(ok=False)`  | 那段 `feedback` 字串；下一輪會重試上一個動作 |
+| `ToolErrorObservation`         | 某個 skill 或它的 hook 拋出例外，或引數驗證失敗 | 例外的型別與訊息 |
+| `ValidationErrorObservation`   | 某個 validator 回傳 `Result(ok=False)`，或模型的回覆解析失敗（包含 skill 名稱不存在） | 那段 `feedback` 字串；下一輪由模型自己決定怎麼做 |
 | `MaxIterationsObservation`     | 跑滿 `max_iterations`             | `iterations`、`last_action_summary`，以及一份深拷貝的 `partial_state`；迴圈到此結束 |
 
 每一筆錯誤都會進到 stream，沒有任何一筆會以 exception 的形式跳出來。這是框架的硬性承諾：`agent.run` 要嘛回傳一個 `AgentState`，要嘛就只因為呼叫端自己的 bug（例如 `model=None`）才會 raise。

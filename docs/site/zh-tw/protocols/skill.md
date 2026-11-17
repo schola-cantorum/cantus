@@ -80,4 +80,4 @@ found: Dune
 - **沒註冊**：你忘了加 `@skill`，或是忘了 import 定義它的那個模組，於是 agent 從頭到尾都看不到這個工具。
 - **沒寫型別註記**：`def search_book(title)`（沒寫 `: str`）會讓 args schema 塌成 `Any`，LLM 很容易就亂塞東西進來。
 - **Pydantic 驗證失敗**：呼叫端傳了 `title=123`，`validate_args()` 會丟出 `ValidationError`，agent 再把這個錯誤交回給模型重試。
-- **回傳值不是 JSON-serializable**：序列化這個 observation 時會掉到 `repr()` fallback，模型最後讀到的會是一坨很亂的東西。
+- **回傳值的 `repr()` 很亂**：模型讀到的每個 observation 都是它的 `repr()`，所以請回傳字串、數字或小的 dict，不要回傳一大包物件。

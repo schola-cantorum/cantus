@@ -10,6 +10,12 @@ hero:
       text: Quickstart (Colab)
       link: /quickstart
     - theme: alt
+      text: Quickstart (Model APIs)
+      link: /quickstart-providers
+    - theme: alt
+      text: Build an Agent
+      link: /quickstart-agent
+    - theme: alt
       text: Overview
       link: /overview
     - theme: alt

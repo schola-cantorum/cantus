@@ -1,14 +1,14 @@
-# `cantus.adapters` — 接上 MCP 與 Anthropic Memory（v0.3.2）
+# `cantus.adapters` — 接上 MCP、Anthropic Memory 與其他框架
 
 ## 套件總覽
 
-`cantus.adapters` 是 v0.3.2 引入的 bridge 層。它的工作很單純：把 cantus 的 Skill 和 Memory 物件「翻譯」給業界既有的 agent 生態（MCP、Anthropic Memory tool）看得懂，也反過來把外部的 tool 拉進 cantus 來用。v0.3.2 一共出貨三個公開 callable：
+`cantus.adapters` 是 v0.3.2 引入的 bridge 層。它的工作很單純：把 cantus 的 Skill 和 Memory 物件「翻譯」給業界既有的 agent 生態（MCP、Anthropic Memory tool）看得懂，也反過來把外部的 tool 拉進 cantus 來用。這一節先講 v0.3.2 加入的三個 callable；跨框架的 adapter（LangChain、DSPy、HuggingFace smolagents、OpenHands）在下面的 batch2 與 batch3a 兩節。
 
 | 函式 | 方向 | 依賴 |
 | --- | --- | --- |
 | `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install（不需外部 SDK） |
-| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus[mcp]` |
-| `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus[mcp]` |
+| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
+| `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus-agent[mcp]` |
 
 設計原則：
 
@@ -71,7 +71,7 @@ t = threading.Thread(
 t.start()
 ```
 
-用 `port=0` 時，實際的 port 是由 SDK 決定的。如果你需要把分配到的 port 讀回來、交給別的服務用，請參考 mcp SDK 提供的 server-info hook。production 等級的 graceful shutdown 則留給 v0.4.0 的 `cantus-serve-core` 處理。
+用 `port=0` 時，實際的 port 是由 SDK 決定的。如果你需要把分配到的 port 讀回來、交給別的服務用，請參考 mcp SDK 提供的 server-info hook。`McpServer` 沒有 graceful shutdown 的 API。
 
 ## `import_mcp_server` 五行範例（stdio）
 
@@ -86,7 +86,7 @@ for s in skills:
 
 ### 信任邊界（重要）
 
-在 stdio transport 之下，`command_or_url` 會被當成**子程序**啟動。cantus 一律用 list 形式的 `subprocess.Popen(args=[...])`、**絕不**用 `shell=True`，而且會拒絕含有 shell metacharacter（`|` `>` `<` `&` `;` `$`、反引號、換行）的輸入。但這只能擋住不小心造成的注入；**千萬不要餵給它一個來路不明的 `command_or_url`**——這麼做等於授權它執行任意程式。
+在 stdio transport 之下，`command_or_url` 會被當成**子程序**啟動。cantus 會拒絕含有 shell metacharacter（`|` `>` `<` `&` `;` `$`、反引號、換行、carriage return）的輸入，再把指令字串交給 mcp SDK，由 SDK 啟動子程序。但這只能擋住不小心造成的注入；**千萬不要餵給它一個來路不明的 `command_or_url`**——這麼做等於授權它執行任意程式。
 
 `http` transport 則是用 `urllib.parse.urlparse` 檢查 scheme 屬於 `{"http", "https"}`、netloc 不為空；其他 scheme（`file://`、`ftp://`、`javascript:`）一律拒絕。但它**不會**驗證遠端 server 內容是否可信——server 回傳什麼 schema，cantus 就照單全包。正式環境請對 `command_or_url` 的來源做白名單管控。
 
@@ -124,7 +124,7 @@ cantus v0.3.1 的 audit 早就標出這條 trap。由於 v0.3.2 的 adapter 沒�
 | 時機 | 例外類型 | 子字串標記 |
 | --- | --- | --- |
 | Handshake / 連線（同步的建立階段） | `RuntimeError`（視情況也可能是 `ValueError` / `OSError` / `ImportError`） | `<adapter>_handshake_failed` |
-| Call-time（已連上、單次 tool call 失敗） | cantus `ToolErrorObservation`（由 Agent dispatcher 自動包裝） | `<adapter>_remote_error` 或 `<adapter>_call_failed` |
+| Call-time（已連上、單次 tool call 失敗） | cantus `ToolErrorObservation`（由 Agent dispatcher 自動包裝） | `<adapter>_remote_error` |
 
 `<adapter>` 是該 adapter family 的小寫短名（`mcp`、`langchain`、`dspy`、`huggingface` 等）。v0.3.2 的 `mcp_handshake_failed` / `mcp_remote_error` 就是照這個慣例命名的，v0.3.3 新增的四個跨框架 adapter 也沿用它（例如 `langchain_handshake_failed`）。
 
@@ -144,18 +144,9 @@ except RuntimeError as exc:
 
 至於 call-time 錯誤，Agent loop 已經自動把它包成 EventStream 上的 `ToolErrorObservation`，所以學生在 Inspector 看到 `mcp_remote_error: ...` 時，就知道是遠端 tool call 那一步出了問題。
 
-## 預告 v0.3.3：cross-framework adapters
+## 跨框架 adapter
 
-v0.3.2 只出貨三件 MVP：MCP 的雙向加上 Anthropic Memory tool。v0.3.3 的 `cantus-adapter-layer-batch2` 排程要交付：
-
-- `cantus[langchain]` extras，加上一個雙向的 LangChain `Tool` / `Runnable` adapter
-- `cantus[dspy]` extras，加上一個 DSPy `Tool` adapter
-- `cantus[huggingface]` extras，加上一個 HuggingFace tool adapter（最初對準 `transformers.Tool`，現在改對準 `smolagents.Tool`，見下方範例的說明）
-- `cantus[openhands]` extras，加上一個 OpenHands action adapter
-
-每一個都遵守上面「錯誤命名慣例」一節定義的 `<adapter>_handshake_failed` / `<adapter>_remote_error` 規則，這一頁也會持續長出對應的章節。
-
-如果你的 v0.3.2 環境現在就需要這些跨框架接點，暫時的辦法是自己手寫 glue（例如在一個 cantus Skill 裡呼叫某個 LangChain Tool）。等 v0.3.3 ship 之後，再切換到正式的 framework adapter。
+LangChain、DSPy、HuggingFace（`smolagents`）與 OpenHands 的 adapter 都已經出貨，各自的章節接在下面；它們都沿用上面「錯誤命名慣例」那一節定義的 `<adapter>_handshake_failed` / `<adapter>_remote_error` 命名規則。
 
 
 <!-- merged: adapters-batch2 -->
@@ -166,16 +157,16 @@ v0.3.2 只出貨三件 MVP：MCP 的雙向加上 Anthropic Memory tool。v0.3.3 
 
 ## 套件總覽
 
-在 v0.3.2 那三件 MVP（MCP server、MCP client、Anthropic Memory）的基礎上，v0.3.3 又接上四個主流 agent stack 的 bridge：LangChain、DSPy、HuggingFace、OpenHands。這是六個新的 callable，每一個都綁一個 `cantus[<name>]` extras：
+在 v0.3.2 那三件 MVP（MCP server、MCP client、Anthropic Memory）的基礎上，v0.3.3 又接上四個主流 agent stack 的 bridge：LangChain、DSPy、HuggingFace、OpenHands。這是六個新的 callable，每一個都綁一個 `cantus-agent[<name>]` extras：
 
 | 函式 | 方向 | 依賴 |
 | --- | --- | --- |
-| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus[langchain]` |
-| `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus[langchain]` |
-| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus[dspy]` |
-| `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool`（v0.3.3 僅 export；v0.3.4 補上 import） | `pip install cantus[huggingface]` |
-| `expose_as_openhands_action(skill)` | cantus → OpenHands（僅 export） | `pip install cantus[openhands]` |
+| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
+| `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus-agent[langchain]` |
+| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
+| `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus-agent[dspy]` |
+| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool`（v0.3.3 僅 export；v0.3.4 補上 import） | `pip install cantus-agent[huggingface]` |
+| `expose_as_openhands_action(skill)` | cantus → OpenHands（僅 export） | `pip install cantus-agent[openhands]`（僅 Python 3.12） |
 
 設計原則延續 v0.3.2 的 `adapters.md`：純包裝層、`Skill.spec_for_llm()` 形狀不變、`Registry.KINDS` 不變、不引入 `Adapter` ABC。錯誤命名沿用 `<framework>_handshake_failed` / `<framework>_remote_error` 的慣例。
 
@@ -238,7 +229,7 @@ def translate(text: str, target: str) -> str:
 hf_tool = expose_as_hf_tool(translate)  # 餵給 smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**是 smolagents，不是 transformers。** `transformers.Tool` 在 transformers 4.53 已被移除，所以 `cantus[huggingface]` 現在安裝的是 [`smolagents`](https://github.com/huggingface/smolagents)（HuggingFace 官方接手 agents 的套件），`expose_as_hf_tool` 回傳的是 `smolagents.Tool` 實例：一個動態建立的子類，`forward` 逐一具名列出 Skill 的每個參數，`output_type` 固定為 `"any"`。JSON Schema 型別不在 `string / integer / number / boolean / array / object` 之內的一律匯出成 `any`。**已知限制：**匯出的工具沒有原始碼，所以 `tool.to_dict()`、`tool.save()`、`tool.push_to_hub()` 會拋例外；`CodeAgent`／`ToolCallingAgent` 的 `run()` 路徑用不到它們。
+**是 smolagents，不是 transformers。** `transformers.Tool` 在 transformers 4.53 已被移除，所以 `cantus-agent[huggingface]` 現在安裝的是 [`smolagents`](https://github.com/huggingface/smolagents)（HuggingFace 官方接手 agents 的套件），`expose_as_hf_tool` 回傳的是 `smolagents.Tool` 實例：一個動態建立的子類，`forward` 逐一具名列出 Skill 的每個參數，`output_type` 固定為 `"any"`。JSON Schema 型別不在 `string / integer / number / boolean / array / object` 之內的一律匯出成 `any`。**已知限制：**匯出的工具沒有原始碼，所以 `tool.to_dict()`、`tool.save()`、`tool.push_to_hub()` 會拋例外；`CodeAgent`／`ToolCallingAgent` 的 `run()` 路徑用不到它們。
 
 **HF 的 import 方向延到 v0.3.4**（v0.3.3 時期的說明，當時對準的是 transformers 介面）：在 transformers 介面裡，一個 HuggingFace `Tool` 比較偏向「一個 stateless callable 加一份 JSON schema dict」，並沒有對等於 LangChain `BaseTool` 的執行單元。常見的情境是 cantus → HF（把一個 Skill export 出去給 `HfAgent` 呼叫），所以反向的 import 就留給 v0.3.4 batch3 評估時再說。
 
@@ -377,7 +368,7 @@ action = expose_as_openhands_action(my_cantus_skill)
 
 ## SDK gate
 
-`import_hf_tool` 用的是既有的 `cantus[huggingface]` extras（現在是 `smolagents>=1.26,<2`；這個 group 不再依賴 transformers），除此之外**不引入任何新依賴**。沒裝 smolagents 時，匯入 `cantus.adapters.huggingface` 會丟 `ImportError("pip install cantus[huggingface]")`；至於 `cantus.adapters` 套件本身（不帶 extras）仍然可以正常匯入，那個 lazy stub 只會在第一次呼叫時才解析。
+`import_hf_tool` 用的是既有的 `cantus-agent[huggingface]` extras（現在是 `smolagents>=1.26,<2`；這個 group 不再依賴 transformers），除此之外**不引入任何新依賴**。沒裝 smolagents 時，匯入 `cantus.adapters.huggingface` 會丟 `ImportError("pip install cantus[huggingface]")`；至於 `cantus.adapters` 套件本身（不帶 extras）仍然可以正常匯入，那個 lazy stub 只會在第一次呼叫時才解析。
 
 ## 與 batch2 一節的關係
 

@@ -53,7 +53,7 @@ Runtime extras（Gemma 4 + transformers + bitsandbytes）需要：
 pip install 'cantus-agent[runtime]==0.6.0'
 ```
 
-Serve extras（v0.4.0 —— FastAPI app factory；會一併安裝 `fastapi`、`uvicorn`、`pydantic-settings`）：
+Serve extras（v0.4.0 —— FastAPI app factory；會一併安裝 `fastapi`、`uvicorn`、`pydantic-settings`，以及 channel gateway 用的 `httpx`、`pynacl`、`websockets`、`google-cloud-pubsub`）：
 
 ```bash
 pip install 'cantus-agent[serve]==0.6.0'
@@ -102,7 +102,7 @@ print(getattr(final, "answer", final))
 
 ## 多 provider 快速上手（v0.2.1）
 
-Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI、Anthropic、Google Gemini、Groq 或 NVIDIA NIM，不再侷限於本地 Gemma。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
+Tier 2 ChatModel adapter 讓同一個 Agent 改接 OpenAI、Anthropic、Google Gemini、Groq 或 NVIDIA NIM，不再侷限於本地 Gemma；另有三個本機後端（Ollama、in-process MLX，以及 omlx / mlx-omni-server 端點）也走同一個 `load_chat_model`。八家的完整步驟見 [`docs/site/zh-tw/quickstart-providers.md`](./docs/site/zh-tw/quickstart-providers.md)；不需要 API key、一塊一塊把 agent 組起來的版本見 [`docs/site/zh-tw/quickstart-agent.md`](./docs/site/zh-tw/quickstart-agent.md)。**把 `ChatModel` 餵給 `Agent` 之前一定要先用 `ChatModelAsHandle` 包一層**——Agent 只認得 Tier 1 `.generate(prompt) -> str` 介面。
 
 OpenAI（`pip install 'cantus-agent[openai]'`，並設定 `OPENAI_API_KEY`）：
 

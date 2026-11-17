@@ -206,5 +206,5 @@ Things to keep in mind:
 
 - The five building blocks do **not** register themselves: `get_registry().names_for("skill")` is unchanged before and after instantiation, and the top-level keys of `registry.spec_for_llm()` are always just `"skill"`.
 - An LLM agent never sees a building block — they are an orchestration layer you write in host code. If you want the agent to see an entry point, wrap the whole orchestration in a single `@skill` function; what the agent sees is that skill.
-- A building block leaves no trace in the `EventStream` on its own, but if its component pieces are registered Skills, the individual Skill calls **are still** traced by `_dispatch_skill`. To record the orchestration layer itself, add `@debug` to the component Skills by hand.
+- A building block leaves no trace in the `EventStream`: it calls its steps directly, not through the agent's dispatcher, even when those steps are registered Skills. To watch the steps run, add `@debug` to the component Skills; to get one event on the stream, wrap the whole orchestration in a single `@skill`.
 - All five classes are plain Python classes with no async interface; `.run` is a synchronous method, and concurrency is always the host code's responsibility.

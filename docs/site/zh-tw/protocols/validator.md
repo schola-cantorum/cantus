@@ -80,13 +80,13 @@ ensure_isbn_valid = EnsureIsbnValid()
 
 - 跟 analyzer 一樣，validator 本身**不會**直接出現在 LLM 的 system prompt 裡。它是掛在某支 skill 上的，而那支 skill 的 spec JSON 形狀完全不變——照樣只有 `{"name", "description", "args_schema"}` 這三個 key。
 - post-hook 會在 skill body 成功 return 之後執行，並把那支 skill 的回傳值當成自己的輸入。
-- `Result(ok=True, value=v)` 會產生 `SkillObservation(result=v)`。`Result(ok=True)` 但沒給 `value` 時，會退回去用 skill 原本的回傳值。`Result(ok=False, feedback=...)` 會產生 `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)`，而且**不會**發出 `SkillObservation`。
-- 如果回傳值不是 `Result`，它會被原封不動寫進 `SkillObservation`，當作這支 skill 的新 `result`。所以 post-hook 也可以順手整理一下格式。不過只要你想要一個嚴格的 pass/fail 判斷，就請固定回傳一個 `Result`。
+- `Result(ok=True, value=v)` 會產生 `SkillObservation(result=v)`。`Result(ok=True)` 但沒給 `value` 時，會產生 `SkillObservation(result=None)`，所以請一律把值帶上：`Result.success(v)`。`Result(ok=False, feedback=...)` 會產生 `ValidationErrorObservation(validator_name="<post_hook function name>", feedback=...)`，而且**不會**發出 `SkillObservation`。
+- `@validator`（或 `Validator` 子類別）必須回傳 `Result`。回傳別的東西會丟出 `TypeError`，模型看到的是 `ToolErrorObservation(message="post_hook TypeError: ...")`。直接拿一個普通 callable 當 `post_hook` 則不會檢查：它回傳什麼，就成為這支 skill 的新 `result`。
 - 萬一 post-hook 拋出例外，你會拿到 `ToolErrorObservation(message="post_hook <ExcType>: <msg>")`。
 
 ## 常見錯誤
 
-- **忘了回傳 `Result`。** post-hook 如果回傳 `True`、`book` 或 `None`，這些值都會被當成新的 result 直接傳出去。想要一個嚴格的判斷，你就必須回傳 `Result.success(...)` 或 `Result.failure(...)`。
+- **忘了回傳 `Result`。** validator 如果回傳 `True`、`book` 或 `None`，會丟出 `TypeError`，模型看到的是 `ToolErrorObservation` 而不是你的判斷。請回傳 `Result.success(...)` 或 `Result.failure(...)`。
 - **feedback 寫得太工程師。** `"AssertionError at line 42"` 對 LLM 來說毫無意義。你要寫的是模型看得懂、而且能照著做的指示，例如：`"An ISBN must be 13 digits; only 10 are present, so add the missing digits."`
 - **把 validator 當成 fixer 用。** 在 post-hook 裡偷偷把值修好、然後回傳 `Result.success(...)`，這是一種反模式。資料的修補請搬到 analyzer 或一支新的 skill 裡。
 - **試著用 `from cantus import validator` 或 `register_validator(fn)`。** 這兩種寫法都會丟 `ImportError`。請改用 `from cantus.hooks import validator` 搭配 `@skill(post_hook=fn)`。

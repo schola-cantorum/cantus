@@ -28,11 +28,11 @@
 | -------------------------- | --------------------------------------------------------------------------------- | ----------------- |
 | `skill`（protocol kind）   | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
 | `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory、MarkdownMemory，加上 AutoMemory 包裝）            | 對應的 memory 介面 |
-| `analyzer`（hook helper）  | 在 agent loop 開始前讀取輸入，產出一份結構化的 insight                            | dataclass / dict  |
-| `validator`（hook helper） | 檢查 agent 的輸出是否合格，必要時可以觸發 retry                                   | `Result(ok, ...)` |
+| `analyzer`（hook helper）  | 掛在某個 skill 上的 `pre_hook`：在 skill 本體執行前，把引數轉成結構化的值 | dataclass / dict  |
+| `validator`（hook helper） | 掛在某個 skill 上的 `post_hook`：判斷 skill 的回傳值，並可把 feedback 送回給模型 | `Result(ok, ...)` |
 | `cantus.workflows`         | 一個命名空間，裡面放的是把 skill 與 hook 組合成流程的 building block               | 任意值            |
 
-cantus 剛好只有兩個 protocol kind：`skill`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們在 agent loop 的前後執行，而不是在 loop 裡被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Skill 的 `spec_for_llm()`；沒有另外的 `tool` 類別。
+cantus 剛好只有兩個 protocol kind：`skill`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們掛在某一個 skill 上，在那個 skill 本體的前後執行，而不是自己被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Skill 的 `spec_for_llm()`；沒有另外的 `tool` 類別。
 
 ## Model Provider
 
@@ -68,13 +68,16 @@ cantus 可以把一個 agent 透過四種訊息通道對外服務：
 - **smolagents**：decorator-first 的順手感來自這裡，但我們沒有採用 CodeAgent 那種直接執行 LLM 寫出來的程式碼的做法，改走顯式 dispatch。
 - **LangGraph**：我們略過了 graph 的編譯步驟，但把「可重播」這個承諾留在核心。`Inspector(stream).replay()` 能在任何時間點重建完整的歷史。
 
-整個 core runtime 不到 800 行 Python，且沒有額外的執行期相依，所以只要一句 `pip install` 就能直接放進 notebook 裡用。
+整個 core runtime 不到 800 行 Python，執行期只相依 `pydantic`，所以只要一句 `pip install` 就能直接放進 notebook 裡用。
 
 ## 文件地圖
 
 - `overview.md`（本頁）：四層架構、兩個 protocol kind 加上 hook helper 與 workflow building block，以及與相關專案的比較。
-- `quickstart.md`：大約 30 秒，從 `import` 一路到你的第一次 agent run。
+- `quickstart.md`：在 Colab 上從 `import` 一路到你的第一次 agent run。
+- `quickstart-desktop.md`：在 Windows、macOS 或 Linux 上做同一件事，外加 serve 與 tunnel。
+- `quickstart-providers.md`：同一個 agent，換上八種模型 API 各跑一次。
+- `quickstart-agent.md`：一塊一塊把 agent 組起來——工具、身分、防護、記憶。
 - `protocols/{skill,analyzer,validator,memory,debug}.md`：兩個 protocol kind（`skill` / `memory`）與兩個 hook helper（`analyzer` / `validator`）的三個入口範例與常見陷阱；組合用的範本則住在 `cantus.workflows` 的 building block 裡。
 - `core/{agent,event-stream,inspector}.md`：runtime 內部的資料結構。
 - `cookbook/{patterns,errors,tips}.md`：常見的組合方式與排錯。
-- `llms-txt.md`：`docs/llms.txt` 是什麼、為什麼存在，以及如何把它當成老師端的可行性測試來用。
+- `llms.txt`（repository 根目錄）：給外部 LLM 讀的引導文件，說明在 repository 的 `docs/llms-txt.md`（不屬於這個網站）。

@@ -8,7 +8,7 @@ If you are running in Colab and want to load 4-bit Gemma from Google Drive, see 
 
 - Python 3.10 or newer
 - [`uv`](https://docs.astral.sh/uv/) installed — `brew install uv` on macOS, `pipx install uv` on most systems, or the [official installer](https://docs.astral.sh/uv/getting-started/installation/)
-- An API key from a Chat Completions provider. This walkthrough uses OpenAI; Anthropic, Google, and Groq work the same way through `load_chat_model("<provider>/<model>")`.
+- An API key from a model provider. This walkthrough uses OpenAI; [Quickstart (Model APIs)](./quickstart-providers.md) shows the same steps for every other provider, hosted and local.
 
 ## Five-minute walkthrough
 
@@ -101,7 +101,7 @@ pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`. Press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server. With `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment; with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY`. Treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
+It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`. Press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server. With `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment; with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY`. Treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [Terminal UI](./tui.md) for the full pane reference.
 
 ## Local LLMs via Ollama
 
@@ -174,6 +174,8 @@ print(response.message.content)
 ## Where to go next
 
 - [`quickstart.md`](./quickstart.md) — Colab-first quickstart that loads 4-bit Gemma via Google Drive caching.
-- [`cookbook/`](./cookbook/) — runnable recipes covering workflows, multi-provider routing, retrieval, and the `cantus.serve` FastAPI app.
+- [Quickstart (Model APIs)](./quickstart-providers.md) — the same agent on each of the eight providers.
+- [Quickstart (Build an Agent)](./quickstart-agent.md) — add an identity, a guardrail and memory, one piece at a time.
+- [Cookbook: patterns](./cookbook/patterns.md) — runnable recipes for composing skills, hooks, workflows and memory.
 - `cantus-agent[serve]` — wrap your agent behind a FastAPI HTTP endpoint (`from cantus.serve import serve`).
-- [`docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md`](./llm_wiki/research/cloudflare_tunnel_vs_ngrok.md) — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).
+- `docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md` in the repository — why this walkthrough picks `cloudflared` over `ngrok` (free random subdomain, no auth token persisted, clean `Ctrl-C` teardown).

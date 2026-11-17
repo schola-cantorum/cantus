@@ -33,7 +33,7 @@ TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validat
 註冊時馬上就會印出一行確認：
 
 ```
-[debug] registered Skill 'search_book'
+[debug] registered SearchBook 'search_book'
 [debug] spec={"name": "search_book", "description": "Search the library catalog.", "args_schema": {...}}
 ```
 
@@ -43,13 +43,15 @@ TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validat
 [debug] search_book thought='look up by title' args=[]/{"title": "三體"} result="《三體》劉慈欣 / 9787536692930"
 ```
 
-如果丟出例外：
+如果 skill 本體丟出例外：
 
 ```
-[debug] search_book thought='' args=[]/{"title": 123} raised ValidationError: 1 validation error for SearchBookArgs
+[debug] search_book thought='' args=[]/{"title": "Dune"} raised KeyError: 'Dune'
 ```
 
-那個 `thought` 來自呼叫端的 `_debug_thought` 關鍵字引數。agent loop 會從 LLM 的 reasoning 自動把它填進去。你自己手動呼叫 skill、把它漏掉也沒關係——它就印成一個空字串。
+引數驗證發生在 agent 的 dispatcher 裡，早於被包起來的 `run`，所以引數型別錯誤不會印成 `[debug]` 這一行；它會變成 stream 上的 `ToolErrorObservation`。
+
+那個 `thought` 來自呼叫端的 `_debug_thought` 關鍵字引數。agent loop 目前不會傳這個引數，所以在 `Agent.run` 裡它印成空字串；你自己手動呼叫 skill、想幫這一行加上標記時，再自己傳進去。
 
 ## Memory 不能直接用 `@debug` 包
 
