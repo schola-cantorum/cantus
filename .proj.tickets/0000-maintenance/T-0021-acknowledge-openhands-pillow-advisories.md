@@ -2,7 +2,7 @@
 id: T-0021
 title: Acknowledge the pillow 12.3.0 advisories in the openhands audit group until browser-use allows pillow 13
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Changes .github/workflows/supply-chain.yml only (acknowledged advisory IDs scoped to one matrix group); no change to cantus/ runtime behaviour, public API or pyproject dependencies. Stage 7 runs because a workflow changes.
 ---
