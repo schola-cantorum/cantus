@@ -351,3 +351,119 @@ JSON Lines persistence (ADR-0015). Session identity for channel wiring stays ope
 epic.
 
 **Revisit when.** The session epic (sixth in ADR-0017's order) reaches stage 1.
+
+---
+
+## OQ-010 — What do `max_retries` and a `pre_hook` promise once the loop is split into stages?
+
+**Deferred on:** 2026-11-17
+**Status:** open
+
+**Reason.** Both are behaviour of the agent loop that the async-core epic rewrites when it splits the
+loop into stages (ADR-0015, ADR-0016). `max_retries` is a public parameter and the hook call is
+contract surface, so neither can change on the lightweight path, and fixing them in today's loop
+would be redone by that epic.
+
+**Evidence.**
+- Verified by running a scripted model on `7590e84`: `Agent.run(max_retries=0)` and
+  `max_retries=3` both use all `max_iterations`. Both `ValidationErrorObservation` branches
+  `continue` whether or not the budget is spent (`cantus/core/agent.py:139-144`,
+  `cantus/core/agent.py:156-163`).
+- Verified: arguments are validated against the tool's own signature, then the hook is called as
+  `pre_hook(**args)` (`cantus/core/agent.py:359-376`). A hook whose parameter names differ, or one
+  that is meant to change an argument's type, fails at dispatch.
+- Verified: a parameter annotated with a Pydantic model reaches the body as a `dict`, because
+  `validate_args` returns `model_dump()` (`cantus/protocols/skill.py:75-77`).
+- The manual states today's behaviour for both (`docs/site/core/agent.md:58`, T-0022;
+  `docs/site/protocols/analyzer.md`, T-0023).
+
+**Blocks.** The async-core epic's spec. Choices still open: enforce `max_retries` (and what the loop
+does when it is spent) or deprecate the parameter; whether a pre_hook may change the type the model
+is asked for, which needs the schema to come from the hook; whether the body receives validated
+model instances or dumped dicts.
+
+**Not blocked.** Epic 1 (Tool rename): its AC-01 keeps today's hook semantics, and it changes the
+same files only to rename.
+
+**Revisit when.** The async-core epic (second in ADR-0017's order) reaches stage 1.
+
+---
+
+## OQ-011 — How does a student's worker run in the `cantus serve` process, and do the shipped channel gateways work end to end?
+
+**Deferred on:** 2026-11-17
+**Status:** open
+
+**Reason.** The channel cookbooks cannot be made correct by editing prose: the fix needs a decision
+on how student code is started beside the server, which is public surface, and runtime fixes in two
+gateways. The user decided (2026-11-17) that this is its own epic, placed after the async-core epic
+because the worker is where students call `await agent.arun()`.
+
+**Evidence.**
+- Verified: each channel's queue is an in-process `deque` (`cantus/serve/channels/line.py:60`), and
+  `send()` raises unless `mount(app)` ran in the same process (`cantus/serve/channels/line.py:100`).
+  The LINE, Telegram and Discord cookbooks start the worker with `python scripts/worker.py` in
+  another shell (`docs/site/channels/line.md:123`, `docs/site/channels/discord.md:151`), so it
+  never sees an event.
+- Verified: the `serve()` lifespan starts only `RealtimeChannel.connect()`
+  (`cantus/serve/app.py:118-119`); there is no entry for student code in the server process.
+- Verified: the Discord interactions handler enqueues the raw payload
+  (`cantus/serve/channels/discord.py:283`); the cookbook reads `event["interaction"]`
+  (`docs/site/channels/discord.md:127`), a key that is never present.
+- Inferred from the Discord API, not checked against Discord: the handler has already answered with
+  type 5, so the cookbook's later POST to `/callback` would be refused, and `send()` would need the
+  follow-up webhook instead.
+- Verified: `GoogleChatPubSubChannel._app` is read (`cantus/serve/channels/googlechat.py:190`) and
+  never assigned; the channel is not a `WebhookChannel`, so `serve()` never calls `mount`. `send()`
+  therefore always raises under `cantus serve`.
+- Verified: the send URL prefixes `spaces/` (`cantus/serve/channels/googlechat.py:197`) while the
+  cookbook sets the space to `spaces/YOUR_SPACE_ID` (`docs/site/channels/google-chat.md:100`).
+- Verified: `googlechat.py` makes no logging call; the cookbook quotes a `connected` log line
+  (`docs/site/channels/google-chat.md:116`).
+
+**Blocks.** A new epic, "channel gateways work end to end". Choices still open: the entry point for
+a student worker (a hook on `serve()`, a student-written script that builds the app and starts the
+worker, or something else), within the Charter rule that a gateway never runs an agent; whether the
+Google Chat space setting accepts the bare id, the `spaces/` form, or both. When that epic reaches
+stage 1, ADR-0017's delivery order gains it, and the sentence in ADR-0016 that gives the cookbook
+worker update to the async-core epic moves with it. Its stage 8 needs the real platforms (OQ-001).
+
+**Not blocked.** The gateways' inbound side (signature checks, queueing) and the async-core epic's
+other work.
+
+**Revisit when.** The async-core epic closes, or earlier if the user wants the Discord and Google
+Chat runtime fixes ahead of it.
+
+---
+
+## OQ-012 — Which epics carry the install-hint fix and the `Args:` descriptions?
+
+**Deferred on:** 2026-11-17
+**Status:** open
+
+**Reason.** Both change what `cantus/` emits at run time, so they are outside the lightweight path
+(ADR-0012), and both sit in files that epic 1 is about to rename. The user decided (2026-11-17) to
+attach each to a later epic instead of reopening epic 1's reviewed spec.
+
+**Evidence.**
+- Verified: `ImportError` hints name `pip install cantus[...]` (`cantus/model/factory.py:87`,
+  `cantus/serve/__init__.py:18`, `cantus/config.py:26`, `cantus/model/loader.py:131`,
+  `cantus/model/providers/mlx.py:26`, `cantus/protocols/memory.py:116`, and the five adapters under
+  `cantus/adapters/`), while the distribution is `cantus-agent` (`pyproject.toml:6`) and the CLI
+  already says so (`cantus/cli.py:268`). Tests assert the old substring in 21 places, and
+  `cantus/__init__.py:110` documents it as the serve gate's message.
+- Verified by running: the `Args:` block is parsed into `_args_descriptions`
+  (`cantus/protocols/skill.py:122`, `cantus/protocols/skill.py:132`) and nothing reads it, so
+  `spec_for_llm()` carries no per-argument description (`cantus/protocols/skill.py:67-73`).
+- Epic 1's spec puts "any change to how the prompt instructs the model" out of scope
+  (`.proj.specs/0001-tool-rename-phase-one/spec.en.md`, Out of Scope).
+
+**Blocks.** Nothing until the carrying epics start. Install hints: one ticket in the async-core
+epic, with a test that every hint names `cantus-agent`. `Args:` descriptions: the tool-calling epic
+(third in ADR-0017's order), where the argument schema is also sent through native function
+calling.
+
+**Not blocked.** Epic 1.
+
+**Revisit when.** The async-core epic reaches stage 1 (install hints); the tool-calling epic reaches
+stage 1 (`Args:` descriptions).
