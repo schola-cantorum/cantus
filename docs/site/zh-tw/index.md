@@ -10,6 +10,12 @@ hero:
       text: 快速上手（Colab）
       link: /zh-tw/quickstart
     - theme: alt
+      text: 快速上手（模型 API）
+      link: /zh-tw/quickstart-providers
+    - theme: alt
+      text: 快速上手（建置 Agent）
+      link: /zh-tw/quickstart-agent
+    - theme: alt
       text: 總覽
       link: /zh-tw/overview
     - theme: alt

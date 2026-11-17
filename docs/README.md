@@ -16,7 +16,9 @@ A table of contents for everything under `docs/`. New here? Start with the
 - [Overview](site/overview.md) — architecture and design philosophy
 - [Quickstart](site/quickstart.md) — from zero to first agent in 10 minutes
 - [Desktop quickstart](site/quickstart-desktop.md) — API-key-backed walkthrough for Windows / macOS / Linux (a plain copy also lives at [quickstart-desktop.md](quickstart-desktop.md))
-- [Model providers](site/model-providers.md) — the eight `load_chat_model` prefixes
+- [Quickstart: model APIs](site/quickstart-providers.md) — the same agent on each of the eight providers, hosted and local
+- [Quickstart: build an agent](site/quickstart-agent.md) — tools, identity, guardrail and memory, one piece at a time, with no API key
+- [Model providers](site/model-providers.md) — reference for the eight `load_chat_model` prefixes
 
 ## Core concepts
 

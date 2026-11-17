@@ -12,6 +12,8 @@ function sidebar(base: string) {
         { text: 'Overview', link: `${base}/overview` },
         { text: 'Quickstart (Colab)', link: `${base}/quickstart` },
         { text: 'Quickstart (Desktop)', link: `${base}/quickstart-desktop` },
+        { text: 'Quickstart (Model APIs)', link: `${base}/quickstart-providers` },
+        { text: 'Quickstart (Build an Agent)', link: `${base}/quickstart-agent` },
         { text: 'Terminal UI', link: `${base}/tui` },
       ],
     },
@@ -82,9 +84,8 @@ export default defineConfig({
   description:
     'A polyphonic framework for composing LLM agent harnesses — teaching-oriented, Colab-first.',
   cleanUrls: true,
-  // Migrated content carries relative links that are tightened in later
-  // iterations; do not fail the build on dead links while the corpus moves.
-  ignoreDeadLinks: true,
+  // Every relative link resolves (T-0022), so a dead link fails the build.
+  ignoreDeadLinks: false,
   // The interactive manual is mirrored into docs/site/public/interactive/ and
   // served verbatim at /interactive/; it is not a VitePress page.
   locales: {

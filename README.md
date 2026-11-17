@@ -53,7 +53,7 @@ The runtime extras (Gemma 4 + transformers + bitsandbytes) require:
 pip install 'cantus-agent[runtime]==0.6.0'
 ```
 
-The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`):
+The serve extras (v0.4.0 — FastAPI app factory; pulls `fastapi`, `uvicorn`, `pydantic-settings`, plus `httpx`, `pynacl`, `websockets` and `google-cloud-pubsub` for the channel gateways):
 
 ```bash
 pip install 'cantus-agent[serve]==0.6.0'
@@ -102,7 +102,7 @@ print(getattr(final, "answer", final))
 
 ## Multi-provider quickstart (v0.2.1)
 
-Tier 2 ChatModel adapters let you point the same Agent at OpenAI, Anthropic, Google Gemini, Groq, or NVIDIA NIM instead of local Gemma. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
+Tier 2 ChatModel adapters let you point the same Agent at OpenAI, Anthropic, Google Gemini, Groq, or NVIDIA NIM instead of local Gemma; three local backends (Ollama, in-process MLX, and an omlx / mlx-omni-server endpoint) load through the same `load_chat_model` call. [`docs/site/quickstart-providers.md`](./docs/site/quickstart-providers.md) walks through all eight, and [`docs/site/quickstart-agent.md`](./docs/site/quickstart-agent.md) builds an agent piece by piece with no API key. **You MUST wrap a `ChatModel` with `ChatModelAsHandle` before passing it to `Agent`** — the Agent only speaks the Tier 1 `.generate(prompt) -> str` protocol.
 
 OpenAI (install `pip install 'cantus-agent[openai]'`, set `OPENAI_API_KEY`):
 
