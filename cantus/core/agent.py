@@ -18,6 +18,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, Union
 
+from cantus._deprecation import warn_legacy
 from cantus.core.action import (
     Action,
     CallSkillAction,
@@ -72,13 +73,88 @@ class AgentState:
     stream: EventStream = field(default_factory=EventStream)
 
 
-@dataclass
+class _ToolsField:
+    """Descriptor: every write to `Agent.tools` resolves to a Registry."""
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._slot = "_" + name
+
+    def __get__(self, obj: Any, objtype: Any = None) -> Any:
+        if obj is None:
+            return None
+        return obj.__dict__[self._slot]
+
+    def __set__(self, obj: Any, value: Any) -> None:
+        if value is None:
+            value = _get_global_registry()
+            if value.names_for("tool"):
+                warn_legacy("W11")
+        elif not isinstance(value, Registry):
+            value = Registry(tools=value)
+        obj.__dict__[self._slot] = value
+
+
+@dataclass(init=False)
 class Agent:
-    """Default agent that drives the model + EventStream loop."""
+    """Default agent that drives the model + EventStream loop.
+
+    The agent can call only the Tools it was given.
+    """
 
     model: ModelHandle
-    registry: Registry = field(default_factory=_get_global_registry)
+    tools: Any = _ToolsField()
     soul: "Soul | None" = field(default=None, kw_only=True)
+
+    def __init__(
+        self,
+        model: ModelHandle,
+        tools: Any = None,
+        *,
+        soul: "Soul | None" = None,
+        registry: Any = None,
+    ) -> None:
+        """Create an agent.
+
+        Args:
+            model: The loaded model; anything with ``generate(prompt)``.
+            tools: The Tools the agent may call: a list (or any iterable) of
+                Tool instances, or a ready ``Registry``.
+            soul: An optional Soul added to the system prompt.
+            registry: Deprecated; use ``tools``.
+        """
+        if registry is not None:
+            if not isinstance(registry, Registry):
+                raise TypeError(
+                    f"registry must be a Registry, got {type(registry).__name__}; "
+                    "pass tools with Agent(model, tools=[...])"
+                )
+            # dataclasses.replace(agent, registry=r2) passes the old tools along
+            # with the new registry; there the registry wins.
+            if tools is not None and sys._getframe(1).f_globals.get("__name__") != "dataclasses":
+                raise TypeError(
+                    "pass either tools= or registry=, not both; "
+                    "registry= is deprecated, use tools="
+                )
+            warn_legacy("W10")
+            tools = registry
+        self.model = model
+        self.tools = tools
+        self.soul = soul
+
+    @property
+    def registry(self) -> Registry:
+        """The agent's tools as a Registry."""
+        registry: Registry = self.tools
+        return registry
+
+    @registry.setter
+    def registry(self, value: Any) -> None:
+        if not isinstance(value, Registry):
+            raise TypeError(
+                f"agent.registry must be a Registry, got {type(value).__name__}; "
+                "use agent.tools = [...] or Registry(tools=[...])"
+            )
+        self.tools = value
 
     def step(self, state: AgentState) -> Union[Action, Observation]:
         """One decision step: ask the model for the next action.

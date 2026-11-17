@@ -6,32 +6,12 @@ import warnings
 import pytest
 
 from cantus import Agent, CantusDeprecationWarning, Registry, register_tool
-from cantus.core.observation import (
-    SkillObservation,  # T-0009 renames this class
-    ToolErrorObservation,
-)
+from cantus.core.observation import ToolErrorObservation
 from cantus.grammar.tool_call import build_schema, parse_tool_call
+from tests.agent_helpers import ScriptedModel, call_json, final_json, tool_results
 
-
-class ScriptedModel:
-    """Model stub: returns the scripted outputs in order, records prompts."""
-
-    def __init__(self, outputs):
-        self.outputs = list(outputs)
-        self.prompts = []
-
-    def generate(self, prompt, **kwargs):
-        self.prompts.append(prompt)
-        return self.outputs.pop(0)
-
-
-def _call_json(name, **args):
-    # T-0010 switches this key
-    return json.dumps({"thought": "t", "action": {"skill_name": name, "args": args}})
-
-
-def _final_json():
-    return json.dumps({"thought": "d", "action": {"final_answer": "ok"}})
+_call_json = call_json
+_final_json = final_json
 
 
 def _registry():
@@ -59,12 +39,9 @@ def _assert_no_cantus_warning(caught):
 def test_agent_run_with_an_explicit_registry_is_silent_and_prompts_with_tool_key(records):
     reg = _registry()
     model = ScriptedModel([_call_json("echo", value="hi"), _final_json()])
-    state = Agent(model, registry=reg).run("q")  # T-0008 switches this to tools=
+    state = Agent(model, tools=reg).run("q")
 
-    observations = [e for e in state.stream if isinstance(e, SkillObservation)]
-    assert [(o.skill_name, o.result) for o in observations] == [  # T-0009 switches skill_name
-        ("echo", "hi")
-    ]
+    assert tool_results(state.stream) == [("echo", "hi")]
     assert not [e for e in state.stream if isinstance(e, ToolErrorObservation)]
     prompt = json.loads(model.prompts[0])
     assert list(prompt["tools"]) == ["tool"]

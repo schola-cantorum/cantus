@@ -8,48 +8,17 @@ from pathlib import Path
 import pytest
 
 from cantus import Agent, Registry, Result, Tool, register_tool, tool
-from cantus.core.observation import (
-    SkillObservation,  # T-0009 renames this class
-    ToolErrorObservation,
-    ValidationErrorObservation,
-)
+from cantus.core.observation import ToolErrorObservation, ValidationErrorObservation
 from cantus.core.registry import _get_global_registry  # approved exception: see the T-0007 ticket, stage-5 readings
+from tests.agent_helpers import ScriptedModel, call_json, final_json, observations, run_agent
 
 FIXTURE = Path(__file__).parent / "fixtures" / "skill_spec_for_llm_v0_2_1.json"
 
 
-class ScriptedModel:
-    """Model stub: returns the scripted outputs in order, records prompts."""
-
-    def __init__(self, outputs):
-        self.outputs = list(outputs)
-        self.prompts = []
-
-    def generate(self, prompt, **kwargs):
-        self.prompts.append(prompt)
-        return self.outputs.pop(0)
-
-
-def _call_json(name, **args):
-    # T-0010 switches this key
-    return json.dumps({"thought": "t", "action": {"skill_name": name, "args": args}})
-
-
-def _final_json():
-    return json.dumps({"thought": "d", "action": {"final_answer": "ok"}})
-
-
-def _run(tools, outputs):
-    reg = Registry()
-    for t in tools:
-        register_tool(t, registry=reg)
-    model = ScriptedModel(outputs)
-    stream = Agent(model, registry=reg).run("q").stream  # T-0008 switches this to tools=
-    return stream, model
-
-
-def _observations(stream):
-    return [e for e in stream if isinstance(e, (SkillObservation, ValidationErrorObservation))]
+_call_json = call_json
+_final_json = final_json
+_run = run_agent
+_observations = observations
 
 
 def _global_names():
@@ -424,7 +393,7 @@ def test_register_tool_with_hooks_runs_them_when_dispatched():
     reg = Registry()
     register_tool(body, registry=reg, pre_hook=pre_hook, post_hook=post_hook)
     model = ScriptedModel([_call_json("body", a=1), _final_json()])
-    Agent(model, registry=reg).run("q")  # T-0008 switches this to tools=
+    Agent(model, tools=reg).run("q")
 
     assert log == ["pre", "body", "post"]
 

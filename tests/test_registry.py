@@ -200,3 +200,148 @@ def test_spec_for_llm_has_only_the_tool_key_sorted_by_name():
     assert list(spec.keys()) == ["tool"]
     assert len(spec) == 1
     assert list(json.loads(json.dumps(spec))) == ["tool"]
+
+
+# --- T-0008: Registry(tools=...) ----------------------------------------------
+
+
+def _named_tool(name):
+    def fn(x: int) -> int:
+        """Identity."""
+        return x
+
+    fn.__name__ = name
+    return tool(fn)
+
+
+def test_registry_holds_exactly_the_tools_it_is_given():
+    a = _named_tool("a")
+    b = _named_tool("b")
+
+    for container in ([a, b], (a, b), (t for t in (a, b))):
+        reg = Registry(tools=container)
+        assert reg.names_for("tool") == ["a", "b"]
+        assert reg.lookup("tool", "a") is a
+        assert reg.lookup("tool", "b") is b
+
+
+def test_empty_registry_has_no_tools():
+    assert Registry().names_for("tool") == []
+    assert Registry(tools=[]).names_for("tool") == []
+
+
+def test_duplicate_tool_name_raises_value_error_naming_name_and_positions():
+    first = _named_tool("add")
+    other = _named_tool("sub")
+    second = _named_tool("add")
+
+    with pytest.raises(ValueError) as excinfo:
+        Registry(tools=[first, other, second])
+    message = str(excinfo.value)
+    assert "'add'" in message
+    assert "0" in message and "2" in message
+    assert "the same Tool twice" not in message
+
+    with pytest.raises(ValueError) as excinfo:
+        Registry(tools=[first, first])
+    message = str(excinfo.value)
+    assert "'add'" in message
+    assert "0" in message and "1" in message
+    assert "the same Tool twice" in message
+
+
+def test_undecorated_function_raises_type_error_pointing_at_tool_decorator():
+    import functools
+
+    def add(x: int) -> int:
+        return x
+
+    good = _named_tool("good")
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[good, add])
+    message = str(excinfo.value)
+    assert "@tool" in message
+    assert "'add'" in message
+    assert "tools[1]" in message
+    assert "cantus.tool(" in message
+
+    with pytest.raises(TypeError, match=r"tools\[0\].*@tool"):
+        Registry(tools=[lambda x: x])
+    with pytest.raises(TypeError, match=r"tools\[0\].*@tool"):
+        Registry(tools=[functools.partial(add, 1)])
+
+
+def test_wrong_container_raises_type_error_naming_the_received_type():
+    one = _named_tool("one")
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=one)
+    message = str(excinfo.value)
+    assert "Tool" in message and "tools=[...]" in message
+
+    for bad, type_name in (("abc", "str"), (b"abc", "bytes"), ({"a": one}, "dict"), (3, "int")):
+        with pytest.raises(TypeError) as excinfo:
+            Registry(tools=bad)
+        message = str(excinfo.value)
+        assert type_name in message
+        assert "list" in message
+        assert "Registry" in message
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=None)
+    assert "NoneType" in str(excinfo.value)
+    assert "omit" in str(excinfo.value)
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=Registry())
+    assert "already a Registry" in str(excinfo.value)
+
+
+def test_other_wrong_elements_raise_type_error_with_position():
+    class MyTool(Tool):
+        """Mine."""
+
+        name = "my_tool"
+
+        def run(self, a: int) -> int:
+            return a
+
+    class Foo:
+        pass
+
+    class Named:
+        name = "named"
+
+    good = _named_tool("good")
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[MyTool])
+    message = str(excinfo.value)
+    assert "tools[0]" in message and "MyTool" in message and "instance" in message
+    assert "@tool" not in message
+
+    with pytest.raises(TypeError) as excinfo:
+        Registry(tools=[good, Foo])
+    message = str(excinfo.value)
+    assert "tools[1]" in message and "Foo" in message
+    assert "@tool" not in message
+
+    for index, bad, type_name in (
+        (2, None, "NoneType"),
+        (2, 5, "int"),
+        (2, Named(), "Named"),
+    ):
+        with pytest.raises(TypeError) as excinfo:
+            Registry(tools=[good, good, bad])
+        message = str(excinfo.value)
+        assert f"tools[{index}]" in message and type_name in message
+        assert "@tool" not in message
+
+
+def test_set_frozenset_and_dict_values_are_accepted():
+    a = _named_tool("a")
+    b = _named_tool("b")
+
+    for container in ({a, b}, frozenset([a, b]), {"x": a, "y": b}.values()):
+        assert Registry(tools=container).names_for("tool") == ["a", "b"]
