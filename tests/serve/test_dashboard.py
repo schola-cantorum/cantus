@@ -436,7 +436,7 @@ def test_get_tools_openapi_summary_and_operation_id() -> None:
     operation = TestClient(serve(Registry())).get("/openapi.json").json()["paths"]["/tools"]["get"]
 
     assert operation["summary"] == "List registered Tools"
-    assert operation["operationId"].startswith("dashboard_list_tools")
+    assert operation["operationId"] == "dashboard_list_tools_tools_get"
     assert not operation.get("deprecated")
 
 

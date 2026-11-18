@@ -1027,3 +1027,24 @@ def test_tools_route_works_on_a_plain_fastapi_app() -> None:
             },
         }
     ]
+
+
+# --- Rows 6 and 9: OpenAPI texts of the introspection tool list ------------
+
+
+def test_openapi_describes_the_tool_list_route_and_the_tool_entry_component() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    document = TestClient(serve(_registry_with_echo())).get("/openapi.json").json()
+    operation = document["paths"]["/introspection/tools"]["get"]
+    component = document["components"]["schemas"]["ToolEntry"]
+
+    assert operation["summary"] == "Registered Tool specs"
+    assert operation["operationId"] == "introspection_tools_introspection_tools_get"
+    assert not operation.get("deprecated")
+    items = operation["responses"]["200"]["content"]["application/json"]["schema"]["items"]
+    assert items == {"$ref": "#/components/schemas/ToolEntry"}
+    assert sorted(component["properties"]) == ["args_schema", "description", "name"]
+    assert sorted(component["required"]) == ["args_schema", "description", "name"]

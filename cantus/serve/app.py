@@ -37,7 +37,7 @@ from cantus.core.action import CallToolAction
 from cantus.core.event_stream import EventStream
 from cantus.core.observation import ToolErrorObservation, ToolObservation
 from cantus.core.registry import Registry
-from cantus.serve._aliases import AliasState, CantusFastAPI, add_alias_route
+from cantus.serve._aliases import CantusFastAPI, add_alias_route
 from cantus.serve.channel import Channel, RealtimeChannel, WebhookChannel
 from cantus.serve.dashboard import (
     RESERVED_DASHBOARD_NAMES,
@@ -142,7 +142,6 @@ def serve(
         redoc_url=effective_settings.redoc_url,
         lifespan=_lifespan,
     )
-    app.state.alias_state = AliasState()
     # require_auth reads Settings from app.state.settings.
     app.state.settings = effective_settings
     app.state.channels = list(channels) if channels else []

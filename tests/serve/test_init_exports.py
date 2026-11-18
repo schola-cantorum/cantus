@@ -130,33 +130,22 @@ def test_collect_tools_returns_tool_entries_with_literal_fields() -> None:
     }
 
 
-def test_the_tool_names_and_routes_are_silent_with_bearer_auth_and_log_nothing(caplog) -> None:
-    import logging
-    import warnings
+def test_importing_the_tool_names_emits_no_cantus_deprecation_warning(tmp_path) -> None:
+    """A fresh interpreter imports the new names with the cantus category escalated to an error."""
+    import subprocess
+    import sys
 
-    from fastapi.testclient import TestClient
+    code = (
+        "import warnings, cantus\n"
+        "warnings.simplefilter('error', cantus.CantusDeprecationWarning)\n"
+        "import cantus.serve\n"
+        "from cantus.serve import ToolEntry, serve\n"
+        "from cantus.serve.introspection import collect_tools\n"
+        "print(ToolEntry.__name__, collect_tools.__name__)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, cwd=str(tmp_path), timeout=60
+    )
 
-    import cantus
-    from cantus import Registry, tool
-    from cantus.config import Settings
-
-    def echo(value: str) -> str:
-        """Echo back."""
-        return value
-
-    caplog.set_level(logging.DEBUG)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", cantus.CantusDeprecationWarning)
-        import cantus.serve  # noqa: F401
-        from cantus.serve import ToolEntry, serve  # noqa: F401
-        from cantus.serve.introspection import collect_tools  # noqa: F401
-
-        settings = Settings(auth_mode="bearer", bearer_token="t0k")
-        client = TestClient(serve(Registry(tools=[tool(echo)]), settings=settings))
-        headers = {"Authorization": "Bearer t0k"}
-
-        assert client.post("/tools/echo", json={"value": "hi"}, headers=headers).status_code == 200
-        assert client.get("/tools", headers=headers).status_code == 200
-        assert client.get("/introspection/tools", headers=headers).status_code == 200
-
-    assert [r for r in caplog.records if r.name == "cantus.serve"] == []
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split() == ["ToolEntry", "collect_tools"]

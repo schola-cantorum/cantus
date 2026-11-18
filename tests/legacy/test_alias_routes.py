@@ -5,6 +5,7 @@ the package to build an expected value.
 """
 
 import asyncio
+import copy
 import logging
 import os
 from typing import Any
@@ -180,6 +181,8 @@ def test_alias_and_primary_answer_alike_for_every_credential(
             assert a.status_code == 401
             assert a.json() == AUTH_REQUIRED
         assert (a.status_code, a.content) == (p.status_code, p.content)
+        _assert_notice(a)
+        assert not _has_notice(p)
 
 
 def test_alias_list_routes_are_404_when_their_group_is_off():
@@ -316,12 +319,31 @@ def test_openapi_marks_alias_operations_deprecated_with_literal_ids_and_summarie
     assert invoke["requestBody"]["content"]["application/json"]["schema"] == ADD_SCHEMA
     assert invoke["description"] == "Add two numbers."
 
-    for primary in (
-        paths["/tools/add"]["post"],
-        paths["/tools"]["get"],
-        paths["/introspection/tools"]["get"],
-    ):
-        assert not primary.get("deprecated")
+    deprecated = sorted(
+        (path, method)
+        for path, operations in paths.items()
+        for method, operation in operations.items()
+        if operation.get("deprecated")
+    )
+    assert deprecated == [
+        ("/introspection/skills", "get"),
+        ("/skills", "get"),
+        ("/skills/add", "post"),
+        ("/skills/boom", "post"),
+        ("/skills/multiply", "post"),
+        ("/skills/ping", "post"),
+    ]
+
+
+def test_a_tool_without_a_docstring_has_the_tool_fallback_description_on_both_families():
+    def nodoc(value: str) -> str:
+        return value
+
+    app = serve(Registry(tools=[tool(nodoc)]), settings=_settings())
+    paths = TestClient(app).get("/openapi.json").json()["paths"]
+
+    assert paths["/skills/nodoc"]["post"]["description"] == "Invoke cantus Tool 'nodoc'"
+    assert paths["/tools/nodoc"]["post"]["description"] == "Invoke cantus Tool 'nodoc'"
 
 
 # --- Row 26: one log record per template -----------------------------------
@@ -333,8 +355,18 @@ def test_each_alias_template_is_logged_once_per_application(caplog):
     client.post("/skills/add", json={"a": 1, "b": 2})
     client.post("/skills/multiply", json={"a": 1, "b": 2})
     client.post("/skills/add", json={"a": 1, "b": 2})
+    client.post(
+        "/skills/add",
+        json={"a": 1, "b": 2, "note": "MARKER-BODY-456"},
+        headers={"Authorization": "Bearer t0k"},
+    )
     records = _serve_records(caplog)
     assert [r.getMessage() for r in records] == [LOG_INVOKE]
+    for record in caplog.records:
+        text = record.getMessage() + repr(record.args)
+        assert "WRONG-SECRET-123" not in text
+        assert "MARKER-BODY-456" not in text
+        assert "t0k" not in text
     assert records[0].levelname == "WARNING"
 
     caplog.clear()
@@ -380,6 +412,21 @@ def test_a_first_request_that_fails_with_500_or_405_still_logs(caplog):
     assert _client().get("/skills/add").status_code == 405
     assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_INVOKE]
 
+    caplog.clear()
+    assert _client().head("/skills").status_code == 405
+    assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_DASHBOARD]
+
+    caplog.clear()
+    assert _client().options("/skills/add").status_code == 405
+    assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_INVOKE]
+
+
+def test_a_404_from_a_disabled_group_logs_nothing(caplog):
+    caplog.set_level(logging.WARNING)
+    assert _client(dashboard=False).get("/skills").status_code == 404
+    assert _client(introspection=False).get("/introspection/skills").status_code == 404
+    assert _serve_records(caplog) == []
+
 
 # --- Row 28: no secrets in the record -------------------------------------
 
@@ -404,9 +451,9 @@ def test_two_applications_each_log_once(caplog):
     first, second = _client(), _client()
     first.get("/skills")
     second.get("/skills")
-    assert len(_serve_records(caplog)) == 2
+    assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_DASHBOARD, LOG_DASHBOARD]
     first.get("/skills")
-    assert len(_serve_records(caplog)) == 2
+    assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_DASHBOARD, LOG_DASHBOARD]
 
 
 # --- Row 30: concurrency ---------------------------------------------------
@@ -461,6 +508,7 @@ def test_rollup_carries_the_same_list_under_both_keys():
     body = _client().get("/introspection").json()
     assert body["skills"] == SPECS
     assert body["tools"] == SPECS
+    assert set(body) == {"tools", "skills", "sessions", "permissions", "queues", "dataflow"}
 
 
 def _permissions() -> PermissionsSnapshot:
@@ -490,6 +538,44 @@ def test_snapshot_accepts_the_legacy_field_name():
         }
     )
     assert loaded.tools == [entry]
+
+
+def test_snapshot_built_with_tools_only_fills_the_legacy_list_with_the_same_entries():
+    entry = ToolEntry(name="add", description="Add two numbers.", args_schema=ADD_SCHEMA)
+    snapshot = IntrospectionSnapshot(
+        tools=[entry],
+        sessions=[],
+        permissions=_permissions(),
+        queues=[],
+        dataflow=DataflowGraph(nodes=[], edges=[]),
+    )
+
+    dumped = snapshot.model_dump()
+    assert dumped["skills"] == [SPECS[0]]
+    assert dumped["tools"] == [SPECS[0]]
+    assert set(dumped) == {"tools", "skills", "sessions", "permissions", "queues", "dataflow"}
+
+
+def test_validating_a_v06_shaped_mapping_leaves_it_unchanged():
+    payload = {
+        "skills": [SPECS[0]],
+        "sessions": [],
+        "permissions": _permissions().model_dump(),
+        "queues": [],
+        "dataflow": {"nodes": [], "edges": []},
+    }
+    before = copy.deepcopy(payload)
+
+    IntrospectionSnapshot.model_validate(payload)
+
+    assert payload == before
+
+
+def test_openapi_snapshot_schema_requires_both_lists():
+    schema = _client().get("/openapi.json").json()["components"]["schemas"]["IntrospectionSnapshot"]
+
+    assert "skills" in schema["required"]
+    assert "tools" in schema["required"]
 
 
 def test_snapshot_keeps_both_lists_as_given_when_they_differ():
@@ -556,6 +642,15 @@ def test_gated_routes_lists_the_alias_paths_beside_the_primaries():
     assert _gated("bearer", dashboard=False) == sorted(_INVOKE + _INTROSPECTION)
 
 
+def test_gated_routes_with_introspection_off_lists_the_invoke_and_dashboard_paths():
+    from cantus.serve.introspection import collect_permissions
+
+    settings = _settings("bearer", introspection=False)
+    app = serve(Registry(tools=[_make("add"), _make("multiply")]), settings=settings)
+
+    assert collect_permissions(app, settings).gated_routes == sorted(_INVOKE + _DASHBOARD)
+
+
 # --- Row 13, legacy half ----------------------------------------------------
 
 
@@ -581,7 +676,8 @@ def test_a_tool_named_skills_collides_with_the_dashboard_path():
 # --- Row 33: a plain FastAPI app --------------------------------------------
 
 
-def test_alias_routes_work_on_an_app_not_built_by_serve():
+def test_alias_routes_work_on_an_app_not_built_by_serve(caplog):
+    caplog.set_level(logging.WARNING)
     from cantus.serve.dashboard import register_dashboard_routes
     from cantus.serve.introspection import SessionTracker
 
@@ -600,3 +696,27 @@ def test_alias_routes_work_on_an_app_not_built_by_serve():
     dashboard = client.get("/skills")
     assert dashboard.status_code == 200
     assert dashboard.json() == SPECS
+    assert not _has_notice(introspection)
+    assert not _has_notice(dashboard)
+    assert _serve_records(caplog) == []
+    paths = client.get("/openapi.json").json()["paths"]
+    assert paths["/skills"]["get"]["deprecated"] is True
+    assert paths["/introspection/skills"]["get"]["deprecated"] is True
+    assert not paths["/tools"]["get"].get("deprecated")
+    assert not paths["/introspection/tools"]["get"].get("deprecated")
+
+
+def test_an_application_mounted_under_a_prefix_still_marks_and_logs_its_aliases(caplog):
+    caplog.set_level(logging.WARNING)
+    parent = FastAPI()
+    parent.mount("/api", serve(_registry(), settings=_settings()))
+    client = TestClient(parent)
+
+    alias = client.get("/api/skills")
+    primary = client.get("/api/tools")
+
+    assert alias.status_code == 200
+    assert alias.json() == SPECS
+    _assert_notice(alias)
+    assert not _has_notice(primary)
+    assert [r.getMessage() for r in _serve_records(caplog)] == [LOG_DASHBOARD]

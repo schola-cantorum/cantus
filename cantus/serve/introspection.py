@@ -436,7 +436,9 @@ def register_introspection_routes(
     caller honours ``settings.introspection`` (don't call this when it is
     False) and passes ``dependencies`` to gate the group behind
     :func:`cantus.serve.security.require_auth`. Every endpoint is GET-only —
-    the group is purely observational and mutates no runtime state.
+    the group is purely observational and mutates no runtime state (the only
+    side effect is the one deprecation log record when the v0.6 list alias is
+    first used on an application built by ``serve()``).
 
     Channels and the session tracker are read from ``request.app.state`` at
     request time; the registry and settings are bound at registration time.

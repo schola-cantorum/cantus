@@ -24,8 +24,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from cantus.core.agent import Agent
 from cantus import Registry, tool
+from cantus.core.agent import Agent
 from cantus.protocols.memory import ShortTermMemory
 from cantus.serve import serve
 from cantus.serve.channel import LocalMockReceiver

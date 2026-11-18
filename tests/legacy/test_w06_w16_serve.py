@@ -21,6 +21,15 @@ from tests.legacy.support import (  # noqa: E402
     write_module,
 )
 
+
+
+@pytest.fixture(autouse=True)
+def _clean_env(monkeypatch):
+    for key in list(os.environ):
+        if key.startswith("CANTUS_SERVE_"):
+            monkeypatch.delenv(key, raising=False)
+
+
 # --- Row 20: SkillEntry (W6) -------------------------------------------------
 
 _W6_MODULES = ["cantus.serve", "cantus.serve.introspection"]
@@ -92,8 +101,21 @@ def test_collect_skills_returns_the_same_result_as_collect_tools():
         warnings.simplefilter("always")
         legacy = cantus.serve.introspection.collect_skills(registry)
 
-    assert [entry.name for entry in legacy] == ["add"]
-    assert legacy == cantus.serve.introspection.collect_tools(registry)
+    assert [entry.model_dump() for entry in legacy] == [
+        {
+            "name": "add",
+            "description": "Add two numbers.",
+            "args_schema": {
+                "properties": {
+                    "a": {"title": "A", "type": "integer"},
+                    "b": {"title": "B", "type": "integer"},
+                },
+                "required": ["a", "b"],
+                "title": "AddArgs",
+                "type": "object",
+            },
+        }
+    ]
 
 
 def test_collect_skills_is_not_an_attribute_of_the_serve_package():
@@ -130,11 +152,30 @@ def test_openapi_has_no_skill_entry_component():
 
 
 def test_star_import_of_cantus_serve_raises_no_deprecation_warning(tmp_path):
-    result = run_python(
-        ["-W", "error::DeprecationWarning", "-c", "from cantus.serve import *"], cwd=tmp_path
+    code = (
+        "import warnings, cantus\n"
+        "warnings.simplefilter('error', cantus.CantusDeprecationWarning)\n"
+        "from cantus.serve import *\n"
+        "from cantus.serve.introspection import *\n"
     )
+    result = run_python(["-c", code], cwd=tmp_path)
 
     assert result.returncode == 0, result.stderr
+    assert "CantusDeprecationWarning" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "statement,w_id",
+    [
+        ("from cantus.serve.introspection import SkillEntry", "W6"),
+        ("from cantus.serve.introspection import collect_skills", "W16"),
+    ],
+)
+def test_from_import_on_the_introspection_module_prints_its_warning_once(tmp_path, statement, w_id):
+    result = run_python(["-c", statement], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr.count(EXPECTED[w_id]) == 1
 
 
 # --- Row 34: the CLI under an error filter -----------------------------------
@@ -167,26 +208,51 @@ def test_cli_serve_stops_on_w2_when_deprecation_warnings_are_errors(tmp_path):
     env["PYTHONPATH"] = str(tmp_path)
     env["PYTHONWARNINGS"] = "error::DeprecationWarning"
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "cantus",
-            "serve",
-            "--registry-import",
-            "regmod:registry",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(_free_port()),
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path),
-        env=env,
-        timeout=60,
-    )
+    command = [
+        sys.executable,
+        "-m",
+        "cantus",
+        "serve",
+        "--registry-import",
+        "regmod:registry",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(_free_port()),
+    ]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, cwd=str(tmp_path), env=env, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        pytest.fail("cantus serve kept running: the legacy decorator no longer ends the command")
 
     assert result.returncode == 1
     assert EXPECTED["W2"] in result.stderr
     assert "Traceback" in result.stderr
+
+
+# --- A registry filled the v0.6 way is still served ---------------------------
+
+
+def test_a_registry_filled_by_the_legacy_decorator_is_served_on_both_families():
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+
+        @cantus.skill
+        def legacy_add(a: int, b: int) -> int:
+            """Add two numbers."""
+            return a + b
+
+        registry = cantus.get_registry()
+
+    client = TestClient(serve(registry, settings=Settings(auth_mode="none")))
+
+    assert client.post("/tools/legacy_add", json={"a": 3, "b": 4}).json() == {"result": 7}
+    assert client.post("/skills/legacy_add", json={"a": 3, "b": 4}).json() == {"result": 7}
+    assert [spec["name"] for spec in client.get("/tools").json()] == ["legacy_add"]

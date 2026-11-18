@@ -220,7 +220,7 @@ def test_tools_add_openapi_operation_is_not_deprecated_and_has_the_tool_texts() 
 
     assert operation["requestBody"]["content"]["application/json"]["schema"] == _ADD_SCHEMA
     assert operation["summary"] == "Invoke Tool: add"
-    assert operation["operationId"].startswith("invoke_tool_add")
+    assert operation["operationId"] == "invoke_tool_add_tools_add_post"
     assert not operation.get("deprecated")
     assert operation["description"] == "Add two numbers."
 

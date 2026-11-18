@@ -1,7 +1,7 @@
 """cantus.serve.dashboard — read-only dashboard endpoints.
 
 Provides the constants and the route-registration helper used by
-:func:`cantus.serve.app.serve`. v0.4.0 ships three endpoints:
+:func:`cantus.serve.app.serve`. It registers three endpoints and one alias:
 
 * ``GET /tools``   — list each Tool's ``spec_for_llm()`` projection. The
   v0.6 alias route registered through :mod:`cantus.serve._aliases` answers
@@ -10,8 +10,8 @@ Provides the constants and the route-registration helper used by
 * ``GET /events``  — last N entries from the host-attached
   ``app.state.event_persistence`` (``[]`` when nothing is attached).
 
-When ``Settings.dashboard`` is False, the entire router is omitted and the
-three paths return 404 (FastAPI default behaviour for unregistered routes);
+When ``Settings.dashboard`` is False, the entire router is omitted and these
+paths, the alias included, return 404 (FastAPI default behaviour for unregistered routes);
 Tool-invoke endpoints under ``/tools/<name>`` (and the v0.6 alias route for
 them) are unaffected.
 
@@ -48,7 +48,7 @@ def register_dashboard_routes(
     *,
     dependencies: list[DependsType] | None = None,
 ) -> None:
-    """Attach the three read-only dashboard endpoints to ``app``.
+    """Attach the read-only dashboard endpoints (and the v0.6 list alias) to ``app``.
 
     Caller is responsible for honouring ``settings.dashboard``: if it is
     False this function SHOULD NOT be called (the absence of the routes is
