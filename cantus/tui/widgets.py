@@ -55,19 +55,20 @@ def format_step(step: dict[str, Any]) -> str:
 
 
 def active_skill_names(sessions: list[dict[str, Any]]) -> set[str]:
-    """Skill names with at least one currently-running session.
+    """Tool names with at least one currently-running session.
 
     Derived entirely client-side from the sessions slice (no extra request):
     a session counts as active iff its ``status`` is ``"running"`` and its
-    ``source`` is a ``skill:<name>`` identifier. Non-skill sources (e.g. a
-    channel) are skipped rather than raising, so a mixed sessions list is safe.
+    ``source`` is a ``tool:<name>`` identifier (the legacy prefix a v0.6 server
+    sends is accepted too). Other sources (e.g. a channel) are skipped rather
+    than raising, so a mixed sessions list is safe.
     """
     names: set[str] = set()
     for s in sessions:
         if s.get("status") != "running":
             continue
         source = s.get("source", "")
-        if isinstance(source, str) and source.startswith("skill:"):
+        if isinstance(source, str) and source.startswith(("tool:", "skill:")):  # legacy-alias
             name = source.split(":", 1)[1]
             if name:
                 names.add(name)

@@ -7,11 +7,15 @@ import sys
 import warnings
 from types import FrameType
 
+GUIDE_URL = (
+    "https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/"
+    "MIGRATION_v0.6.0_to_v0.7.0.md"
+)
+
 _TEMPLATE = (
     "{old} is deprecated since cantus 0.7.0 and will be removed in a later release; "
     "use {new} instead.{hint} "
-    "See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/"
-    "MIGRATION_v0.6.0_to_v0.7.0.md"
+    "See " + GUIDE_URL
 )
 
 # w_id (or "w_id:variant") -> (old, new, hint). Section 2.4 of the epic traceability.

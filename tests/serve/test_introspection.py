@@ -10,14 +10,16 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 
 # --- Read-models (task 3.1) ----------------------------------------------
 
 
-def test_skill_entry_serializes_expected_keys() -> None:
-    from cantus.serve.introspection import SkillEntry
+def test_tool_entry_serializes_expected_keys() -> None:
+    from cantus.serve.introspection import ToolEntry
 
-    entry = SkillEntry(name="search", description="d", args_schema={"type": "object"})
+    entry = ToolEntry(name="search", description="d", args_schema={"type": "object"})
     dumped = entry.model_dump()
     assert set(dumped) == {"name", "description", "args_schema"}
     assert isinstance(dumped["name"], str)
@@ -29,7 +31,7 @@ def test_session_entry_serializes_expected_keys() -> None:
     from cantus.serve.introspection import SessionEntry
 
     entry = SessionEntry(
-        id="r1", source="skill:search", started_at="2026-05-28T00:00:00Z",
+        id="r1", source="tool:search", started_at="2026-05-28T00:00:00Z",
         status="completed", event_count=3,
     )
     dumped = entry.model_dump()
@@ -42,7 +44,7 @@ def test_permissions_snapshot_serializes_expected_keys() -> None:
 
     snap = PermissionsSnapshot(
         auth_mode="bearer", dashboard_requires_auth=True,
-        introspection_requires_auth=False, gated_routes=["/skills"],
+        introspection_requires_auth=False, gated_routes=["/tools"],
     )
     dumped = snap.model_dump()
     assert set(dumped) == {
@@ -68,7 +70,7 @@ def test_workflow_trace_serializes_ordered_steps() -> None:
 
     trace = WorkflowTrace(
         run_id="r1",
-        steps=[WorkflowStep(index=0, kind="action", type="CallSkillAction", summary="x")],
+        steps=[WorkflowStep(index=0, kind="action", type="CallToolAction", summary="x")],
     )
     dumped = trace.model_dump()
     assert set(dumped) == {"run_id", "steps"}
@@ -96,7 +98,7 @@ def test_introspection_snapshot_serializes_rollup_keys() -> None:
     )
 
     snap = IntrospectionSnapshot(
-        skills=[],
+        tools=[],
         sessions=[],
         permissions=PermissionsSnapshot(
             auth_mode="none", dashboard_requires_auth=True,
@@ -106,7 +108,7 @@ def test_introspection_snapshot_serializes_rollup_keys() -> None:
         dataflow=DataflowGraph(nodes=[], edges=[]),
     )
     dumped = snap.model_dump()
-    assert set(dumped) == {"skills", "sessions", "permissions", "queues", "dataflow"}
+    assert {"tools", "sessions", "permissions", "queues", "dataflow"} <= set(dumped)
 
 
 # --- SessionTracker (task 4.1) -------------------------------------------
@@ -122,12 +124,12 @@ def test_session_tracker_records_one_run_with_all_fields() -> None:
     from cantus.serve.introspection import SessionTracker
 
     tracker = SessionTracker()
-    run_id = tracker.start("skill:search")
+    run_id = tracker.start("tool:search")
     entries = tracker.entries()
     assert len(entries) == 1
     entry = entries[0]
     assert entry.id == run_id
-    assert entry.source == "skill:search"
+    assert entry.source == "tool:search"
     assert entry.status == "running"
     assert entry.event_count == 0
     assert entry.started_at  # non-empty ISO timestamp
@@ -139,7 +141,7 @@ def test_session_tracker_finish_updates_status_and_event_count() -> None:
     from cantus.serve.introspection import SessionTracker
 
     tracker = SessionTracker()
-    run_id = tracker.start("skill:x")
+    run_id = tracker.start("tool:x")
     stream = EventStream()
     stream.append(FinalAnswerAction(answer="done"))
     tracker.finish(run_id, status="completed", stream=stream)
@@ -175,16 +177,13 @@ def test_session_tracker_event_stream_for_unknown_run_is_none() -> None:
 
 
 def _registry_with_echo() -> Any:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+    from cantus import Registry, tool
 
     def echo(value: str) -> str:
         """Echo back."""
         return value
 
-    registry = Registry()
-    registry.register("skill", register_skill(echo))
-    return registry
+    return Registry(tools=[tool(echo)])
 
 
 def test_serve_creates_session_tracker_on_app_state() -> None:
@@ -196,59 +195,56 @@ def test_serve_creates_session_tracker_on_app_state() -> None:
     assert isinstance(app.state.session_tracker, SessionTracker)
 
 
-def test_skill_invoke_records_one_session_entry() -> None:
+def test_tool_invoke_records_one_session_entry() -> None:
     from fastapi.testclient import TestClient
 
     from cantus.serve import serve
 
     app = serve(_registry_with_echo())
     client = TestClient(app)
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 200
     assert resp.json() == {"result": "hi"}
 
     entries = app.state.session_tracker.entries()
     assert len(entries) == 1
     entry = entries[0]
-    assert entry.source == "skill:echo"
+    assert entry.source == "tool:echo"
     assert entry.status == "completed"
     assert set(entry.model_dump()) == {
         "id", "source", "started_at", "status", "event_count",
     }
 
 
-# --- skill-invoke EventStream wiring (cantus-serve-tui-mvp task 2.x) ------
+# --- tool-invoke EventStream wiring (cantus-serve-tui-mvp task 2.x) ------
 
 
 def _registry_with_boom() -> Any:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+    from cantus import Registry, tool
 
     def boom(value: str) -> str:
         """Always raises."""
         raise ValueError("kaboom")
 
-    registry = Registry()
-    registry.register("skill", register_skill(boom))
-    return registry
+    return Registry(tools=[tool(boom)])
 
 
-def test_skill_invoke_records_two_step_event_stream() -> None:
+def test_tool_invoke_records_two_step_event_stream() -> None:
     from fastapi.testclient import TestClient
 
     from cantus.serve import serve
 
     app = serve(_registry_with_echo())
     client = TestClient(app)
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 200
 
     sessions = client.get("/introspection/sessions").json()
     assert len(sessions) == 1
     run = sessions[0]
-    assert run["source"] == "skill:echo"
+    assert run["source"] == "tool:echo"
     assert run["status"] == "completed"
-    # The skill invocation records a CallToolAction + ToolObservation.
+    # The tool invocation records a CallToolAction + ToolObservation.
     assert run["event_count"] == 2
 
     trace = client.get(f"/introspection/workflows/{run['id']}")
@@ -261,14 +257,14 @@ def test_skill_invoke_records_two_step_event_stream() -> None:
     assert steps[1]["type"] == "ToolObservation"
 
 
-def test_skill_invoke_error_records_tool_error_observation() -> None:
+def test_tool_invoke_error_records_tool_error_observation() -> None:
     from fastapi.testclient import TestClient
 
     from cantus.serve import serve
 
     app = serve(_registry_with_boom())
     client = TestClient(app, raise_server_exceptions=False)
-    resp = client.post("/skills/boom", json={"value": "x"})
+    resp = client.post("/tools/boom", json={"value": "x"})
     assert resp.status_code == 500
 
     sessions = client.get("/introspection/sessions").json()
@@ -285,12 +281,11 @@ def test_skill_invoke_error_records_tool_error_observation() -> None:
     assert steps[1]["type"] == "ToolErrorObservation"
 
 
-# --- collect_skills (task 5.1) -------------------------------------------
+# --- collect_tools (task 5.1) -------------------------------------------
 
 
-def _registry_with_two_named_skills() -> Any:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+def _registry_with_two_named_tools() -> Any:
+    from cantus import Registry, tool
 
     def search_web(query: str) -> dict[str, Any]:
         """Search the web."""
@@ -300,20 +295,17 @@ def _registry_with_two_named_skills() -> Any:
         """Summarize."""
         return text[:10]
 
-    registry = Registry()
-    registry.register("skill", register_skill(search_web))
-    registry.register("skill", register_skill(summarize))
-    return registry
+    return Registry(tools=[tool(search_web), tool(summarize)])
 
 
-def test_collect_skills_projects_specs() -> None:
-    from cantus.serve.introspection import collect_skills
+def test_collect_tools_projects_specs() -> None:
+    from cantus.serve.introspection import collect_tools
 
-    skills = collect_skills(_registry_with_two_named_skills())
-    assert len(skills) == 2
-    for entry in skills:
+    tools = collect_tools(_registry_with_two_named_tools())
+    assert len(tools) == 2
+    for entry in tools:
         assert set(entry.model_dump()) == {"name", "description", "args_schema"}
-    names = {e.name for e in skills}
+    names = {e.name for e in tools}
     assert names == {"search_web", "summarize"}
 
 
@@ -379,7 +371,7 @@ def test_collect_queues_reports_depth_and_null(monkeypatch: Any) -> None:
 # --- collect_dataflow (task 5.4) -----------------------------------------
 
 
-def test_collect_dataflow_includes_channel_and_skill_nodes() -> None:
+def test_collect_dataflow_includes_channel_and_tool_nodes() -> None:
     from cantus.serve.channel import LocalMockReceiver
     from cantus.serve.introspection import collect_dataflow
 
@@ -389,8 +381,9 @@ def test_collect_dataflow_includes_channel_and_skill_nodes() -> None:
     assert len(dumped["nodes"]) > 0
     assert isinstance(dumped["edges"], list)
     labels = {n["label"] for n in dumped["nodes"]}
-    assert "echo" in labels  # the registered skill
+    assert "echo" in labels  # the registered tool
     assert "LocalMockReceiver" in labels  # the attached channel
+    assert {"id": "tool:echo", "kind": "tool", "label": "echo"} in dumped["nodes"]
 
 
 # --- workflow projection (task 5.5) --------------------------------------
@@ -407,7 +400,7 @@ def test_collect_workflow_projects_ordered_steps() -> None:
     stream.append(ToolObservation(tool_name="echo", result="hi"))
 
     tracker = SessionTracker()
-    run_id = tracker.start("skill:echo")
+    run_id = tracker.start("tool:echo")
     tracker.finish(run_id, stream=stream)
 
     trace = collect_workflow(tracker, run_id)
@@ -454,7 +447,7 @@ def test_per_concept_endpoints_return_200_and_shape() -> None:
     app, _ = _app_with_routes()
     client = TestClient(app)
 
-    assert isinstance(client.get("/introspection/skills").json(), list)
+    assert isinstance(client.get("/introspection/tools").json(), list)
     assert isinstance(client.get("/introspection/sessions").json(), list)
     perms = client.get("/introspection/permissions")
     assert perms.status_code == 200
@@ -474,9 +467,9 @@ def test_rollup_combines_slices_and_matches_per_concept() -> None:
     rollup = client.get("/introspection")
     assert rollup.status_code == 200
     body = rollup.json()
-    assert set(body) == {"skills", "sessions", "permissions", "queues", "dataflow"}
-    # The skills slice equals the per-concept skills endpoint body.
-    assert body["skills"] == client.get("/introspection/skills").json()
+    assert {"tools", "sessions", "permissions", "queues", "dataflow"} <= set(body)
+    # The tools slice equals the per-concept tools endpoint body.
+    assert body["tools"] == client.get("/introspection/tools").json()
 
 
 def test_rollup_rejects_post_with_405() -> None:
@@ -496,7 +489,7 @@ def test_workflow_endpoint_returns_trace_and_404() -> None:
     app, _ = _app_with_routes()
     stream = EventStream()
     stream.append(FinalAnswerAction(answer="done"))
-    run_id = app.state.session_tracker.start("skill:echo")
+    run_id = app.state.session_tracker.start("tool:echo")
     app.state.session_tracker.finish(run_id, stream=stream)
 
     client = TestClient(app)
@@ -519,11 +512,11 @@ def test_introspection_enabled_returns_200_through_serve() -> None:
     app = serve(_registry_with_echo())  # introspection defaults to True
     client = TestClient(app)
     assert client.get("/introspection").status_code == 200
-    for slice_path in ("skills", "sessions", "permissions", "queues", "dataflow"):
+    for slice_path in ("tools", "sessions", "permissions", "queues", "dataflow"):
         assert client.get(f"/introspection/{slice_path}").status_code == 200
 
 
-def test_introspection_disabled_404s_but_dashboard_and_skill_unaffected() -> None:
+def test_introspection_disabled_404s_but_dashboard_and_tool_unaffected() -> None:
     from fastapi.testclient import TestClient
 
     from cantus.config import Settings
@@ -532,11 +525,11 @@ def test_introspection_disabled_404s_but_dashboard_and_skill_unaffected() -> Non
     app = serve(_registry_with_echo(), settings=Settings(introspection=False))
     client = TestClient(app)
     assert client.get("/introspection").status_code == 404
-    assert client.get("/introspection/skills").status_code == 404
-    # Dashboard + skill-invoke endpoints continue to behave as before.
-    assert client.get("/skills").status_code == 200
+    assert client.get("/introspection/tools").status_code == 404
+    # Dashboard + tool-invoke endpoints continue to behave as before.
+    assert client.get("/tools").status_code == 200
     assert client.get("/health").status_code == 200
-    assert client.post("/skills/echo", json={"value": "hi"}).status_code == 200
+    assert client.post("/tools/echo", json={"value": "hi"}).status_code == 200
 
 
 def test_introspection_auth_required_rejects_then_accepts(
@@ -584,13 +577,11 @@ def test_introspection_requires_auth_false_opens_endpoints(
 # --- reserved path collision (task 6.3) ----------------------------------
 
 
-def test_skill_named_introspection_rejected() -> None:
-    import pytest
-
+def test_tool_named_introspection_rejected() -> None:
     from cantus.core.registry import Registry
     from cantus.serve import serve
 
-    class _StubSkill:
+    class _StubTool:
         name = "introspection"
 
         def spec_for_llm(self) -> dict[str, Any]:
@@ -600,77 +591,75 @@ def test_skill_named_introspection_rejected() -> None:
             return None
 
     registry = Registry()
-    registry.register("skill", _StubSkill())
-    with pytest.raises(ValueError, match="reserved introspection path"):
+    registry.register("tool", _StubTool())
+    with pytest.raises(ValueError) as exc:
         serve(registry)
+    assert str(exc.value) == (
+        "Tool name 'introspection' collides with a reserved introspection path "
+        "(reserved introspection path)"
+    )
 
 
 # --- S1: workflow-trace summary de-sensitization (gate-c task 2.1) --------
 #
 # The workflow endpoint must project a STRUCTURAL summary per step that never
-# carries skill argument values, skill result values, or raw exception
+# carries tool argument values, tool result values, or raw exception
 # messages. These regression tests pin that contract with the spec's example
 # secret strings.
 
 
-def _registry_with_secret_skill() -> Any:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+def _registry_with_secret_tool() -> Any:
+    from cantus import Registry, tool
 
     def issue(api_key: str) -> dict[str, Any]:
         """Issue a token for the supplied credential."""
         return {"token": "token-secret-value"}
 
-    registry = Registry()
-    registry.register("skill", register_skill(issue))
-    return registry
+    return Registry(tools=[tool(issue)])
 
 
 def _registry_with_secret_boom() -> Any:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+    from cantus import Registry, tool
 
     def leaky(value: str) -> str:
         """Always raises with a message that must not leak."""
         raise ValueError("boom-secret-detail")
 
-    registry = Registry()
-    registry.register("skill", register_skill(leaky))
-    return registry
+    return Registry(tools=[tool(leaky)])
 
 
-def _run_secret_skill() -> tuple[Any, str]:
-    """Invoke the secret skill once with a sensitive arg; return (client, run_id)."""
+def _run_secret_tool() -> tuple[Any, str]:
+    """Invoke the secret tool once with a sensitive arg; return (client, run_id)."""
     from fastapi.testclient import TestClient
 
     from cantus.serve import serve
 
-    app = serve(_registry_with_secret_skill())
+    app = serve(_registry_with_secret_tool())
     client = TestClient(app)
-    resp = client.post("/skills/issue", json={"api_key": "sk-secret-value"})
+    resp = client.post("/tools/issue", json={"api_key": "sk-secret-value"})
     assert resp.status_code == 200
     run_id: str = client.get("/introspection/sessions").json()[0]["id"]
     return client, run_id
 
 
 def test_workflow_summary_omits_arg_values() -> None:
-    client, run_id = _run_secret_skill()
+    client, run_id = _run_secret_tool()
     body = client.get(f"/introspection/workflows/{run_id}").text
     assert "sk-secret-value" not in body
 
 
 def test_workflow_summary_omits_result_values() -> None:
-    client, run_id = _run_secret_skill()
+    client, run_id = _run_secret_tool()
     body = client.get(f"/introspection/workflows/{run_id}").text
     assert "token-secret-value" not in body
 
 
 def test_workflow_action_summary_has_keys_not_values() -> None:
-    client, run_id = _run_secret_skill()
+    client, run_id = _run_secret_tool()
     steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
     first = steps[0]
     assert first["type"] == "CallToolAction"
-    # The structural summary projects the skill name and the argument key
+    # The structural summary projects the tool name and the argument key
     # names — but never the argument values.
     assert "issue" in first["summary"]
     assert "api_key" in first["summary"]
@@ -684,7 +673,7 @@ def test_workflow_error_summary_omits_message() -> None:
 
     app = serve(_registry_with_secret_boom())
     client = TestClient(app, raise_server_exceptions=False)
-    resp = client.post("/skills/leaky", json={"value": "x"})
+    resp = client.post("/tools/leaky", json={"value": "x"})
     assert resp.status_code == 500
 
     run_id = client.get("/introspection/sessions").json()[0]["id"]
@@ -711,8 +700,6 @@ def _introspection_warnings(caught: Any) -> list[Any]:
 def test_open_introspection_emits_startup_warning(monkeypatch: Any) -> None:
     import importlib
     import warnings
-
-    import pytest
 
     from cantus.serve import serve
 
@@ -780,25 +767,263 @@ def test_introspection_workflows_endpoint_gated_by_auth(monkeypatch: Any) -> Non
     assert ok.status_code != 401
 
 
-def test_trace_summaries_keep_their_text_until_the_serve_ticket():
-    # T-0009 row 12 (D5): the step type is the new class name; the summary strings keep their
-    # v0.6 text. T-0012 rewrites these summaries and this test with them.
+# --- Row 7: the rollup's tools list ---------------------------------------
+
+
+def test_rollup_tools_list_holds_the_literal_entries_for_two_tools() -> None:
     from fastapi.testclient import TestClient
 
-    from cantus import Registry, register_tool
     from cantus.serve import serve
 
-    def echo(value: str) -> str:
-        """Echo the value."""
-        return value
+    body = TestClient(serve(_registry_with_two_named_tools())).get("/introspection").json()
 
-    reg = Registry()
-    register_tool(echo, registry=reg)
-    client = TestClient(serve(reg))
-    client.post("/skills/echo", json={"value": "hi"})
-    run_id = client.get("/introspection/sessions").json()[0]["id"]
-    steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
+    assert body["tools"] == [
+        {
+            "name": "search_web",
+            "description": "Search the web.",
+            "args_schema": {
+                "properties": {"query": {"title": "Query", "type": "string"}},
+                "required": ["query"],
+                "title": "SearchWebArgs",
+                "type": "object",
+            },
+        },
+        {
+            "name": "summarize",
+            "description": "Summarize.",
+            "args_schema": {
+                "properties": {"text": {"title": "Text", "type": "string"}},
+                "required": ["text"],
+                "title": "SummarizeArgs",
+                "type": "object",
+            },
+        },
+    ]
 
-    assert [s["type"] for s in steps] == ["CallToolAction", "ToolObservation"]
-    assert steps[0]["summary"] == "CallSkillAction skill='echo' arg_keys=['value']"
-    assert steps[1]["summary"] == "SkillObservation skill='echo' result_type=str"
+
+def test_rollup_tools_list_is_empty_for_an_empty_registry() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry
+    from cantus.serve import serve
+
+    body = TestClient(serve(Registry())).get("/introspection").json()
+
+    assert body["tools"] == []
+
+
+# --- Row 8: IntrospectionSnapshot.tools -----------------------------------
+
+
+def _snapshot_parts() -> dict[str, Any]:
+    return {
+        "sessions": [],
+        "permissions": {
+            "auth_mode": "none",
+            "dashboard_requires_auth": True,
+            "introspection_requires_auth": True,
+            "gated_routes": [],
+        },
+        "queues": [],
+        "dataflow": {"nodes": [], "edges": []},
+    }
+
+
+def test_snapshot_built_with_tools_dumps_the_literal_list() -> None:
+    from cantus.serve.introspection import (
+        DataflowGraph,
+        IntrospectionSnapshot,
+        PermissionsSnapshot,
+        ToolEntry,
+    )
+
+    entry = ToolEntry(name="add", description="Add.", args_schema={"type": "object"})
+    snap = IntrospectionSnapshot(
+        tools=[entry],
+        sessions=[],
+        permissions=PermissionsSnapshot(
+            auth_mode="none", dashboard_requires_auth=True,
+            introspection_requires_auth=True, gated_routes=[],
+        ),
+        queues=[],
+        dataflow=DataflowGraph(nodes=[], edges=[]),
+    )
+
+    assert snap.model_dump()["tools"] == [
+        {"name": "add", "description": "Add.", "args_schema": {"type": "object"}}
+    ]
+
+
+def test_snapshot_built_without_any_tool_list_is_rejected() -> None:
+    from pydantic import ValidationError
+
+    from cantus.serve.introspection import IntrospectionSnapshot
+
+    with pytest.raises(ValidationError):
+        IntrospectionSnapshot.model_validate(_snapshot_parts())
+
+
+def test_model_validate_leaves_the_input_dict_unchanged() -> None:
+    import copy
+
+    from cantus.serve.introspection import IntrospectionSnapshot
+
+    data = {
+        "tools": [{"name": "add", "description": "Add.", "args_schema": {}}],
+        **_snapshot_parts(),
+    }
+    before = copy.deepcopy(data)
+
+    IntrospectionSnapshot.model_validate(data)
+
+    assert data == before
+
+
+def test_openapi_snapshot_schema_requires_tools() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    schema = TestClient(serve(_registry_with_echo())).get("/openapi.json").json()[
+        "components"
+    ]["schemas"]["IntrospectionSnapshot"]
+
+    assert "tools" in schema["properties"]
+    assert "tools" in schema["required"]
+
+
+# --- Row 10: dataflow nodes and edges for a tool --------------------------
+
+
+def _add_registry() -> Any:
+    from cantus import Registry, tool
+
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    return Registry(tools=[tool(add)])
+
+
+def test_dataflow_has_a_tool_node_and_a_dispatch_edge_without_a_channel() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    body = TestClient(serve(_add_registry())).get("/introspection/dataflow").json()
+
+    assert {"id": "tool:add", "kind": "tool", "label": "add"} in body["nodes"]
+    assert {"source": "serve", "target": "tool:add", "label": "dispatch"} in body["edges"]
+
+
+def test_dataflow_has_a_tool_node_and_a_dispatch_edge_with_a_channel() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+    from cantus.serve.channel import LocalMockReceiver
+
+    app = serve(_add_registry(), channels=[LocalMockReceiver()])
+    body = TestClient(app).get("/introspection/dataflow").json()
+
+    assert {"id": "tool:add", "kind": "tool", "label": "add"} in body["nodes"]
+    assert {"source": "serve", "target": "tool:add", "label": "dispatch"} in body["edges"]
+    assert {"id": "channel:0", "kind": "channel", "label": "LocalMockReceiver"} in body["nodes"]
+
+
+# --- Row 11: the session source -------------------------------------------
+
+
+def test_session_source_is_tool_colon_name_after_a_call() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    client = TestClient(serve(_add_registry()))
+    assert client.post("/tools/add", json={"a": 3, "b": 4}).status_code == 200
+
+    assert client.get("/introspection/sessions").json()[-1]["source"] == "tool:add"
+
+
+def test_session_source_is_tool_colon_name_after_a_failing_call() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    client = TestClient(serve(_registry_with_boom()), raise_server_exceptions=False)
+    assert client.post("/tools/boom", json={"value": "x"}).status_code == 500
+
+    assert client.get("/introspection/sessions").json()[-1]["source"] == "tool:boom"
+
+
+# --- Row 12: trace summaries ----------------------------------------------
+
+
+def test_trace_summaries_are_structural_literals_without_values() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry, tool
+    from cantus.serve import serve
+
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    def boom(value: str) -> str:
+        """Always raises."""
+        raise ValueError("EXC-MSG-7788")
+
+    app = serve(Registry(tools=[tool(add), tool(boom)]))
+    client = TestClient(app, raise_server_exceptions=False)
+    assert client.post("/tools/add", json={"a": 11111, "b": 22222}).json() == {"result": 33333}
+    assert client.post("/tools/boom", json={"value": "ARG-VALUE-9911"}).status_code == 500
+
+    sessions = client.get("/introspection/sessions").json()
+    traces = [client.get(f"/introspection/workflows/{run['id']}").json() for run in sessions]
+    steps = [step for trace in traces for step in trace["steps"]]
+
+    assert [(s["type"], s["summary"]) for s in steps] == [
+        ("CallToolAction", "CallToolAction tool='add' arg_keys=['a', 'b']"),
+        ("ToolObservation", "ToolObservation tool='add' result_type=int"),
+        ("CallToolAction", "CallToolAction tool='boom' arg_keys=['value']"),
+        ("ToolErrorObservation", "ToolErrorObservation tool='boom'"),
+    ]
+    text = " ".join(s["summary"] for s in steps)
+    for secret in ("11111", "22222", "33333", "ARG-VALUE-9911", "EXC-MSG-7788"):
+        assert secret not in text
+
+
+def test_trace_summary_of_another_event_type_is_its_bare_class_name() -> None:
+    from cantus.core.action import FinalAnswerAction
+    from cantus.core.event_stream import EventStream
+    from cantus.serve.introspection import project_workflow_trace
+
+    stream = EventStream()
+    stream.append(FinalAnswerAction(answer="ANSWER-TEXT-5566"))
+
+    trace = project_workflow_trace("r1", stream)
+
+    assert [(s.type, s.summary) for s in trace.steps] == [
+        ("FinalAnswerAction", "FinalAnswerAction")
+    ]
+
+
+def test_tools_route_works_on_a_plain_fastapi_app() -> None:
+    from fastapi.testclient import TestClient
+
+    app, _ = _app_with_routes()
+
+    response = TestClient(app).get("/introspection/tools")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "name": "echo",
+            "description": "Echo back.",
+            "args_schema": {
+                "properties": {"value": {"title": "Value", "type": "string"}},
+                "required": ["value"],
+                "title": "EchoArgs",
+                "type": "object",
+            },
+        }
+    ]

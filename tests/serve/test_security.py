@@ -1,7 +1,7 @@
 """Tests for cantus.serve.security (v0.4.1 cantus-serve-security).
 
 Each test corresponds to one scenario from the
-`Cantus serve gates Skill endpoints behind opt-in authentication` Requirement
+`Cantus serve gates Tool endpoints behind opt-in authentication` Requirement
 in the cantus-distribution capability (cantus-serve-security release content).
 
 Test matrix:
@@ -46,18 +46,14 @@ def _fresh_settings_class() -> type[Any]:
 
 
 def _registry_with_echo() -> Any:
-    """Build a Registry with a single `echo` Skill returning the input string."""
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
+    """Build a Registry with a single `echo` Tool returning the input string."""
+    from cantus import Registry, tool
 
     def echo(value: str) -> str:
         """Echo back."""
         return value
 
-    instance = register_skill(echo)
-    registry = Registry()
-    registry.register("skill", instance)
-    return registry
+    return Registry(tools=[tool(echo)])
 
 
 _AUTH_REQUIRED_BODY = {"detail": "Authentication required"}
@@ -77,11 +73,11 @@ def test_none_mode_preserves_v040_behavior() -> None:
     app = serve(_registry_with_echo(), settings=settings)
     client = TestClient(app)
 
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 200
     assert resp.json() == {"result": "hi"}
     # Dashboard endpoints also accept anonymous requests under NONE.
-    assert client.get("/skills").status_code == 200
+    assert client.get("/tools").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/events").status_code == 200
 
@@ -104,7 +100,7 @@ def test_bearer_missing_header_401(monkeypatch: pytest.MonkeyPatch) -> None:
 
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 401
     assert resp.json() == _AUTH_REQUIRED_BODY
 
@@ -115,7 +111,7 @@ def test_bearer_wrong_token_401(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearer wrong-secret"},
     )
@@ -131,9 +127,9 @@ def test_bearer_401_bodies_byte_identical_between_missing_and_wrong(
 
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
-    missing = client.post("/skills/echo", json={"value": "hi"})
+    missing = client.post("/tools/echo", json={"value": "hi"})
     wrong = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearer wrong-secret"},
     )
@@ -152,7 +148,7 @@ def test_bearer_no_space_after_scheme_returns_401(
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearercorrect-secret"},
     )
@@ -167,7 +163,7 @@ def test_bearer_empty_token_returns_401(monkeypatch: pytest.MonkeyPatch) -> None
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearer "},
     )
@@ -185,7 +181,7 @@ def test_bearer_uppercase_scheme_still_accepted(
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "BEARER correct-secret"},
     )
@@ -202,7 +198,7 @@ def test_bearer_extra_whitespace_around_token_accepted(
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearer correct-secret  "},
     )
@@ -218,7 +214,7 @@ def test_bearer_correct_token_200(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _bearer_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"Authorization": "Bearer correct-secret"},
     )
@@ -244,7 +240,7 @@ def test_api_key_mode_missing_header_401(monkeypatch: pytest.MonkeyPatch) -> Non
 
     app = _api_key_app(monkeypatch)
     client = TestClient(app)
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 401
     assert resp.json() == _AUTH_REQUIRED_BODY
 
@@ -255,7 +251,7 @@ def test_api_key_mode_wrong_key_401(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _api_key_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"X-API-Key": "wrong-key"},
     )
@@ -269,7 +265,7 @@ def test_api_key_mode_correct_key_200(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _api_key_app(monkeypatch)
     client = TestClient(app)
     resp = client.post(
-        "/skills/echo",
+        "/tools/echo",
         json={"value": "hi"},
         headers={"X-API-Key": "correct-key"},
     )
@@ -312,9 +308,9 @@ def test_secretstr_does_not_leak_in_repr_json_openapi_or_log(
 
     # Log surface — drive both a 401 and a 200 then scan caplog.
     with caplog.at_level(logging.DEBUG, logger="cantus.serve"):
-        client.post("/skills/echo", json={"value": "hi"})  # missing auth → 401
+        client.post("/tools/echo", json={"value": "hi"})  # missing auth → 401
         client.post(
-            "/skills/echo",
+            "/tools/echo",
             json={"value": "hi"},
             headers={"Authorization": "Bearer correct-secret"},
         )  # valid → 200
@@ -454,3 +450,64 @@ def test_require_auth_fails_closed_on_unknown_mode() -> None:
         require_auth(req)  # type: ignore[arg-type]
     assert excinfo.value.status_code == 401
     assert excinfo.value.detail == "Authentication required"
+
+
+# --- Row 2 / Row 5: the Tool routes under both auth modes -----------------
+
+
+def test_bearer_mode_ignores_an_api_key_header_alone() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    settings = Settings(auth_mode="bearer", bearer_token="t0k")
+    client = TestClient(serve(_registry_with_echo(), settings=settings))
+    resp = client.post("/tools/echo", json={"value": "hi"}, headers={"X-API-Key": "t0k"})
+
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Authentication required"}
+
+
+def test_get_tools_is_gated_when_the_dashboard_requires_auth() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    settings = Settings(auth_mode="bearer", bearer_token="t0k", dashboard_requires_auth=True)
+    client = TestClient(serve(_registry_with_echo(), settings=settings))
+
+    anonymous = client.get("/tools")
+    assert anonymous.status_code == 401
+    assert anonymous.json() == {"detail": "Authentication required"}
+    allowed = client.get("/tools", headers={"Authorization": "Bearer t0k"})
+    assert allowed.status_code == 200
+    assert [t["name"] for t in allowed.json()] == ["echo"]
+
+
+def test_get_tools_is_open_when_the_dashboard_does_not_require_auth() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    settings = Settings(auth_mode="bearer", bearer_token="t0k", dashboard_requires_auth=False)
+    client = TestClient(serve(_registry_with_echo(), settings=settings))
+
+    assert client.get("/tools").status_code == 200
+    assert client.post("/tools/echo", json={"value": "hi"}).status_code == 401
+
+
+def test_dashboard_off_hides_get_tools_but_not_the_invoke_route() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    client = TestClient(serve(_registry_with_echo(), settings=Settings(dashboard=False)))
+
+    assert client.get("/tools").status_code == 404
+    resp = client.post("/tools/echo", json={"value": "hi"})
+    assert resp.status_code == 200
+    assert resp.json() == {"result": "hi"}

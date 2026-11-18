@@ -3,7 +3,7 @@
 Covers:
 - Mount loop only invokes WebhookChannel members (not plain Channels)
 - httpx.AsyncClient lifespan creates and closes app.state.http_client
-- Coexistence: Skill / dashboard / webhook routes do not collide
+- Coexistence: Tool / dashboard / webhook routes do not collide
 """
 
 from __future__ import annotations
@@ -15,8 +15,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+from cantus import Registry, tool
 from cantus.serve import serve
 from cantus.serve.channel import LocalMockReceiver
 from cantus.serve.channels._signing import compute_line_signature
@@ -80,21 +79,18 @@ def test_httpx_lifespan_creates_and_closes_client() -> None:
 
 
 def _make_registry_with_echo() -> Registry:
-    registry = Registry()
-
     def echo(value: str) -> str:
         """Echo back the input."""
         return value
 
-    registry.register("skill", register_skill(echo))
-    return registry
+    return Registry(tools=[tool(echo)])
 
 
 def test_coexistence_with_existing_routes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A single serve() call accepting LocalMockReceiver + LineWebhookChannel +
-    one Skill must expose /skills/echo, /health, AND /channels/line, none
+    one Tool must expose /tools/echo, /health, AND /channels/line, none
     shadowing each other."""
     monkeypatch.setenv("CANTUS_SERVE_CHANNEL_LINE_SECRET", "co-secret")
     monkeypatch.setenv(
@@ -108,8 +104,8 @@ def test_coexistence_with_existing_routes(
     app = serve(registry, channels=[plain, line_ch])
 
     with TestClient(app) as client:
-        # 1. Skill route
-        resp = client.post("/skills/echo", json={"value": "hi"})
+        # 1. Tool route
+        resp = client.post("/tools/echo", json={"value": "hi"})
         assert resp.status_code == 200
         assert resp.json() == {"result": "hi"}
 

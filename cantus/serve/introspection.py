@@ -1,7 +1,7 @@
 """cantus.serve.introspection — read-only runtime observation layer.
 
 C2.0 cantus-runtime-introspection-api. This module projects state that cantus
-already holds — the Skill registry, the auth settings, attached channels, the
+already holds — the Tool registry, the auth settings, attached channels, the
 EventStream — into stable, read-only Pydantic models served under
 ``/introspection/*``. It is an *observation* layer, not a real subsystem: it
 never mutates registry, settings, session, channel, or event-stream state, and
@@ -18,18 +18,21 @@ from __future__ import annotations
 
 import uuid
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.params import Depends as DependsType
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
+from cantus._deprecation import warn_legacy
 from cantus.core.action import Action, CallToolAction
 from cantus.core.event_stream import EventStream
 from cantus.core.observation import ToolErrorObservation, ToolObservation
 from cantus.core.registry import Registry
+from cantus.serve._aliases import add_alias_route
 from cantus.serve.channel import (
     Channel,
     QueueIntrospectable,
@@ -45,8 +48,8 @@ if TYPE_CHECKING:
 # --- Read-models ----------------------------------------------------------
 
 
-class SkillEntry(BaseModel):
-    """One registered Skill's ``spec_for_llm()`` projection."""
+class ToolEntry(BaseModel):
+    """One registered Tool's ``spec_for_llm()`` projection."""
 
     name: str
     description: str
@@ -122,11 +125,28 @@ class DataflowGraph(BaseModel):
 class IntrospectionSnapshot(BaseModel):
     """Roll-up combining every per-concept slice except per-run workflows."""
 
-    skills: list[SkillEntry]
+    tools: list[ToolEntry]
+    skills: list[ToolEntry]  # legacy-alias
     sessions: list[SessionEntry]
     permissions: PermissionsSnapshot
     queues: list[QueueEntry]
     dataflow: DataflowGraph
+
+    @model_validator(mode="before")
+    @classmethod
+    def _mirror_tool_lists(cls, data: Any) -> Any:
+        """Fill whichever of ``tools`` and the legacy list is missing from the other."""
+        if not isinstance(data, Mapping):
+            return data
+        has_tools, has_legacy = "tools" in data, "skills" in data  # legacy-alias
+        if has_tools == has_legacy:
+            return data
+        filled = dict(data)
+        if has_tools:
+            filled["skills"] = data["tools"]  # legacy-alias
+        else:
+            filled["tools"] = data["skills"]  # legacy-alias
+        return filled
 
 
 # --- SessionTracker -------------------------------------------------------
@@ -155,7 +175,7 @@ class SessionTracker:
     ``start(source)`` opens a run (status ``"running"``) and returns its id;
     ``finish(run_id, ...)`` closes it. Retention is bounded to the most-recent
     ``max_entries`` runs — older runs are dropped. The tracker is purely
-    observational: it never intercepts or alters agent/skill execution.
+    observational: it never intercepts or alters agent/tool execution.
     """
 
     DEFAULT_MAX_ENTRIES = 100
@@ -220,16 +240,16 @@ class SessionTracker:
 # --- Collectors (project existing runtime objects into read-models) -------
 
 
-def collect_skills(registry: Registry) -> list[SkillEntry]:
-    """Project each registered Skill's ``spec_for_llm()`` (mirrors dashboard)."""
-    out: list[SkillEntry] = []
+def collect_tools(registry: Registry) -> list[ToolEntry]:
+    """Project each registered Tool's ``spec_for_llm()`` (mirrors dashboard)."""
+    out: list[ToolEntry] = []
     for name in registry.names_for("tool"):
         instance = registry.lookup("tool", name)
         if instance is None:
             continue
         spec: dict[str, Any] = instance.spec_for_llm()
         out.append(
-            SkillEntry(
+            ToolEntry(
                 name=spec["name"],
                 description=spec.get("description") or "",
                 args_schema=spec.get("args_schema") or {},
@@ -304,9 +324,9 @@ def collect_dataflow(
 ) -> DataflowGraph:
     """Derive the static component topology from the registry and channels.
 
-    Nodes: the serve app, the event stream, each registered skill, each
+    Nodes: the serve app, the event stream, each registered tool, each
     attached channel. Edges: inbound channel→serve, outbound serve→channel,
-    serve→skill dispatch, and serve→event-stream emission. No runtime traffic
+    serve→tool dispatch, and serve→event-stream emission. No runtime traffic
     sampling is performed.
     """
     nodes: list[DataflowNode] = [
@@ -318,9 +338,9 @@ def collect_dataflow(
     ]
 
     for name in registry.names_for("tool"):
-        skill_id = f"skill:{name}"
-        nodes.append(DataflowNode(id=skill_id, kind="skill", label=name))
-        edges.append(DataflowEdge(source="serve", target=skill_id, label="dispatch"))
+        tool_id = f"tool:{name}"
+        nodes.append(DataflowNode(id=tool_id, kind="tool", label=name))
+        edges.append(DataflowEdge(source="serve", target=tool_id, label="dispatch"))
 
     for index, channel in enumerate(channels):
         channel_id = f"channel:{index}"
@@ -335,7 +355,7 @@ def collect_dataflow(
 def _summarize_event(event: Any) -> str:
     """Project an event into a structural, de-sensitized step summary.
 
-    The summary names *structure* — skill names, argument key names, result
+    The summary names *structure* — tool names, argument key names, result
     and event type names — but never the argument values, result values, or
     raw exception messages, any of which can carry secrets or PII. This is the
     text surfaced by ``GET /introspection/workflows/{run_id}`` and the TUI
@@ -348,18 +368,18 @@ def _summarize_event(event: Any) -> str:
     """
     if isinstance(event, CallToolAction):
         return (
-            f"CallSkillAction skill={event.tool_name!r} "  # T-0012 rewrites this summary
+            f"CallToolAction tool={event.tool_name!r} "
             f"arg_keys={sorted(event.args)}"
         )
     if isinstance(event, ToolObservation):
         return (
-            f"SkillObservation skill={event.tool_name!r} "  # T-0012 rewrites this summary
+            f"ToolObservation tool={event.tool_name!r} "
             f"result_type={type(event.result).__name__}"
         )
     if isinstance(event, ToolErrorObservation):
         # The exception (error) type name only — the raw message may embed
         # internal paths or input values, so it is dropped.
-        return f"ToolErrorObservation skill={event.tool_name!r}"  # T-0012 rewrites this summary
+        return f"ToolErrorObservation tool={event.tool_name!r}"
     return type(event).__name__
 
 
@@ -389,6 +409,17 @@ def collect_workflow(
     return project_workflow_trace(run_id, stream)
 
 
+def __getattr__(name: str) -> Any:
+    """Serve the legacy names as their Tool counterparts, with a deprecation warning."""
+    if name == "SkillEntry":  # legacy-alias
+        warn_legacy("W6")
+        return ToolEntry
+    if name == "collect_skills":  # legacy-alias
+        warn_legacy("W16")
+        return collect_tools
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # --- Route registration ---------------------------------------------------
 
 
@@ -412,14 +443,28 @@ def register_introspection_routes(
     """
     deps: list[DependsType] = list(dependencies) if dependencies else []
 
-    @app.get(
-        "/introspection/skills",
-        name="introspection_skills",
-        summary="Registered Skill specs",
+    def introspection_tools() -> list[ToolEntry]:
+        return collect_tools(registry)
+
+    app.add_api_route(
+        "/introspection/tools",
+        introspection_tools,
+        methods=["GET"],
+        name="introspection_tools",
+        summary="Registered Tool specs",
         dependencies=deps,
     )
-    def introspection_skills() -> list[SkillEntry]:
-        return collect_skills(registry)
+    add_alias_route(
+        app,
+        path="/introspection/skills",  # legacy-alias
+        alias_template="/introspection/skills",  # legacy-alias
+        primary_template="/introspection/tools",
+        endpoint=introspection_tools,
+        methods=["GET"],
+        name="introspection_skills",  # legacy-alias
+        summary="Registered Skill specs",  # legacy-alias
+        dependencies=deps,
+    )
 
     @app.get(
         "/introspection/sessions",
@@ -482,8 +527,10 @@ def register_introspection_routes(
     )
     def introspection_rollup(request: Request) -> IntrospectionSnapshot:
         tracker: SessionTracker = request.app.state.session_tracker
+        entries = collect_tools(registry)
         return IntrospectionSnapshot(
-            skills=collect_skills(registry),
+            tools=entries,
+            skills=entries,  # legacy-alias
             sessions=tracker.entries(),
             permissions=collect_permissions(request.app, settings),
             queues=collect_queues(request.app.state.channels),
@@ -500,13 +547,13 @@ __all__ = [
     "QueueEntry",
     "SessionEntry",
     "SessionTracker",
-    "SkillEntry",
+    "ToolEntry",
     "WorkflowStep",
     "WorkflowTrace",
     "collect_dataflow",
     "collect_permissions",
     "collect_queues",
-    "collect_skills",
+    "collect_tools",
     "collect_workflow",
     "project_workflow_trace",
     "register_introspection_routes",

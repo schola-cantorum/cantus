@@ -68,10 +68,10 @@ def test_serve_routes_are_silent(records):
     app = serve(_registry())
     client = TestClient(app)
 
-    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}  # T-0012 renames this route
-    assert client.get("/skills").status_code == 200  # T-0012 renames this route
+    assert client.post("/tools/echo", json={"value": "hi"}).json() == {"result": "hi"}
+    assert client.get("/tools").status_code == 200
     for path in (
-        "/introspection/skills",  # T-0012 renames this route
+        "/introspection/tools",
         "/introspection/sessions",
         "/introspection/permissions",
         "/introspection/queues",
@@ -91,10 +91,38 @@ def test_workflow_trace_route_after_an_invocation_is_silent(records):
 
     client = TestClient(serve(_registry()))
 
-    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}  # T-0012 renames this route
+    assert client.post("/tools/echo", json={"value": "hi"}).json() == {"result": "hi"}
     run_id = client.get("/introspection/sessions").json()[0]["id"]
     trace = client.get(f"/introspection/workflows/{run_id}")
 
     assert trace.status_code == 200
     assert [s["type"] for s in trace.json()["steps"]] == ["CallToolAction", "ToolObservation"]
     _assert_no_cantus_warning(records)
+
+
+def test_the_tool_serve_surface_is_silent_with_bearer_auth_and_logs_nothing(caplog):
+    # T-0012 row 16: the Tool names and the primary routes raise no cantus warning and log nothing.
+    pytest.importorskip("fastapi")
+    import logging
+
+    import cantus
+    from fastapi.testclient import TestClient
+
+    from cantus.config import Settings
+
+    caplog.set_level(logging.DEBUG)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", cantus.CantusDeprecationWarning)
+        import cantus.serve  # noqa: F401
+        from cantus.serve import ToolEntry, serve  # noqa: F401
+        from cantus.serve.introspection import collect_tools  # noqa: F401
+
+        settings = Settings(auth_mode="bearer", bearer_token="t0k")
+        client = TestClient(serve(_registry(), settings=settings))
+        headers = {"Authorization": "Bearer t0k"}
+
+        assert client.post("/tools/echo", json={"value": "hi"}, headers=headers).status_code == 200
+        assert client.get("/tools", headers=headers).status_code == 200
+        assert client.get("/introspection/tools", headers=headers).status_code == 200
+
+    assert [r for r in caplog.records if r.name == "cantus.serve"] == []

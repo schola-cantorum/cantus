@@ -1,4 +1,4 @@
-"""cantus.serve — FastAPI app factory for cantus Skill registry.
+"""cantus.serve — FastAPI app factory for cantus Tool registry.
 
 Importing this module triggers the FastAPI SDK import. When `cantus[serve]`
 is not installed, the import fails with an actionable :class:`ImportError`
@@ -18,6 +18,9 @@ except ImportError as exc:
         "Run: pip install cantus[serve]"
     ) from exc
 
+from typing import Any
+
+from cantus._deprecation import warn_legacy
 from cantus.config import AuthMode
 from cantus.serve.app import serve
 from cantus.serve.channel import (
@@ -44,7 +47,7 @@ from cantus.serve.introspection import (
     QueueEntry,
     SessionEntry,
     SessionTracker,
-    SkillEntry,
+    ToolEntry,
     WorkflowStep,
     WorkflowTrace,
     register_introspection_routes,
@@ -70,8 +73,8 @@ __all__ = [
     "RealtimeChannel",
     "SessionEntry",
     "SessionTracker",
-    "SkillEntry",
     "TelegramWebhookChannel",
+    "ToolEntry",
     "WebhookChannel",
     "WorkflowStep",
     "WorkflowTrace",
@@ -79,3 +82,11 @@ __all__ = [
     "require_auth",
     "serve",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Serve the legacy name as `ToolEntry`, with a deprecation warning."""
+    if name == "SkillEntry":  # legacy-alias
+        warn_legacy("W6")
+        return ToolEntry
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
