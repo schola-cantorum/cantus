@@ -148,9 +148,13 @@ T-0020 還要在最終的 branch build 上再跑一次。
   3. Generation: after loading, `generation_config.do_sample = False` with `temperature`, `top_p`
      and `top_k` cleared, asserted and printed before the first query; `max_new_tokens` is the
      loader's 256; no seed (it has no effect on greedy decoding).
-  4. Packages: `transformers`, `bitsandbytes`, `accelerate`, `huggingface_hub`, `tokenizers` and
-     `safetensors` pinned in one install line; torch as preinstalled; `pip freeze` saved for each
-     build and compared; cantus installed with `--no-deps` both times.
+  4. Packages: the versions preinstalled in the Colab runtime, plus `bitsandbytes` and
+     `accelerate` if missing; both builds run in the same runtime, so they share them. The
+     versions of `torch`, `transformers`, `bitsandbytes`, `accelerate`, `huggingface_hub`,
+     `tokenizers`, `safetensors` and `pydantic` are printed, `pip freeze` is saved for each build
+     and compared, and the first freeze is the pin list for T-0020's run. cantus is installed with
+     `--no-deps` both times. (Changed on 2026-11-18, before the first run: no version set was
+     known to load Gemma 4 on Colab in advance, so none is pinned blind.)
   5. Which build ran: the wheel is built from `git archive <sha>`; its sha256 is recomputed in
      Colab; `direct_url.json`, `cantus.__file__` and `hasattr(cantus, "tool")` are recorded.
   6. Agent: no Soul; `Agent.run(query, max_iterations=12)`; a new agent per query; tools
@@ -162,8 +166,9 @@ T-0020 還要在最終的 branch build 上再跑一次。
   7. Records: a proxy around `generate` appends each turn's prompt, raw output, new-token count
      and duration to a JSONL file. Per query: the number of parse errors (a
      `ValidationErrorObservation` whose `validator_name` is `action_parse`) and their
-     `error_type`s, the tool calls, the W13 count (warnings whose text contains
-     `the action key "skill_name"`), the final answer, and whether the run ended in
+     `error_type`s, the tool calls, the W13 count (warnings recorded with
+     `warnings.catch_warnings(record=True)` and `simplefilter("always")` around each `Agent.run`
+     whose text contains `the action key "skill_name"`), the final answer, and whether the run ended in
      `MaxIterationsObservation`. The recording code is the same for both builds.
      `warnings.filters` is printed after the model loads.
   8. Noise probe: one fixed prompt is generated twice after loading and once more after the
@@ -199,7 +204,8 @@ T-0020 還要在最終的 branch build 上再跑一次。
   rows 2, 3, 8, 9 and 10) live in `tests/legacy/test_w12_w13_wire.py`; the owned modules keep the
   versions without it. `tests/test_integration_smoke.py::test_v0_1_example_runs_after_migration`
   is about `@skill(pre_hook=...)` and an agent without `tools=`, so it moved unchanged to
-  `tests/legacy/test_t0010_migration_smoke.py`. `cantus/grammar/tool_call.py` gained two private
+  `tests/legacy/test_w02_w11_migration_smoke.py` (its new-API twin stays in
+  `tests/test_integration_smoke.py`). `cantus/grammar/tool_call.py` gained two private
   helpers, `_action_name` (the name rule) and `_resolve_registry` (the fallback and W12).
 - **Self-check** (ticket-rules section 3; traceability 4.2 patterns over every touched file under
   `cantus/`, `tests/`, `docs/site/`, `docs/api/`; `tests/legacy/` is exempt). Clean:
@@ -222,16 +228,56 @@ T-0020 還要在最終的 branch build 上再跑一次。
   `inspect.getmembers` on a `ParsedToolCall` read the legacy property and emit W7; a W13 turned
   into an error by a filter is swallowed without a trace; the grammar functions test
   `registry is None`, so a falsy non-Registry value no longer falls back; the schema does not
-  accept the legacy key; W12 is emitted at the call even when the input then fails to parse.
+  accept the legacy key; W12 is emitted at the call even when the input then fails to parse;
+  `dataclasses.replace(parsed, skill_name=...)` warns from `dataclasses.py`, not from the
+  caller's line; a filter outside cantus that inspects only the legacy key in raw model output
+  misses a `tool_name` that now takes precedence.
   T-0012 and T-0014: `tests/agent_helpers.py::call_json` now scripts `tool_name`.
-- **Coverage report** (full suite `1547 passed, 3 skipped`; the skips need `mlx_lm`, `rank_bm25`
+- **Coverage report** (counts after the stage-6 fixes, full suite `1556 passed, 3 skipped`; the skips need `mlx_lm`, `rank_bm25`
   and `sentence_transformers`):
 
   | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
   | S1 `Agent.run` / `Agent.step`, new API | `tests/test_agent_run.py` (6), `tests/test_agent_step.py` (3), `tests/test_error_loop.py` (3), `tests/test_failure_handling.py` (27), `tests/test_hooks.py` (12): rows 1–8 | `cantus/core/agent.py` 96% | AC-21 (TR-81), AC-22 (TR-83, 84), AC-23 (TR-86–88); X2; V2-10; C2-F9-d, e, f, h; K2-F5 | the uncovered lines of `agent.py` are the `ModelHandle` protocol stub and retry branches of `run` (unchanged) |
-  | S2 grammar, new API | `tests/test_tool_call_grammar.py` (9): rows 9–11 | `cantus/grammar/tool_call.py` 89% | AC-24 (TR-89–91); V2-10 | five structural `GrammarError` branches (top level not an object, missing keys, non-string thought, non-object action, non-string final answer): texts unchanged, not tested before either |
-  | S1/S2 legacy key, W13 and W12 | `tests/legacy/test_w12_w13_wire.py` (22): rows 12–16, 18, 19 | same; the name rule and the fallback are fully covered | AC-17 (TR-64–66), AC-22 (TR-82, 85), AC-24 (TR-90 legacy half); W12, W13 supporting rows; C2-F9-a, b, c, g | — |
-  | S2 `ParsedToolCall` legacy name | `tests/legacy/test_w07_parsed_tool_call.py` (6): row 17 | `cantus/core/_legacy_events.py` 100% | W7 supporting rows (the `ParsedToolCall` half) | `del parsed.skill_name` (not supported, D8) |
-  | S3 subprocess | rows 14 and 21 in the two legacy modules; `tests/legacy/test_t0010_migration_smoke.py` (1) | not measured (subprocess) | TR-85; TR-79 shape for W12, W13, W7 | — |
-  | Stage 8 | see below | — | AC-40 (TR-150) | Colab, by hand |
+  | S2 grammar, new API | `tests/test_tool_call_grammar.py` (15): rows 9–11 | `cantus/grammar/tool_call.py` 100% after the stage-6 additions | AC-24 (TR-89–91); V2-10 | — |
+  | S1/S2 legacy key, W13 and W12 | `tests/legacy/test_w12_w13_wire.py` (24): rows 12–16, 18, 19 | same; the name rule and the fallback are fully covered | AC-17 (TR-64–66), AC-22 (TR-82, 85), AC-24 (TR-90 legacy half); W12, W13 supporting rows; C2-F9-a, b, c, g | — |
+  | S2 `ParsedToolCall` legacy name | `tests/legacy/test_w07_parsed_tool_call.py` (8): row 17 | `cantus/core/_legacy_events.py` 100% | W7 supporting rows (the `ParsedToolCall` half) | `del parsed.skill_name` (not supported, D8) |
+  | S3 subprocess | rows 14 and 21 in the two legacy modules; `tests/legacy/test_w02_w11_migration_smoke.py` (1) | not measured (subprocess) | TR-85; TR-79 shape for W12, W13, W7 | — |
+  | Stage 8 | the stage-8 entries below | — | AC-40 (TR-150) | the Colab run is by hand and is recorded when it has been done |
+- **Stage 6 (2026-11-18).** `/code-review` on the committed change at `3e35059` (base `7208bba`),
+  two `harness-reviewer` passes (Standards 20 findings, Spec 11; no high, four medium). Fixed in
+  `c7a4888`: a migrated hook test had become a tautology and tests its original subject again;
+  the fallback of `parse_tool_call` is now shown to read the global registry; grammar tests for
+  C2-F9-d and C2-F9-h and for the structural error texts; W7 on `ParsedToolCall` under an
+  escalating filter; a count of all cantus warnings in the subprocess cases; the migration smoke
+  has a new-API twin in the main suite and its legacy copy is named after its W ids; docstrings
+  that claimed the agent constrains decoding with the schema; smaller items. The Colab protocol
+  was corrected in two places before the first run (how W13 is counted; package versions, see
+  step 4). Left as they are, shown to the user: `cantus.core.agent` imports the private name rule
+  from `cantus.grammar.tool_call` (the helper could live in a neutral module); a non-legacy test
+  imports the private `_get_global_registry`; duplicated test helpers; the private module name
+  `_legacy_events`; the approved test plan table is not committed. After the fixes: full suite
+  `1556 passed, 3 skipped`, the mutation check kills all 29, Python 3.10–3.14 pass.
+- **Stage 7 (2026-11-18).** Project `security-review`: five candidates, each checked by an
+  independent reviewer, none confirmed; no finding at the reporting threshold. Report:
+  `.proj.specs/0001-tool-rename-phase-one/review/security-T-0010.md`.
+- **Stage 8, part A (2026-11-18, ADR-0018), by the agent.** Surface: a Python script in a
+  subprocess, on the ticket build installed as a wheel in a fresh virtual environment, run from a
+  directory outside the checkout with `PYTHONPATH` and `PYTHONWARNINGS` unset. Commit
+  `c7a4888e62973728e4cd54deea3e2c954fd99fb8` (`git archive`, `uv build --wheel`; the wheel holds
+  the same 87 `cantus/**/*.py` files as `git ls-files`), `cantus_agent-0.6.0-py3-none-any.whl`,
+  sha256 `28ae961306ad26f0cebc013949d72340cdab090f0dd4f60c10f9f65d867bd11b`; `cantus.__file__`
+  under the fresh environment's `site-packages`; Python 3.13.11, macOS 26.6.2 arm64. Observed:
+  `tool_name` output runs the tool with no cantus warning; the five parse texts and the empty
+  final-answer text read exactly as in traceability 2.2 (`unknown_tool`,
+  `available: ['alpha', 'beta']`); `tool_name: null` next to a valid legacy key reports
+  `tool_name must be a string, got NoneType` without a warning; an empty registry gives
+  `tool 'x' not registered. Available: []`; legacy-key output runs the tools and prints W13 once
+  for the call site; `final_answer` with the legacy key is final; `build_schema` requires
+  `tool_name` and `args`; the three `GrammarError` texts; `ParsedToolCall` legacy keyword and
+  assignment print W7. A second script run with `-W error::DeprecationWarning` completes a
+  legacy-key `Agent.run` and `parse_tool_call` with the same results (exit status 0). The Colab
+  program was also run end to end with a stub model against v0.6.0 from PyPI and against this
+  wheel, each in a fresh environment, to check the recording code on both builds.
+- **Stage 8, part B (Colab, AC-40): not run yet.** By hand, by the user, with the notebook built
+  for commit `c7a4888` and the wheel above. AC-40 stays unverified until it is recorded here.
