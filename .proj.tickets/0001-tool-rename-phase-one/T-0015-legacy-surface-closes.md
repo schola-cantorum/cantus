@@ -2,7 +2,7 @@
 id: T-0015
 title: Legacy surface closes — every legacy name, text and export checked together
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0011, T-0013, T-0014]
 ---
 
