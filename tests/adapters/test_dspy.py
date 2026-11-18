@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from cantus.protocols.skill import Skill, skill
+from cantus.protocols.tool import Tool, tool
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ def test_import_without_dspy_sdk_raises_actionable_error(monkeypatch):
 def test_expose_round_trip(fake_dspy):
     from cantus.adapters.dspy import expose_as_dspy_tool
 
-    @skill
+    @tool
     def lookup_word(word: str) -> str:
         """Look up a word in the dictionary."""
         return word
@@ -112,26 +112,91 @@ def test_expose_round_trip(fake_dspy):
     assert "word" in dspy_tool.signature.input_fields
 
 
-def test_expose_rejects_non_skill(fake_dspy):
+def _plain_function(word: str) -> str:
+    return word
+
+
+def _bad_inputs(a_tool: Tool) -> list[tuple[Any, str]]:
+    return [
+        (None, "NoneType"),
+        ("x", "str"),
+        (42, "int"),
+        ({}, "dict"),
+        (_plain_function, "function"),
+        (Tool, "type"),
+        ([a_tool], "list"),
+    ]
+
+
+def test_expose_with_tool_keyword_matches_positional(fake_dspy):
+    import warnings
+
+    import cantus.adapters as adapters
     from cantus.adapters.dspy import expose_as_dspy_tool
 
-    for bad in ("not a skill", None, {"x": 1}, 42):
-        with pytest.raises(TypeError, match="expose_as_dspy_tool expects Skill"):
-            expose_as_dspy_tool(bad)  # type: ignore[arg-type]
+    @tool
+    def lookup_word(word: str) -> str:
+        """Look up a word in the dictionary."""
+        return f"defined:{word}"
+
+    for fn in (adapters.expose_as_dspy_tool, expose_as_dspy_tool):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            by_keyword = fn(tool=lookup_word)
+            positional = fn(lookup_word)
+        assert by_keyword.name == "lookup_word"
+        assert by_keyword.desc == "Look up a word in the dictionary."
+        assert by_keyword(word="cantus") == "defined:cantus"
+        assert positional(word="cantus") == "defined:cantus"
+
+
+def test_expose_rejects_non_tool_positional_and_keyword(fake_dspy):
+    import cantus.adapters as adapters
+    from cantus.adapters.dspy import expose_as_dspy_tool
+
+    @tool
+    def lookup_word(word: str) -> str:
+        """Look up a word in the dictionary."""
+        return word
+
+    for fn in (adapters.expose_as_dspy_tool, expose_as_dspy_tool):
+        for bad, type_name in _bad_inputs(lookup_word):
+            message = f"expose_as_dspy_tool expects Tool, got {type_name}"
+            with pytest.raises(TypeError, match=message):
+                fn(bad)
+            with pytest.raises(TypeError, match=message):
+                fn(tool=bad)
+        with pytest.raises(TypeError, match="expose_as_dspy_tool expects Tool, got NoneType"):
+            fn()
+
+
+def test_expose_accepts_imported_remote_tool(fake_dspy):
+    from cantus.adapters.dspy import expose_as_dspy_tool, import_dspy_tool
+
+    sig = _FakeSignature({"q": _FakeInputField(str)})
+    dspy_tool = _FakeDspyTool(
+        name="search",
+        desc="Search the catalog",
+        signature=sig,
+        impl=lambda q: f"hit:{q}",
+    )
+    exposed = expose_as_dspy_tool(import_dspy_tool(dspy_tool))
+    assert exposed.name == "search"
+    assert exposed(q="dune") == "hit:dune"
 
 
 def test_expose_type_mapping(fake_dspy):
     from cantus.adapters.dspy import expose_as_dspy_tool
 
-    class MultiTypeSkill(Skill):
+    class MultiTypeTool(Tool):
         name = "multi"
-        description = "Multi-type skill."
+        description = "Multi-type tool."
 
         def run(self, s: str, n: int, x: float, b: bool) -> str:
             return f"{s}:{n}:{x}:{b}"
 
-    sk = MultiTypeSkill()
-    dspy_tool = expose_as_dspy_tool(sk)
+    multi = MultiTypeTool()
+    dspy_tool = expose_as_dspy_tool(multi)
     fields = dspy_tool.signature.input_fields
     assert fields["s"].py_type is str
     assert fields["n"].py_type is int
@@ -144,19 +209,20 @@ def test_expose_type_mapping(fake_dspy):
 # ---------------------------------------------------------------------------
 
 
-def test_import_returns_v030_shaped_skill(fake_dspy):
+def test_import_returns_v030_shaped_tool(fake_dspy):
     from cantus.adapters.dspy import import_dspy_tool
 
     sig = _FakeSignature({"q": _FakeInputField(str)})
-    tool = _FakeDspyTool(
+    dspy_tool = _FakeDspyTool(
         name="search",
         desc="Search the catalog",
         signature=sig,
         impl=lambda q: f"hit:{q}",
     )
-    sk = import_dspy_tool(tool)
-    assert isinstance(sk, Skill)
-    spec = sk.spec_for_llm()
+    imported = import_dspy_tool(dspy_tool)
+    assert isinstance(imported, Tool)
+    assert imported.is_remote is True
+    spec = imported.spec_for_llm()
     assert set(spec.keys()) == {"name", "description", "args_schema"}
     assert spec["name"] == "search"
     assert spec["description"] == "Search the catalog"
@@ -169,14 +235,14 @@ def test_import_handshake_failure(fake_dspy):
 
     # signature attribute exists but does not expose `input_fields`.
     broken_sig = object()
-    tool = _FakeDspyTool(
+    dspy_tool = _FakeDspyTool(
         name="x",
         desc="y",
         signature=broken_sig,  # type: ignore[arg-type]
         impl=None,
     )
     with pytest.raises(RuntimeError, match="dspy_handshake_failed"):
-        import_dspy_tool(tool)
+        import_dspy_tool(dspy_tool)
 
 
 def test_import_rejects_non_tool(fake_dspy):
@@ -187,27 +253,27 @@ def test_import_rejects_non_tool(fake_dspy):
             import_dspy_tool(bad)  # type: ignore[arg-type]
 
 
-def test_imported_skill_is_remote_marker(fake_dspy):
+def test_imported_tool_is_remote_marker(fake_dspy):
     from cantus.adapters.dspy import import_dspy_tool
 
     sig = _FakeSignature({"q": _FakeInputField(str)})
-    tool = _FakeDspyTool(name="x", desc="y", signature=sig, impl=lambda q: q)
-    sk = import_dspy_tool(tool)
-    assert sk.is_remote is True
-    assert "is_remote" not in sk.spec_for_llm()
+    dspy_tool = _FakeDspyTool(name="x", desc="y", signature=sig, impl=lambda q: q)
+    imported = import_dspy_tool(dspy_tool)
+    assert imported.is_remote is True
+    assert "is_remote" not in imported.spec_for_llm()
 
 
-def test_imported_skill_remote_error_wrapping(fake_dspy):
+def test_imported_tool_remote_error_wrapping(fake_dspy):
     from cantus.adapters.dspy import import_dspy_tool
 
     def boom(**_kwargs: Any) -> Any:
         raise ValueError("kapow")
 
     sig = _FakeSignature({"q": _FakeInputField(str)})
-    tool = _FakeDspyTool(name="broken", desc="x", signature=sig, impl=boom)
-    sk = import_dspy_tool(tool)
+    dspy_tool = _FakeDspyTool(name="broken", desc="x", signature=sig, impl=boom)
+    imported = import_dspy_tool(dspy_tool)
     with pytest.raises(RuntimeError, match="dspy_remote_error"):
-        sk(q="hi")
+        imported(q="hi")
 
 
 def test_import_optional_field_not_required(fake_dspy):
@@ -219,9 +285,9 @@ def test_import_optional_field_not_required(fake_dspy):
             "limit": _FakeInputField(int, optional=True),
         }
     )
-    tool = _FakeDspyTool(name="s", desc="x", signature=sig, impl=lambda **kw: kw)
-    sk = import_dspy_tool(tool)
-    spec = sk.spec_for_llm()
+    dspy_tool = _FakeDspyTool(name="s", desc="x", signature=sig, impl=lambda **kw: kw)
+    imported = import_dspy_tool(dspy_tool)
+    spec = imported.spec_for_llm()
     assert spec["args_schema"]["properties"]["q"] == {"type": "string"}
     assert spec["args_schema"]["properties"]["limit"] == {"type": "integer"}
     assert spec["args_schema"]["required"] == ["q"]

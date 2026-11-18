@@ -1,37 +1,37 @@
 """cantus.adapters — bridges to MCP, Anthropic Memory, and four
 cross-framework targets (LangChain / DSPy / HuggingFace / OpenHands).
 
-The adapter layer is a pure conversion utility: it does NOT alter Skill
+The adapter layer is a pure conversion utility: it does NOT alter Tool
 or Memory runtime behaviour and does NOT register a new protocol kind.
 The package exposes ten top-level callables (3 from v0.3.2 + 6 from
 v0.3.3 + 1 from v0.3.4):
 
 v0.3.2 (MCP + Anthropic Memory):
-- ``export_as_mcp_server(skills, *, name, version)`` — wrap a list of
-  cantus Skills as an MCP server (requires ``cantus[mcp]``).
+- ``export_as_mcp_server(tools, *, name, version)`` — wrap a list of
+  cantus Tools as an MCP server (requires ``cantus[mcp]``).
 - ``import_mcp_server(*, transport, command_or_url)`` — connect to a
-  remote MCP server and return a list of cantus Skills.
+  remote MCP server and return a list of cantus Tools.
 - ``expose_as_anthropic_memory_tool(memory)`` — JSON-serialisable dict
   matching the Anthropic Memory tool spec (no SDK dependency).
 
 v0.3.3 (cross-framework batch2):
-- ``expose_as_langchain_tool(skill)`` / ``import_langchain_tool(tool)`` —
-  cantus Skill <-> ``langchain_core.tools.BaseTool``
+- ``expose_as_langchain_tool(tool)`` / ``import_langchain_tool(tool)`` —
+  cantus Tool <-> ``langchain_core.tools.BaseTool``
   (requires ``cantus[langchain]``).
-- ``expose_as_dspy_tool(skill)`` / ``import_dspy_tool(tool)`` —
-  cantus Skill <-> ``dspy.Tool``
+- ``expose_as_dspy_tool(tool)`` / ``import_dspy_tool(tool)`` —
+  cantus Tool <-> ``dspy.Tool``
   (requires ``cantus[dspy]``).
-- ``expose_as_hf_tool(skill)`` — cantus Skill -> ``smolagents.Tool``
+- ``expose_as_hf_tool(tool)`` — cantus Tool -> ``smolagents.Tool``
   (requires ``cantus[huggingface]``).
-- ``expose_as_openhands_action(skill)`` — cantus Skill ->
+- ``expose_as_openhands_action(tool)`` — cantus Tool ->
   ``openhands.events.Action`` (requires ``cantus[openhands]``;
   export-only — the import direction is permanently not applicable
   because ``Action`` is a declarative event record dispatched by the
-  OpenHands host runtime, with no ``__call__`` for ``Skill.run`` to
+  OpenHands host runtime, with no ``__call__`` for ``Tool.run`` to
   delegate to).
 
 v0.3.4 (cross-framework batch3a — HF bidirectional close-out):
-- ``import_hf_tool(tool)`` — cantus Skill <- ``smolagents.Tool``
+- ``import_hf_tool(tool)`` — cantus Tool <- ``smolagents.Tool``
   (requires ``cantus[huggingface]``). Completes the HuggingFace
   bidirectional matrix; the OpenHands import direction is intentionally
   omitted, see ``expose_as_openhands_action`` above.

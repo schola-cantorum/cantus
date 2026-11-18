@@ -6,14 +6,14 @@ cantus[huggingface]``) so a missing SDK surfaces immediately as a clear
 :func:`expose_as_hf_tool` / :func:`import_hf_tool`. ``smolagents`` is the
 successor to the pre-migration target ``transformers.Tool``, which was removed
 in transformers 4.53. Both directions preserve the v0.3.0
-``Skill.spec_for_llm()`` JSON shape — every field declared in a HF Tool's
+cantus ``Tool.spec_for_llm()`` JSON shape — every field declared in a HF Tool's
 ``inputs`` dict is treated as required because ``smolagents.Tool`` has no
 "optional input" concept.
 
-Export builds a dynamic ``smolagents.Tool`` subclass per Skill: ``name`` /
+Export builds a dynamic ``smolagents.Tool`` subclass per cantus Tool: ``name`` /
 ``description`` / ``inputs`` become class attributes, ``output_type`` is
 ``"any"``, and a generated ``forward(self, <a>, <b>, ...)`` dispatches through
-``Skill.__call__``. That call runs ``run()`` directly — pre/post hooks are
+the cantus ``Tool.__call__``. That call runs ``run()`` directly — pre/post hooks are
 applied only by the cantus Agent dispatcher, never by the exported tool.
 Import accepts any ``smolagents.Tool`` instance, including
 ``@smolagents.tool``-decorated functions.
@@ -23,10 +23,10 @@ derives serialisation from ``inspect.getsource``), ``tool.to_dict()``,
 ``tool.save()`` and ``tool.push_to_hub()`` are NOT supported on exported tools.
 Agent ``run()`` paths (``CodeAgent``, ``ToolCallingAgent``) do not need them.
 
-The import path reuses the private :class:`_RemoteSkillBase` base introduced in
+The import path reuses the private :class:`_RemoteToolBase` base introduced in
 v0.3.3 batch2 so the v0.3.0 ``spec_for_llm()`` three-key shape contract is
 honoured without per-adapter duplication; ``is_remote = True`` never leaks into
-the imported Skill's spec.
+the imported Tool's spec.
 """
 
 from __future__ import annotations
@@ -44,7 +44,8 @@ except ImportError as exc:
         "Run: pip install cantus[huggingface]"
     ) from exc
 
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._arguments import resolve_tool
+from cantus.adapters._remote_tool import _RemoteToolBase
 from cantus.protocols.tool import Tool
 
 
@@ -91,7 +92,7 @@ def _build_forward(param_names: list[str]) -> Any:
         bound = signature.bind(self, *args, **kwargs)
         arguments = dict(bound.arguments)
         arguments.pop("self")
-        return type(self)._cantus_skill(**arguments)
+        return type(self)._cantus_tool(**arguments)
 
     forward.__signature__ = signature  # type: ignore[attr-defined]
     return forward
@@ -115,23 +116,35 @@ def _validated_input_names(properties: dict[str, Any]) -> list[str]:
     return names
 
 
-def expose_as_hf_tool(skill: Tool) -> SmolagentsTool:
-    """Wrap a cantus Skill as a ``smolagents.Tool`` instance.
+def expose_as_hf_tool(
+    tool: Tool | None = None,
+    *,
+    skill: Tool | None = None,  # legacy-alias
+) -> SmolagentsTool:
+    """Wrap a cantus Tool as a ``smolagents.Tool`` instance.
 
-    A dynamically created ``Tool`` subclass carries the Skill's ``name`` /
+    A dynamically created ``Tool`` subclass carries the cantus Tool's ``name`` /
     ``description`` / ``inputs`` as class attributes, ``output_type`` is
-    ``"any"``, and the generated ``forward`` dispatches through the Skill's
+    ``"any"``, and the generated ``forward`` dispatches through the cantus Tool's
     ``__call__`` (``run()`` directly; pre/post hooks are applied only by the
     cantus Agent dispatcher). Because the class has no source
     code, ``tool.to_dict()`` / ``tool.save()`` / ``tool.push_to_hub()`` are not
     supported on the returned tool; agent ``run()`` paths do not need them.
-    """
-    if not isinstance(skill, Tool):
-        raise TypeError(
-            f"expose_as_hf_tool expects Skill, got {type(skill).__name__}"
-        )
 
-    spec = skill.spec_for_llm()
+    Args:
+        tool: The cantus Tool to wrap.
+        skill: Deprecated; use ``tool``.
+
+    Returns:
+        A ``smolagents.Tool`` instance.
+
+    Raises:
+        TypeError: If the argument is not a cantus Tool, or both ``tool`` and the
+            deprecated keyword are given.
+    """
+    tool = resolve_tool("expose_as_hf_tool", tool, skill)  # legacy-alias
+
+    spec = tool.spec_for_llm()
     properties = (spec["args_schema"].get("properties") or {})
     param_names = _validated_input_names(properties)
 
@@ -149,10 +162,10 @@ def expose_as_hf_tool(skill: Tool) -> SmolagentsTool:
         "inputs": inputs,
         "output_type": _EXPORTED_OUTPUT_TYPE,
         "forward": _build_forward(param_names),
-        # staticmethod keeps the Skill instance from being bound as a method;
-        # calling it goes through Skill.__call__ (run() directly; hooks are an
+        # staticmethod keeps the Tool instance from being bound as a method;
+        # calling it goes through Tool.__call__ (run() directly; hooks are an
         # Agent dispatcher concern).
-        "_cantus_skill": staticmethod(skill),
+        "_cantus_tool": staticmethod(tool),
         "__doc__": spec["description"] or None,
     }
     exported_cls = type("CantusExportedTool", (SmolagentsTool,), attrs)
@@ -193,8 +206,8 @@ def _derive_args_schema_from_hf_inputs(inputs: Any) -> dict[str, Any]:
     }
 
 
-class _HuggingFaceRemoteSkill(_RemoteSkillBase):
-    """cantus Skill that proxies a ``smolagents.Tool``.
+class _HuggingFaceRemoteTool(_RemoteToolBase):
+    """cantus Tool that proxies a ``smolagents.Tool``.
 
     ``name`` / ``description`` are copied from the tool and ``args_schema`` is
     derived from ``tool.inputs`` via :func:`_derive_args_schema_from_hf_inputs`.
@@ -223,20 +236,20 @@ class _HuggingFaceRemoteSkill(_RemoteSkillBase):
 
 
 def import_hf_tool(tool: SmolagentsTool) -> Tool:
-    """Wrap a ``smolagents.Tool`` as a cantus Skill instance.
+    """Wrap a ``smolagents.Tool`` as a cantus Tool instance.
 
     Any ``smolagents.Tool`` instance is accepted — subclasses written by hand as
     well as tools produced by the ``smolagents.tool`` decorator; the
-    ``isinstance`` check is the only acceptance test. The returned Skill keeps
+    ``isinstance`` check is the only acceptance test. The returned Tool keeps
     the v0.3.0 ``spec_for_llm()`` shape: ``tool.inputs`` is mirrored verbatim
     into ``args_schema`` with every field required, and calls dispatch through
-    ``tool(**kwargs)`` (see :class:`_HuggingFaceRemoteSkill`).
+    ``tool(**kwargs)`` (see :class:`_HuggingFaceRemoteTool`).
     """
     if not isinstance(tool, SmolagentsTool):
         raise TypeError(
             f"import_hf_tool expects smolagents.Tool, got {type(tool).__name__}"
         )
-    return _HuggingFaceRemoteSkill(tool=tool)
+    return _HuggingFaceRemoteTool(tool=tool)
 
 
 __all__ = ["expose_as_hf_tool", "import_hf_tool"]

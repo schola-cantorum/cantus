@@ -2,7 +2,7 @@
 
 Returns a pure Python `dict` (no callables, no Memory instance references)
 matching the Anthropic Memory tool spec: a 4-action surface (`view`,
-`create`, `str_replace`, `delete`) over a Skill-shaped command schema. The
+`create`, `str_replace`, `delete`) over a Tool-shaped command schema. The
 returned dict round-trips through `json.dumps` so host code can feed it
 straight into `client.messages.create(tools=[...])`.
 

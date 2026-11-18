@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from cantus.protocols.skill import Skill, skill
+from cantus.protocols.tool import Tool, tool
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def test_import_without_langchain_sdk_raises_actionable_error(monkeypatch):
 def test_expose_round_trip(fake_langchain):
     from cantus.adapters.langchain import expose_as_langchain_tool
 
-    @skill
+    @tool
     def search_book(title: str) -> str:
         """Search the catalog by exact title."""
         return title
@@ -116,18 +116,83 @@ def test_expose_round_trip(fake_langchain):
     spec = search_book.spec_for_llm()
     assert lc_tool.name == spec["name"]
     assert lc_tool.description == spec["description"]
-    # args_schema is a Pydantic v2 model class whose schema mirrors the Skill's.
+    # args_schema is a Pydantic v2 model class whose schema mirrors the Tool's.
     derived_schema = lc_tool.args_schema.model_json_schema()
     assert "title" in derived_schema["properties"]
     assert derived_schema["properties"]["title"]["type"] == "string"
 
 
-def test_expose_rejects_non_skill(fake_langchain):
+def _plain_function(title: str) -> str:
+    return title
+
+
+def _bad_inputs(a_tool: Tool) -> list[tuple[Any, str]]:
+    return [
+        (None, "NoneType"),
+        ("x", "str"),
+        (42, "int"),
+        ({}, "dict"),
+        (_plain_function, "function"),
+        (Tool, "type"),
+        ([a_tool], "list"),
+    ]
+
+
+def test_expose_with_tool_keyword_matches_positional(fake_langchain):
+    import warnings
+
+    import cantus.adapters as adapters
     from cantus.adapters.langchain import expose_as_langchain_tool
 
-    for bad in ("not a skill", {"name": "fake"}, None, 42):
-        with pytest.raises(TypeError, match="expose_as_langchain_tool expects Skill"):
-            expose_as_langchain_tool(bad)  # type: ignore[arg-type]
+    @tool
+    def search_book(title: str) -> str:
+        """Search the catalog by exact title."""
+        return f"found:{title}"
+
+    for fn in (adapters.expose_as_langchain_tool, expose_as_langchain_tool):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            by_keyword = fn(tool=search_book)
+            positional = fn(search_book)
+        assert by_keyword.name == "search_book"
+        assert by_keyword.description == "Search the catalog by exact title."
+        assert by_keyword.invoke({"title": "Dune"}) == "found:Dune"
+        assert positional.invoke({"title": "Dune"}) == "found:Dune"
+
+
+def test_expose_rejects_non_tool_positional_and_keyword(fake_langchain):
+    import cantus.adapters as adapters
+    from cantus.adapters.langchain import expose_as_langchain_tool
+
+    @tool
+    def search_book(title: str) -> str:
+        """Search the catalog by exact title."""
+        return title
+
+    for fn in (adapters.expose_as_langchain_tool, expose_as_langchain_tool):
+        for bad, type_name in _bad_inputs(search_book):
+            message = f"expose_as_langchain_tool expects Tool, got {type_name}"
+            with pytest.raises(TypeError, match=message):
+                fn(bad)
+            with pytest.raises(TypeError, match=message):
+                fn(tool=bad)
+        with pytest.raises(TypeError, match="expose_as_langchain_tool expects Tool, got NoneType"):
+            fn()
+
+
+def test_expose_accepts_imported_remote_tool(fake_langchain):
+    from cantus.adapters.langchain import expose_as_langchain_tool, import_langchain_tool
+
+    lc_tool = _FakeBaseTool(
+        name="search",
+        description="Search the catalog",
+        args_schema=_make_pydantic_args_schema(),
+        impl=lambda q: f"hit:{q}",
+    )
+    remote = import_langchain_tool(lc_tool)
+    exposed = expose_as_langchain_tool(remote)
+    assert exposed.name == "search"
+    assert exposed.invoke({"q": "dune"}) == "hit:dune"
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +207,7 @@ def _make_pydantic_args_schema():
     return create_model("SearchArgs", q=(str, ...))
 
 
-def test_import_returns_v030_shaped_skill(fake_langchain):
+def test_import_returns_v030_shaped_tool(fake_langchain):
     from cantus.adapters.langchain import import_langchain_tool
 
     args_model = _make_pydantic_args_schema()
@@ -152,9 +217,10 @@ def test_import_returns_v030_shaped_skill(fake_langchain):
         args_schema=args_model,
         impl=lambda q: f"hit:{q}",
     )
-    sk = import_langchain_tool(lc_tool)
-    assert isinstance(sk, Skill)
-    spec = sk.spec_for_llm()
+    imported = import_langchain_tool(lc_tool)
+    assert isinstance(imported, Tool)
+    assert imported.is_remote is True
+    spec = imported.spec_for_llm()
     assert set(spec.keys()) == {"name", "description", "args_schema"}
     assert spec["name"] == "search"
     assert spec["description"] == "Search the catalog"
@@ -170,8 +236,8 @@ def test_import_with_none_args_schema(fake_langchain):
         args_schema=None,
         impl=lambda: "ok",
     )
-    sk = import_langchain_tool(lc_tool)
-    spec = sk.spec_for_llm()
+    imported = import_langchain_tool(lc_tool)
+    spec = imported.spec_for_llm()
     assert spec["args_schema"] == {
         "type": "object",
         "properties": {},
@@ -204,7 +270,7 @@ def test_import_rejects_non_basetool(fake_langchain):
             import_langchain_tool(bad)  # type: ignore[arg-type]
 
 
-def test_imported_skill_is_remote_marker(fake_langchain):
+def test_imported_tool_is_remote_marker(fake_langchain):
     from cantus.adapters.langchain import import_langchain_tool
 
     args_model = _make_pydantic_args_schema()
@@ -214,12 +280,12 @@ def test_imported_skill_is_remote_marker(fake_langchain):
         args_schema=args_model,
         impl=lambda q: q,
     )
-    sk = import_langchain_tool(lc_tool)
-    assert sk.is_remote is True
-    assert "is_remote" not in sk.spec_for_llm()
+    imported = import_langchain_tool(lc_tool)
+    assert imported.is_remote is True
+    assert "is_remote" not in imported.spec_for_llm()
 
 
-def test_imported_skill_remote_error_wrapping(fake_langchain):
+def test_imported_tool_remote_error_wrapping(fake_langchain):
     from cantus.adapters.langchain import import_langchain_tool
 
     def boom(**_kwargs: Any) -> Any:
@@ -232,6 +298,6 @@ def test_imported_skill_remote_error_wrapping(fake_langchain):
         args_schema=args_model,
         impl=boom,
     )
-    sk = import_langchain_tool(lc_tool)
+    imported = import_langchain_tool(lc_tool)
     with pytest.raises(RuntimeError, match="langchain_remote_error"):
-        sk(q="hi")
+        imported(q="hi")

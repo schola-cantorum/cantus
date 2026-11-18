@@ -1,12 +1,12 @@
 """Shared base class for all `cantus.adapters.import_*` adapters.
 
-`_RemoteSkillBase` lifts the three load-bearing patterns from v0.3.2
-`cantus.adapters.mcp_client._RemoteSkill` into a private, framework-internal
+`_RemoteToolBase` lifts the three load-bearing patterns of the MCP client's
+remote tool class (written in v0.3.2) into a private, framework-internal
 base so that LangChain / DSPy / future cross-framework import adapters
-inherit the same v0.3.0 `Skill.spec_for_llm()` shape contract instead of
+inherit the same v0.3.0 `Tool.spec_for_llm()` shape contract instead of
 duplicating it per adapter:
 
-1. ``__init__`` bypasses :class:`Skill`'s signature-introspection path —
+1. ``__init__`` bypasses :class:`Tool`'s signature-introspection path —
    the remote framework's schema is authoritative.
 2. ``spec_for_llm()`` returns the canonical three-key dict directly from
    the remote schema dict; ``is_remote = True`` is NOT leaked into it.
@@ -25,8 +25,8 @@ from typing import Any
 from cantus.protocols.tool import Tool
 
 
-class _RemoteSkillBase(Tool):
-    """Internal base for cantus Skills that proxy a remote framework tool."""
+class _RemoteToolBase(Tool):
+    """Internal base for cantus Tools that proxy a remote framework tool."""
 
     is_remote = True
 
@@ -37,7 +37,7 @@ class _RemoteSkillBase(Tool):
         description: str,
         args_schema_dict: dict[str, Any],
     ) -> None:
-        # Intentionally bypass Skill.__init__: remote frameworks (MCP,
+        # Intentionally bypass Tool.__init__: remote frameworks (MCP,
         # LangChain, DSPy, OpenHands) supply their own authoritative
         # schema, so signature introspection of `run` is both useless
         # (the body just dispatches kwargs) and wrong (it would invent
@@ -69,4 +69,4 @@ class _RemoteSkillBase(Tool):
         )
 
 
-__all__ = ["_RemoteSkillBase"]
+__all__ = ["_RemoteToolBase"]

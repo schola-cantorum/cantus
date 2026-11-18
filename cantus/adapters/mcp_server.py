@@ -1,7 +1,7 @@
-"""MCP server adapter — wraps cantus Skills as MCP tool definitions.
+"""MCP server adapter — wraps cantus Tools as MCP tool definitions.
 
-`export_as_mcp_server(skills, *, name, version)` validates inputs and
-returns an `McpServer` instance. `McpServer.tools` reflects each Skill's
+`export_as_mcp_server(tools, *, name, version)` validates inputs and
+returns an `McpServer` instance. `McpServer.tools` reflects each Tool's
 `spec_for_llm()` output directly into MCP tool fields (`name`,
 `description`, `inputSchema`) with no field rewrite. `McpServer.run()`
 validates the transport, performs a fail-loud port-in-use probe for HTTP
@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import re
 import socket
+from collections.abc import Iterable
 from typing import Any, Literal
 
+from cantus.adapters._arguments import resolve_tools
 from cantus.protocols.tool import Tool
 
 # Alphanumeric leader followed by alphanumeric, dot, underscore, or hyphen.
@@ -43,25 +45,76 @@ def _validate_name_or_version(value: Any, *, field: str) -> None:
         )
 
 
+def _checked_iterable(value: Any) -> list[Tool]:
+    """`McpServer`'s rule: any iterable of Tools, an empty one included."""
+    try:
+        items = list(value)
+    except TypeError:
+        raise TypeError(
+            f"McpServer expects list[Tool], got {type(value).__name__}"
+        ) from None
+    for item in items:
+        if not isinstance(item, Tool):
+            raise TypeError(
+                "McpServer expects list[Tool], "
+                f"got element of type {type(item).__name__}"
+            )
+    return items
+
+
+def _checked_nonempty_list(value: Any) -> list[Tool]:
+    """`export_as_mcp_server`'s rule: a non-empty list of Tools."""
+    if not isinstance(value, list) or len(value) == 0:
+        raise ValueError(
+            "export_as_mcp_server requires at least one Tool in the input list"
+        )
+    for item in value:
+        if not isinstance(item, Tool):
+            raise TypeError(
+                f"export_as_mcp_server expects list[Tool], "
+                f"got element of type {type(item).__name__}"
+            )
+    return value
+
+
 class McpServer:
-    """Thin holder for a list of MCP tool dicts derived from cantus Skills.
+    """Thin holder for a list of MCP tool dicts derived from cantus Tools.
 
     The class is intentionally inert at construction time so that
     `export_as_mcp_server` can return an introspectable server object
     without requiring the `mcp` SDK. The SDK is only imported when
     `run()` is called.
+
+    Args:
+        tools: Any iterable of cantus Tools (an empty one is allowed).
+        skills: Deprecated; use ``tools``.
+        name: The server name, stored as given.
+        version: The server version, stored as given.
+
+    Raises:
+        TypeError: If no tools are given, the value is not iterable, an element
+            is not a Tool, or both ``tools`` and the deprecated keyword are given.
     """
 
-    def __init__(self, skills: list[Tool], *, name: str, version: str) -> None:
+    def __init__(
+        self,
+        tools: Iterable[Tool] | None = None,
+        *,
+        skills: Iterable[Tool] | None = None,  # legacy-alias
+        name: str,
+        version: str,
+    ) -> None:
+        self._tools: list[Tool] = resolve_tools(
+            "McpServer", tools, skills, _checked_iterable  # legacy-alias
+        )
         self.name = name
         self.version = version
-        self._skills: list[Tool] = list(skills)
 
     @property
     def tools(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
-        for sk in self._skills:
-            spec = sk.spec_for_llm()
+        for item in self._tools:
+            spec = item.spec_for_llm()
             out.append(
                 {
                     "name": spec["name"],
@@ -107,7 +160,7 @@ class McpServer:
             name=self.name,
             version=self.version,
             tools=self.tools,
-            skills=self._skills,
+            backing_tools=self._tools,
             transport=transport,
             host=host,
             port=port,
@@ -115,27 +168,36 @@ class McpServer:
 
 
 def export_as_mcp_server(
-    skills: list[Tool],
+    tools: list[Tool] | None = None,
     *,
+    skills: list[Tool] | None = None,  # legacy-alias
     name: str,
     version: str,
 ) -> McpServer:
-    """Validate inputs and return an :class:`McpServer` wrapping the Skills."""
+    """Validate inputs and return an :class:`McpServer` wrapping the Tools.
+
+    Args:
+        tools: A non-empty list of cantus Tools.
+        skills: Deprecated; use ``tools``.
+        name: The server name.
+        version: The server version.
+
+    Returns:
+        The server holder.
+
+    Raises:
+        ValueError: If ``name`` or ``version`` is invalid, or the input is not a
+            non-empty list.
+        TypeError: If an element is not a Tool, or both ``tools`` and the
+            deprecated keyword are given.
+    """
     _validate_name_or_version(name, field="name")
     _validate_name_or_version(version, field="version")
 
-    if not isinstance(skills, list) or len(skills) == 0:
-        raise ValueError(
-            "export_as_mcp_server requires at least one Skill in the input list"
-        )
-    for sk in skills:
-        if not isinstance(sk, Tool):
-            raise TypeError(
-                f"export_as_mcp_server expects list[Skill], "
-                f"got element of type {type(sk).__name__}"
-            )
-
-    return McpServer(skills, name=name, version=version)
+    resolved = resolve_tools(
+        "export_as_mcp_server", tools, skills, _checked_nonempty_list  # legacy-alias
+    )
+    return McpServer(resolved, name=name, version=version)
 
 
 __all__ = ["McpServer", "export_as_mcp_server"]

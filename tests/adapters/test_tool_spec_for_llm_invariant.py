@@ -1,14 +1,15 @@
-"""Importing cantus.adapters must not alter Skill.spec_for_llm() JSON shape.
+"""Importing cantus.adapters must not alter Tool.spec_for_llm() JSON shape.
 
 This is the adapter-side counterpart to the v0.3.0
-`tests/test_skill.py::test_spec_for_llm_shape_unchanged*` contract: even
+`tests/test_tool.py::test_spec_for_llm_matches_v0_2_1_fixture_with_and_without_hooks`
+contract: even
 after every `cantus.adapters.*` submodule is imported, every pre-existing
-Skill's `spec_for_llm()` output remains byte-for-byte identical.
+Tool's `spec_for_llm()` output remains byte-for-byte identical.
 
 v0.3.3 extends the contract to cover nine modules: the three v0.3.2
 modules (`mcp_server`, `mcp_client`, `anthropic_memory`) plus the five
 v0.3.3 additions (`langchain`, `dspy`, `huggingface`, `openhands`,
-`_remote_skill`). Each cross-framework module is gated on its own SDK,
+`_remote_tool`). Each cross-framework module is gated on its own SDK,
 so fake SDKs are injected into ``sys.modules`` before re-import.
 """
 
@@ -19,7 +20,7 @@ import sys
 import types
 from typing import Any
 
-from cantus.protocols.skill import skill
+from cantus.protocols.tool import tool
 
 
 def _purge_adapter_modules() -> None:
@@ -85,7 +86,7 @@ _V032_MODULES = (
 )
 
 _V033_MODULES = (
-    "cantus.adapters._remote_skill",
+    "cantus.adapters._remote_tool",
     "cantus.adapters.langchain",
     "cantus.adapters.dspy",
     "cantus.adapters.huggingface",
@@ -93,8 +94,8 @@ _V033_MODULES = (
 )
 
 
-def test_adapter_import_does_not_change_plain_skill_spec(monkeypatch):
-    @skill
+def test_adapter_import_does_not_change_plain_tool_spec(monkeypatch):
+    @tool
     def search_book_invariant(title: str) -> str:
         """Search the catalog by exact title."""
         return title
@@ -114,8 +115,8 @@ def test_adapter_import_does_not_change_plain_skill_spec(monkeypatch):
     assert set(after.keys()) == {"name", "description", "args_schema"}
 
 
-def test_adapter_import_does_not_change_hooked_skill_spec(monkeypatch):
-    """Mirror of v0.3.0 `test_spec_for_llm_shape_unchanged_with_hooks`."""
+def test_adapter_import_does_not_change_hooked_tool_spec(monkeypatch):
+    """The same invariant for a Tool built with hooks."""
 
     def parse(title: str) -> str:
         return title.strip()
@@ -123,7 +124,7 @@ def test_adapter_import_does_not_change_hooked_skill_spec(monkeypatch):
     def validate(result: str) -> str:
         return result
 
-    @skill(pre_hook=parse, post_hook=validate)
+    @tool(pre_hook=parse, post_hook=validate)
     def hooked_search_invariant(title: str) -> str:
         """Search hooked with pre/post."""
         return title
@@ -148,7 +149,7 @@ def test_adapter_import_does_not_change_hooked_skill_spec(monkeypatch):
 def test_v033_invariant_covers_all_nine_modules(monkeypatch):
     """All nine v0.3.2 + v0.3.3 adapter modules import without altering shape."""
 
-    @skill
+    @tool
     def f(x: int) -> int:
         """Echo x."""
         return x
