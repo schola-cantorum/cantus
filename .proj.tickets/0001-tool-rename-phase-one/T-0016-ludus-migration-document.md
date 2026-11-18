@@ -2,7 +2,7 @@
 id: T-0016
 title: ludus migration document corrected and the binding verified on v0.7
 epic: 0001-tool-rename-phase-one
-status: processing
+status: review
 blocked_by: [T-0015]
 ---
 
@@ -133,3 +133,21 @@ prompt 遷移，再審它的 diff，只跑 Python 3.13，transcript 的關鍵行
   a `ToolErrorObservation`. One challenger and two fact checks reviewed the draft; the user approved
   test plan v2 (20 rows) with every recommendation. Rows: R (red first) 1, 2, 3, 6, 8; G (guards)
   4, 7, 17–20; G for the behaviour and P (prose, stage 6) for the text 5; P 9–16.
+- **Stage 5 result (2026-11-18), document commit `48b8186`.** The scratch harness that extracts
+  runs 1–3 from the document's own text was red on the text at `13b77ad` (rows 1, 2, 3, 6 and 8
+  failed; rows 4 and 5 could not run; the old prompt's check passed the clone with a scripted
+  `skill_name` while stderr carried W13, which reproduces V2-7) and green on `48b8186`. Four broken
+  copies of the new document (prompt without the output condition, run 1 back to the `-W` form,
+  run 2 keeping `PYTHONWARNINGS`, verification without run 3) each turned it red.
+
+  | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
+  |---|---|---|---|---|
+  | S1 document prose | rows 9–16, judged at stage 6 | not measurable (prose) | AC-39 per V2-7/R2-1; K2-F6, K2-F7, K2-F8, K2-F12, K2-F13, R2-5, R2-11 | judged by review only |
+  | S2 document commands | harness rows 1–6 and 8 (7/7 green), row 7 (4/4 mutants red) | ludus variants: migrated, migrated plus scripted `skill_name`, AC-43 variant, unchanged; parent environments: clean, `PYTHONWARNINGS=ignore::DeprecationWarning`, `PYTHONPATH` with a `sitecustomize` that ignores warnings; Python 3.13 on a wheel of `13b77ad` (prototype on 3.10–3.14 and pydantic 2.0) | AC-39; the can-fail proof | Windows shells (the document is POSIX-only by decision D3); a `sitecustomize` or `.pth` inside the environment (the document states the precondition); run 3's hits are judged by reading |
+  | S3 ludus surface | stage 8 E1–E3 | recorded at stage 8 | AC-43; the pass and can-fail proofs | see stage 8 |
+  | S4 repository | `check_no_dev_paths.sh`, `verify-project.py`, full pytest (1848 passed, 3 skipped), `ruff check .`, `mypy cantus`, `npm run docs:api` (no drift) | no package code changed | ticket-rules §1 and §3 | `npm run docs:build` not run: the document is outside `docs/site` |
+  | S5 rendered Markdown | rendered with markdown-it-py (`js-default`), opened with agent-browser | heading order (zh-TW summary first), one table of 9 rows, four code blocks, no stray fence | AC-39 (ADR-0018 route for a Markdown file) | GitHub's renderer not used |
+
+  The §4.2 self-check over the changed document (outside the sweep's §4.1 scope) lists only legacy
+  names the document names on purpose. `git diff --name-only 13b77ad` lists only the document and
+  this ticket.
