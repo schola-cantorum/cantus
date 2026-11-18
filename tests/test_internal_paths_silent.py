@@ -126,3 +126,280 @@ def test_the_tool_serve_surface_is_silent_with_bearer_auth_and_logs_nothing(capl
         assert client.get("/introspection/tools", headers=headers).status_code == 200
 
     assert [r for r in caplog.records if r.name == "cantus.serve"] == []
+
+
+# --- T-0015: the whole new-API surface is silent ---
+
+_CLEAN_ENV_DROPPED = {"PYTHONPATH", "PYTHONWARNINGS", "PYTHONDEVMODE"}
+
+_OPTIONAL_SDK_MODULES = {
+    "cantus.adapters.dspy",
+    "cantus.adapters.huggingface",
+    "cantus.adapters.langchain",
+    "cantus.adapters.mcp",
+    "cantus.adapters.openhands",
+    "cantus.model.providers.mlx",
+}
+
+_WHOLE_SURFACE_SCRIPT = '''\
+import warnings
+
+warnings.filterwarnings("error", message=r".*is deprecated since cantus 0\\.7\\.0")
+
+import importlib
+import json
+import pkgutil
+
+import cantus
+
+skipped = []
+for info in pkgutil.walk_packages(cantus.__path__, "cantus."):
+    if info.name == "cantus.__main__":
+        continue
+    try:
+        importlib.import_module(info.name)
+    except ImportError:
+        skipped.append(info.name)
+print("skipped " + ",".join(skipped))
+
+for mod in (
+    "cantus",
+    "cantus.serve",
+    "cantus.serve.introspection",
+    "cantus.tui.widgets",
+    "cantus.protocols.skill",  # legacy-alias
+    "cantus.hooks",
+    "cantus.workflows",
+    "cantus.adapters",
+):
+    exec(f"from {mod} import *", {})
+    print(f"star {mod} ok")
+
+from cantus import Agent, Registry, ToolObservation, register_tool, tool
+
+
+@tool
+def echo(value: str) -> str:
+    """Echo the value."""
+    return value
+
+
+registry = Registry()
+register_tool(echo, registry=registry)
+assert registry.names_for("tool") == ["echo"]
+assert Registry(tools=[echo]).names_for("tool") == ["echo"]
+
+
+class Scripted:
+    def __init__(self, outputs):
+        self.outputs = list(outputs)
+
+    def generate(self, prompt, **kwargs):
+        return self.outputs.pop(0)
+
+
+call = json.dumps({"thought": "t", "action": {"tool_name": "echo", "args": {"value": "hi"}}})
+final = json.dumps({"thought": "d", "action": {"final_answer": "ok"}})
+state = Agent(Scripted([call, final]), tools=[echo]).run("q")
+observations = [e for e in state.stream if isinstance(e, ToolObservation)]
+assert len(observations) == 1, observations
+assert observations[0].tool_name == "echo"
+assert observations[0].result == "hi"
+
+from cantus.serve import ToolEntry  # noqa: F401
+from cantus.serve.introspection import collect_tools
+
+entries = collect_tools(registry)
+assert [e.name for e in entries] == ["echo"], entries
+
+from cantus.tui.widgets import ToolsPane, active_tool_names  # noqa: F401
+
+assert active_tool_names([{"source": "tool:echo", "status": "running"}]) == {"echo"}
+
+from fastapi.testclient import TestClient
+
+from cantus.serve import serve
+
+client = TestClient(serve(registry))
+for path in ("/tools", "/health", "/events", "/introspection", "/introspection/tools"):
+    assert client.get(path).status_code == 200, path
+posted = client.post("/tools/echo", json={"value": "hi"})
+assert posted.status_code == 200, posted.text
+assert posted.json() == {"result": "hi"}
+print("new api ok")
+'''
+
+
+def _clean_env():
+    import os
+
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if k not in _CLEAN_ENV_DROPPED and not k.startswith("CANTUS_SERVE_")
+    }
+
+
+def test_the_whole_new_api_surface_runs_with_cantus_warnings_as_errors(tmp_path):
+    # T-0015 rows 12 and 13: import every module, star-import the packages, run the new API.
+    pytest.importorskip("fastapi")
+    pytest.importorskip("textual")
+    import re
+    import subprocess
+    import sys
+
+    script = tmp_path / "whole_surface.py"
+    script.write_text(_WHOLE_SURFACE_SCRIPT, encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=str(tmp_path),
+        env=_clean_env(),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    detail = f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+
+    assert proc.returncode == 0, detail
+    assert "new api ok" in proc.stdout, detail
+    for mod in (
+        "cantus",
+        "cantus.serve",
+        "cantus.serve.introspection",
+        "cantus.tui.widgets",
+        "cantus.protocols.skill",  # legacy-alias
+        "cantus.hooks",
+        "cantus.workflows",
+        "cantus.adapters",
+    ):
+        assert f"star {mod} ok" in proc.stdout, detail
+    match = re.search(r"^skipped (.*)$", proc.stdout, re.MULTILINE)
+    assert match is not None, detail
+    skipped = {name for name in match.group(1).split(",") if name}
+    # Only modules that need an optional SDK may fail to import.
+    assert skipped - _OPTIONAL_SDK_MODULES == set(), detail
+    assert "is deprecated since cantus" not in proc.stderr, detail
+
+
+def _free_port() -> int:
+    import socket
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation(tmp_path):
+    # T-0015 row 14: the real CLI process, a registry written with the new API only.
+    import subprocess
+    import sys
+    import threading
+    import time
+    import urllib.error
+    import urllib.request
+
+    if sys.platform == "win32":
+        pytest.skip("POSIX terminate semantics; the live server is not run on Windows")
+    pytest.importorskip("fastapi")
+    pytest.importorskip("uvicorn")
+    (tmp_path / "regmod.py").write_text(
+        "from cantus import Registry, tool\n\n\n"
+        "@tool\n"
+        "def reg_tool(x: int) -> int:\n"
+        '    """Reg."""\n'
+        "    return x\n\n\n"
+        "registry = Registry(tools=[reg_tool])\n",
+        encoding="utf-8",
+    )
+    env = _clean_env()
+    env["PYTHONPATH"] = str(tmp_path)  # the CLI imports the module by name
+    port = _free_port()
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "cantus",
+            "serve",
+            "--registry-import",
+            "regmod:registry",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ],
+        cwd=str(tmp_path),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    chunks: list[str] = []
+
+    def _drain() -> None:
+        assert proc.stderr is not None
+        for line in proc.stderr:
+            chunks.append(line)
+
+    reader = threading.Thread(target=_drain, daemon=True)
+    reader.start()
+    base = f"http://127.0.0.1:{port}"
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    answered = False
+    posted = None
+    try:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and proc.poll() is None:
+            try:
+                with opener.open(f"{base}/tools", timeout=2) as resp:
+                    if resp.status == 200:
+                        answered = True
+                        break
+            except (urllib.error.URLError, OSError):
+                pass
+            time.sleep(0.2)
+        if answered:
+            request = urllib.request.Request(
+                f"{base}/tools/reg_tool",
+                data=b'{"x": 4}',
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with opener.open(request, timeout=10) as resp:
+                posted = (resp.status, resp.read().decode("utf-8"))
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+        reader.join(timeout=5)
+    text = "".join(chunks)
+
+    assert answered, f"the server never answered GET /tools; stderr:\n{text}"
+    assert posted is not None
+    assert posted[0] == 200
+    assert json.loads(posted[1]) == {"result": 4}
+    assert "is deprecated since cantus" not in text, text
+
+
+def test_the_cantus_tui_command_path_is_silent(monkeypatch):
+    # T-0015 row 15: _cmd_tui -> run_tui -> CantusTUI(...), run() stubbed. The modules are
+    # already imported here; their import is covered by the subprocess test above.
+    pytest.importorskip("textual")
+    import cantus
+    import cantus.cli
+    from cantus.tui.app import CantusTUI
+
+    calls: list[object] = []
+
+    def fake_run(self, *args, **kwargs):
+        calls.append(self)
+
+    monkeypatch.setattr(CantusTUI, "run", fake_run)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", cantus.CantusDeprecationWarning)
+        code = cantus.cli.main(["tui", "--url", "http://127.0.0.1:9"])
+
+    assert code == 0
+    assert len(calls) == 1
