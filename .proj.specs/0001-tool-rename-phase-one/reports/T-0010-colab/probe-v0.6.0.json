@@ -1,0 +1,12 @@
+{
+ "label": "v0.6.0",
+ "sha256": [
+  "132214dab6fcb8bbeeb207b70fa68abbab71c74907d6513459b3a4ddcc14457b",
+  "132214dab6fcb8bbeeb207b70fa68abbab71c74907d6513459b3a4ddcc14457b"
+ ],
+ "outputs": [
+  "\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\":",
+  "\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\":"
+ ],
+ "same_within_run": true
+}

@@ -1,0 +1,81 @@
+{
+ "note": "Transcribed by the agent from the cell output of the supplementary diagnostic (ticket build, same runtime, model reloaded with the loader's defaults). The full JSON stays in the user's Drive folder with the records. Not AC-40 evidence.",
+ "default_generation_config": {
+  "do_sample": true,
+  "temperature": 1.0,
+  "top_p": 0.95,
+  "top_k": 64,
+  "max_new_tokens": null,
+  "max_length": null,
+  "eos_token_id": [
+   1,
+   106,
+   50
+  ],
+  "pad_token_id": 0,
+  "bos_token_id": 2,
+  "repetition_penalty": null
+ },
+ "prompt": "query 0 of the ticket build, as recorded in turns-ticket.jsonl",
+ "bare_prompt_first_step_top5": [
+  [
+   "<turn|>",
+   0.9359
+  ],
+  [
+   "\n",
+   0.0481
+  ],
+  [
+   "<tool_call|>",
+   0.0078
+  ],
+  [
+   "\n\n",
+   0.0025
+  ],
+  [
+   "**",
+   0.002
+  ]
+ ],
+ "bare_prompt_default_config_x5": "five generations with the default (sampling) config: each one new token, id 106 (<turn|>), decoded by the loader to the empty string",
+ "bare_prompt_greedy": {
+  "n_new_tokens": 1,
+  "ids": [
+   106
+  ],
+  "text_with_special_tokens": "<turn|>",
+  "text_as_the_loader_returns_it": ""
+ },
+ "chat_template_first_step_top5": [
+  [
+   "{\"",
+   0.4167
+  ],
+  [
+   "[",
+   0.3404
+  ],
+  [
+   "<eos>",
+   0.2063
+  ],
+  [
+   "add",
+   0.0126
+  ],
+  [
+   "The",
+   0.007
+  ]
+ ],
+ "chat_template_greedy": {
+  "n_new_tokens": 49,
+  "text_as_the_loader_returns_it": "{\"tool_calls\": [\n  {\n    \"tool_name\": \"add\",\n    \"parameters\": {\n      \"a\": 3,\n      \"b\": 4\n    }\n  }\n]}"
+ },
+ "bare_prompt_plus_instruction_greedy": {
+  "n_new_tokens": 23,
+  "text": "not transcribed in full: a JSON object beginning with a thought key, ending in <eos>"
+ }
+}

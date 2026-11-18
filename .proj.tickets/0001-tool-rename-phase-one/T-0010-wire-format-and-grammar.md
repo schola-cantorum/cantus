@@ -2,7 +2,7 @@
 id: T-0010
 title: Wire format and grammar speak Tool — tool_name, unknown_tool, build_schema, parse_tool_call
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0009]
 ---
 
@@ -243,7 +243,7 @@ T-0020 還要在最終的 branch build 上再跑一次。
   | S1/S2 legacy key, W13 and W12 | `tests/legacy/test_w12_w13_wire.py` (24): rows 12–16, 18, 19 | same; the name rule and the fallback are fully covered | AC-17 (TR-64–66), AC-22 (TR-82, 85), AC-24 (TR-90 legacy half); W12, W13 supporting rows; C2-F9-a, b, c, g | — |
   | S2 `ParsedToolCall` legacy name | `tests/legacy/test_w07_parsed_tool_call.py` (8): row 17 | `cantus/core/_legacy_events.py` 100% | W7 supporting rows (the `ParsedToolCall` half) | `del parsed.skill_name` (not supported, D8) |
   | S3 subprocess | rows 14 and 21 in the two legacy modules; `tests/legacy/test_w02_w11_migration_smoke.py` (1) | not measured (subprocess) | TR-85; TR-79 shape for W12, W13, W7 | — |
-  | Stage 8 | the stage-8 entries below | — | AC-40 (TR-150) | the Colab run is by hand and is recorded when it has been done |
+  | Stage 8 | the stage-8 entries below | — | AC-40 (TR-150) | AC-40 is not verified as written: the Colab run used an L4 runtime and its result is vacuous (both builds at the ceiling); T-0020 repeats it |
 - **Stage 6 (2026-11-18).** `/code-review` on the committed change at `3e35059` (base `7208bba`),
   two `harness-reviewer` passes (Standards 20 findings, Spec 11; no high, four medium). Fixed in
   `c7a4888`: a migrated hook test had become a tautology and tests its original subject again;
@@ -279,5 +279,55 @@ T-0020 還要在最終的 branch build 上再跑一次。
   legacy-key `Agent.run` and `parse_tool_call` with the same results (exit status 0). The Colab
   program was also run end to end with a stub model against v0.6.0 from PyPI and against this
   wheel, each in a fresh environment, to check the recording code on both builds.
-- **Stage 8, part B (Colab, AC-40): not run yet.** By hand, by the user, with the notebook built
-  for commit `c7a4888` and the wheel above. AC-40 stays unverified until it is recorded here.
+- **Stage 8, part B (2026-11-18): Colab comparison, run on an L4 runtime, not on the T4 that
+  AC-40 names.** Surface: a Colab notebook kernel (Colab Pro, NVIDIA L4, driver 580.82.07, CUDA
+  13.0 as reported by torch, Python 3.13.16), driven by the agent through the user's browser at
+  the user's request; the user approved the Drive mount and chose to run on L4. Records:
+  `.proj.specs/0001-tool-rename-phase-one/reports/T-0010-colab/` (its README lists the cells).
+  - Differences from the protocol: L4 instead of T4 (step 1); the mirror was not at the loader's
+    default shared-drive path but in a MyDrive folder, found by name (step 2); the turn records'
+    `output_tokens` is the decoded output re-tokenized, not the count of generated tokens
+    (step 7); the probe ran twice in each run, four outputs (step 8); the notebook's cell outputs
+    are not committed, the records and the cell list are (step 11).
+  - Builds: `cantus-agent==0.6.0` from PyPI (`hasattr(cantus, "tool")` false, pid 1028), then the
+    wheel of commit `c7a4888` (sha256 `28ae9613…7bd11b` recomputed in Colab and recorded in
+    `direct_url.json`; `hasattr(cantus, "tool")` true, pid 7100 after the restart). The two
+    `pip freeze` files differ only in the cantus line. torch 2.14.1+cu130, transformers 5.22.1,
+    bitsandbytes 0.50.2, accelerate 1.15.0, huggingface_hub 1.33.0, tokenizers 0.23.3,
+    safetensors 0.8.0, pydantic 2.14.2.
+  - Model: `google/gemma-4-E2B-it` mirror, Hub commit
+    `b324173c7d5721c2baba7f3b17b3b9b3d34ab1e9`, `model.safetensors` sha256 `2db5482b…77ddc550`;
+    loaded by `mount_drive_and_load("E2B", allow_hub_fallback=False, drive_root=...)`;
+    `generation_config.do_sample` false, asserted.
+  - Count half: v0.6.0 60 parse errors, ticket build 60, over the five queries (12 each, every
+    one `error_type: json_syntax`); no tool call, no final answer, every run ended in
+    `MaxIterationsObservation`; W13 count 0 on both. In all 120 turns the loader returned the
+    empty string. The prompts differ as expected (`"skill"` against `"tool"` as the catalog key).
+    The noise probe was identical within each run and across the two builds.
+  - W2 half: (a) a cell applying `@skill` printed W2; (b) the first import of a helper module
+    applying `@skill` printed W2, attributed to `/content/w2_helper_module.py:4`, the decorator
+    line. This half does not depend on the GPU and is shown.
+  - Offline replay (step 10): all 120 raw outputs through this ticket's parser and through
+    v0.6.0's parser give `json_syntax` every time and no warning. With every output empty, the
+    replay adds nothing.
+  - Supplementary diagnostic in the same runtime (not AC-40 evidence;
+    `diagnostic-empty-output.json`): with cantus's prompt as it is, the model's first token is
+    the end-of-turn token `<turn|>` with probability 0.94, so greedy decoding returns nothing;
+    five runs with the model's default sampling settings (which a student's notebook uses: the
+    template does not change them) returned nothing either. Wrapped in the tokenizer's chat
+    template, the same prompt gets an answer,
+    `{"tool_calls": [{"tool_name": "add", "parameters": {...}}]}`, which names the key
+    `tool_name` unprompted but is not the shape cantus parses. The cause tested here is the
+    missing chat template; nothing else was varied.
+  - Reading. The count criterion holds as written (60 ≤ 60) and is vacuous, as step 10 defined
+    it: both totals are at the ceiling. The two builds treat an empty output alike; the parser
+    never met a renamed key in this run, so the run says nothing about the rename's effect on
+    the model. **AC-40 is not verified as written**, for two separate reasons: the runtime was
+    L4, not T4; and the count half is vacuous. The W2 half is shown.
+  - For T-0020, which repeats the protocol on the branch build: on this evidence the count will
+    again be 60 against 60 on T4 unless the first token differs there (not tested). T-0020's test
+    plan should decide in advance how a vacuous count is read, and whether to add the small
+    diagnostic above as a supplementary record. For epic 2 (prompt assembly, ADR-0015): with the
+    current prompt Gemma 4 E2B returns nothing on v0.6.0 and on this build, with greedy and with
+    default sampling; the spec's expectation that the model "guesses" the key
+    (`spec.en.md`, Further Notes) did not hold in this run.
