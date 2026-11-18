@@ -2,7 +2,7 @@
 id: T-0016
 title: ludus migration document corrected and the binding verified on v0.7
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0015]
 ---
 
