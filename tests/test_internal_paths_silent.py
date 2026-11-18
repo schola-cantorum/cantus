@@ -80,3 +80,21 @@ def test_serve_routes_are_silent(records):
     ):
         assert client.get(path).status_code == 200, path
     _assert_no_cantus_warning(records)
+
+
+def test_workflow_trace_route_after_an_invocation_is_silent(records):
+    # T-0009 row 12: the trace route reads the recorded events with the new class names.
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from cantus.serve import serve
+
+    client = TestClient(serve(_registry()))
+
+    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}
+    run_id = client.get("/introspection/sessions").json()[0]["id"]
+    trace = client.get(f"/introspection/workflows/{run_id}")
+
+    assert trace.status_code == 200
+    assert [s["type"] for s in trace.json()["steps"]] == ["CallToolAction", "ToolObservation"]
+    _assert_no_cantus_warning(records)

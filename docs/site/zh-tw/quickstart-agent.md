@@ -210,12 +210,12 @@ print("My name is Mei." in model.prompts[-1])  # 第二個 prompt 帶著第一�
 
 ```text
 25
-CallSkillAction
-SkillObservation
-CallSkillAction
-SkillObservation
-CallSkillAction
-SkillObservation
+CallToolAction
+ToolObservation
+CallToolAction
+ToolObservation
+CallToolAction
+ToolObservation
 FinalAnswerAction
 Noodles and tea cost 85 dollars.
 ## Name & Role

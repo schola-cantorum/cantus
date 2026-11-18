@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from cantus.model.loader import ModelHandle
+    from cantus.core.action import CallToolAction as CallSkillAction  # noqa: F401  # legacy-alias
+    from cantus.core.observation import ToolObservation as SkillObservation  # noqa: F401  # legacy-alias
     from cantus.protocols.tool import Tool as Skill  # noqa: F401  # legacy-alias
 
 __version__ = "0.6.0"
@@ -20,7 +22,7 @@ from cantus._deprecation import CantusDeprecationWarning
 from cantus._deprecation import warn_legacy as _warn_legacy
 from cantus.core.action import (
     Action,
-    CallSkillAction,
+    CallToolAction,
     FinalAnswerAction,
 )
 from cantus.core.agent import Agent, AgentState
@@ -29,8 +31,8 @@ from cantus.core.event_stream_persistence import JsonLinesPersistence
 from cantus.core.observation import (
     MaxIterationsObservation,
     Observation,
-    SkillObservation,
     ToolErrorObservation,
+    ToolObservation,
     ValidationErrorObservation,
 )
 from cantus.core.registry import Registry, get_registry  # legacy-alias
@@ -79,10 +81,10 @@ __all__ = [
     "JsonLinesPersistence",
     # Runtime
     "Action",
-    "CallSkillAction",
+    "CallToolAction",
     "FinalAnswerAction",
     "Observation",
-    "SkillObservation",
+    "ToolObservation",
     "ToolErrorObservation",
     "ValidationErrorObservation",
     "MaxIterationsObservation",
@@ -122,12 +124,18 @@ def __getattr__(name: str) -> Any:
     does not require ``fastapi`` / ``uvicorn`` / ``pydantic-settings``.
     Missing extras still surface as ``ImportError`` with the literal
     substring ``"pip install cantus[serve]"`` from the gate inside the
-    target module. It also serves the legacy class name as `Tool`, with a
-    deprecation warning.
+    target module. It also serves the legacy names of renamed classes, with a
+    deprecation warning, and does not cache them.
     """
     if name == "Skill":  # legacy-alias
         _warn_legacy("W1")
         return Tool
+    if name == "CallSkillAction":  # legacy-alias
+        _warn_legacy("W4")
+        return CallToolAction
+    if name == "SkillObservation":  # legacy-alias
+        _warn_legacy("W5")
+        return ToolObservation
     if name in {"serve", "config"}:
         import importlib
 

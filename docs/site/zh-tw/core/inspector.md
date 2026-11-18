@@ -63,10 +63,10 @@ Inspector(state.stream).summary()
 你應該看到：
 
 ```text
-[0] Action :: CallSkillAction :: CallSkillAction(thought='add the first two', skill_name='add', args={'a': 3, 'b': 4})
-[1] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=7)
-[2] Action :: CallSkillAction :: CallSkillAction(thought='now add 5', skill_name='add', args={'a': 7, 'b': 5})
-[3] Observation :: SkillObservation :: SkillObservation(skill_name='add', result=12)
+[0] Action :: CallToolAction :: CallToolAction(thought='add the first two', tool_name='add', args={'a': 3, 'b': 4})
+[1] Observation :: ToolObservation :: ToolObservation(tool_name='add', result=7)
+[2] Action :: CallToolAction :: CallToolAction(thought='now add 5', tool_name='add', args={'a': 7, 'b': 5})
+[3] Observation :: ToolObservation :: ToolObservation(tool_name='add', result=12)
 [4] Action :: FinalAnswerAction :: FinalAnswerAction(thought='done', answer='3+4+5 = 12')
 EventStream: 5 events (3 actions, 2 observations)
 ```

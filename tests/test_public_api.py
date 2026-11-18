@@ -33,15 +33,15 @@ def test_runtime_types_importable():
     from cantus import (
         Action,
         Agent,
-        CallSkillAction,
+        CallToolAction,
         EventStream,
         FinalAnswerAction,
         Inspector,
         MaxIterationsObservation,
         Observation,
         Result,
-        SkillObservation,
         ToolErrorObservation,
+        ToolObservation,
         ValidationErrorObservation,
     )
 
@@ -54,9 +54,9 @@ def test_runtime_types_importable():
             Agent,
             Inspector,
             Result,
-            CallSkillAction,
+            CallToolAction,
             FinalAnswerAction,
-            SkillObservation,
+            ToolObservation,
             ToolErrorObservation,
             ValidationErrorObservation,
             MaxIterationsObservation,
@@ -244,10 +244,10 @@ def test_v030_names_still_in_all():
         "BM25Memory",
         "EmbeddingMemory",
         "Action",
-        "CallSkillAction",
+        "CallToolAction",
         "FinalAnswerAction",
         "Observation",
-        "SkillObservation",
+        "ToolObservation",
         "ToolErrorObservation",
         "ValidationErrorObservation",
         "MaxIterationsObservation",
@@ -377,3 +377,47 @@ def test_version_is_valid_semver() -> None:
     assert re.fullmatch(r"\d+\.\d+\.\d+", cantus.__version__), (
         f"cantus.__version__ must match X.Y.Z semver; got {cantus.__version__!r}"
     )
+
+
+# --- T-0009: the event classes are CallToolAction / ToolObservation ------------
+
+
+def test_event_classes_are_in_all_and_are_attributes():
+    import cantus
+
+    for name in ("CallToolAction", "ToolObservation", "ToolErrorObservation"):
+        assert name in cantus.__all__, f"{name} missing from cantus.__all__"
+        assert isinstance(getattr(cantus, name), type)
+    assert cantus.CallToolAction.__module__ == "cantus.core.action"
+    assert cantus.ToolObservation.__module__ == "cantus.core.observation"
+    assert cantus.ToolErrorObservation.__module__ == "cantus.core.observation"
+
+
+def test_star_import_binds_the_event_classes_and_is_silent(tmp_path):
+    from tests.legacy.support import run_python
+
+    script = (
+        "from cantus import *\n"
+        "assert CallToolAction.__name__ == 'CallToolAction'\n"
+        "assert ToolObservation.__name__ == 'ToolObservation'\n"
+        "assert ToolErrorObservation.__name__ == 'ToolErrorObservation'\n"
+    )
+    result = run_python(["-c", script], cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "CantusDeprecationWarning" not in result.stderr
+    assert "DeprecationWarning" not in result.stderr
+
+
+def test_importing_the_event_modules_is_silent_under_error_filter(tmp_path):
+    from tests.legacy.support import run_python
+
+    result = run_python(
+        [
+            "-W",
+            "error::DeprecationWarning",
+            "-c",
+            "import cantus, cantus.core.action, cantus.core.observation, cantus.core.agent",
+        ],
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr

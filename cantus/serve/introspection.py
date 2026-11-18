@@ -26,9 +26,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.params import Depends as DependsType
 from pydantic import BaseModel
 
-from cantus.core.action import Action, CallSkillAction
+from cantus.core.action import Action, CallToolAction
 from cantus.core.event_stream import EventStream
-from cantus.core.observation import SkillObservation, ToolErrorObservation
+from cantus.core.observation import ToolErrorObservation, ToolObservation
 from cantus.core.registry import Registry
 from cantus.serve.channel import (
     Channel,
@@ -340,26 +340,26 @@ def _summarize_event(event: Any) -> str:
     raw exception messages, any of which can carry secrets or PII. This is the
     text surfaced by ``GET /introspection/workflows/{run_id}`` and the TUI
     Inspector, so it must be safe to expose to any reader of the API. Using
-    ``repr(event)`` here would leak ``CallSkillAction.args`` values and
-    ``SkillObservation.result`` data, so it is deliberately avoided.
+    ``repr(event)`` here would leak ``CallToolAction.args`` values and
+    ``ToolObservation.result`` data, so it is deliberately avoided.
 
     Projection is white-list by event type and never raises: any unrecognized
     event type falls back to its bare type name (no field values).
     """
-    if isinstance(event, CallSkillAction):
+    if isinstance(event, CallToolAction):
         return (
-            f"CallSkillAction skill={event.skill_name!r} "
+            f"CallSkillAction skill={event.tool_name!r} "  # legacy-alias
             f"arg_keys={sorted(event.args)}"
         )
-    if isinstance(event, SkillObservation):
+    if isinstance(event, ToolObservation):
         return (
-            f"SkillObservation skill={event.skill_name!r} "
+            f"SkillObservation skill={event.tool_name!r} "  # legacy-alias
             f"result_type={type(event.result).__name__}"
         )
     if isinstance(event, ToolErrorObservation):
         # The exception (error) type name only — the raw message may embed
         # internal paths or input values, so it is dropped.
-        return f"ToolErrorObservation skill={event.skill_name!r}"
+        return f"ToolErrorObservation skill={event.tool_name!r}"
     return type(event).__name__
 
 
