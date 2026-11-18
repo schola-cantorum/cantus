@@ -1,6 +1,6 @@
 """Tool-call grammar — `thought` free, `args` strict.
 
-The LLM is constrained to emit JSON of shape:
+The grammar describes model output as JSON of shape:
 
     {"thought": <free string>,
      "action": {"tool_name": <one-of-registered>, "args": <tool-arguments>}}
@@ -15,8 +15,9 @@ collapsing the reasoning channel into a strict schema costs accuracy on
 small models. Only the action target and its args are checked.
 
 `build_schema` returns a JSON schema for use with `outlines` /
-`xgrammar`. `parse_tool_call` validates a raw model output against the
-schema and the registered tool catalog. Both take the `Registry` to use as
+`xgrammar`; cantus's own `Agent` does not constrain decoding with it.
+`parse_tool_call` checks a raw model output and the registered tool catalog; it is
+more lenient than the schema (`args` may be omitted, and the old action key is accepted). Both take the `Registry` to use as
 `registry=`; leaving it out falls back to the process-wide registry and is deprecated.
 A model output that still names the tool with the old action key is accepted for one
 deprecation window.
@@ -57,6 +58,11 @@ def _action_name(action: dict[str, Any]) -> tuple[bool, Any]:
 @accepts_legacy_keyword
 @dataclass
 class ParsedToolCall:
+    """What `parse_tool_call` returns: a tool call, or a final answer.
+
+    For a final answer ``tool_name`` is ``None`` and ``args`` is empty.
+    """
+
     thought: str
     tool_name: str | None
     args: dict[str, Any]
@@ -81,8 +87,8 @@ def build_schema(registry: Registry | None = None) -> dict[str, Any]:
     """Return the JSON schema for the tool-call grammar.
 
     `tool_name` is a string enum drawn from the tools registered in
-    ``registry``; the agent calls this each turn so newly-registered tools
-    appear immediately. With no registered tool it is a plain string.
+    ``registry`` at the time of the call; call it again after the tools change.
+    With no registered tool it is a plain string.
 
     Args:
         registry: The registry whose tool names fill the enum. Leaving it out is

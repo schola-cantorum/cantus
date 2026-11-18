@@ -70,7 +70,7 @@ def accepts_legacy_keyword(cls: type[_T]) -> type[_T]:
         tool_name: str | None = self.tool_name
         return tool_name
 
-    def set_skill_name(self: Any, value: str) -> None:  # legacy-alias
+    def set_skill_name(self: Any, value: str | None) -> None:  # legacy-alias
         warn_legacy("W7")
         self.tool_name = value
 

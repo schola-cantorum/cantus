@@ -68,10 +68,10 @@ def test_serve_routes_are_silent(records):
     app = serve(_registry())
     client = TestClient(app)
 
-    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}
-    assert client.get("/skills").status_code == 200
+    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}  # T-0012 renames this route
+    assert client.get("/skills").status_code == 200  # T-0012 renames this route
     for path in (
-        "/introspection/skills",
+        "/introspection/skills",  # T-0012 renames this route
         "/introspection/sessions",
         "/introspection/permissions",
         "/introspection/queues",

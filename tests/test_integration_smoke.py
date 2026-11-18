@@ -164,3 +164,57 @@ print('OK')
     code, out, err = _run_in_fresh_subprocess(script)
     assert code == 0, f"subprocess failed: stdout={out!r} stderr={err!r}"
     assert "OK" in out
+
+
+def test_hooks_workflows_and_agent_loop_coexist_in_a_fresh_process():
+    """A hook-bound tool, a PromptChain and the Agent loop work together from a clean import.
+
+    The protocol-reorg surface: `cantus.hooks`, `@tool(pre_hook=...)` and the
+    `cantus.workflows` building blocks coexist with the Agent loop, and nothing warns.
+    """
+    script = """
+import json
+import warnings
+from dataclasses import dataclass
+
+warnings.simplefilter("error")
+
+from cantus import Agent, tool
+from cantus.hooks import analyzer
+from cantus.workflows import PromptChain
+from cantus.core.action import FinalAnswerAction
+
+
+@analyzer
+def parse_query(text: str) -> dict:
+    return {"value": text}
+
+
+@tool(pre_hook=parse_query)
+def echo(value: str) -> str:
+    "Echo the input back to the caller."
+    return value
+
+
+chain = PromptChain(steps=[echo])
+assert chain.run("hello") == "hello"
+
+
+@dataclass
+class _ImmediateFinalizer:
+    answer: str = "smoke ok"
+
+    def generate(self, prompt, **kwargs):
+        return json.dumps({"thought": "done", "action": {"final_answer": self.answer}})
+
+
+agent = Agent(_ImmediateFinalizer(), tools=[echo])
+state = agent.run("smoke", max_iterations=3)
+final = state.stream[-1]
+assert isinstance(final, FinalAnswerAction), type(final).__name__
+print("FinalAnswerAction emitted:", final.answer)
+"""
+    code, out, err = _run_in_fresh_subprocess(script)
+    assert code == 0, f"subprocess failed: stdout={out!r} stderr={err!r}"
+    assert "FinalAnswerAction emitted: smoke ok" in out
+

@@ -399,7 +399,6 @@ def test_parse_error_texts_are_exact(raw, head):
     error = _only_parse_error(raw, _tool_pair())
     assert error.validator_name == "action_parse"
     assert error.feedback == head + f"raw_output_preview: {raw}"
-    assert len(error.feedback.split("\n")) == 3
 
 
 def test_unknown_tool_name_with_an_apostrophe_is_shown_with_repr():

@@ -50,9 +50,9 @@ def test_tool_internal_raise_becomes_tool_error():
 
 
 def test_unknown_tool_name_at_parse_emits_action_parse_validation_error():
-    """v0.1.2 BREAKING: unknown tool_name at parse-time produces
+    """An unknown tool_name at parse time produces
     `ValidationErrorObservation(validator_name="action_parse",
-    feedback="error_type: unknown_tool\\n...")` rather than the v0.1.1
+    feedback="error_type: unknown_tool\\n...")` rather than a
     `ToolErrorObservation`. This implements the
     `Action parse failures fall back to ValidationErrorObservation`
     requirement's `unknown_tool` vocabulary entry. `ToolErrorObservation`
@@ -76,7 +76,7 @@ def test_unknown_tool_name_at_parse_emits_action_parse_validation_error():
 
 
 def test_validator_post_hook_failure_emits_validation_error_and_retries():
-    """v0.3.0: Validator attaches as a Tool post_hook; Result(ok=False) yields ValidationErrorObservation."""
+    """A validator attaches as a Tool post_hook; Result(ok=False) yields ValidationErrorObservation."""
     fail_count = {"n": 0}
 
     @validator

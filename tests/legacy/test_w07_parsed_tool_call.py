@@ -108,3 +108,18 @@ def test_only_a_mutable_class_gets_the_setter():
             event.skill_name = "x"
     assert cantus_records(caught) == []
     assert event.tool_name == "a"
+
+
+def test_w7_escalates_on_a_parsed_tool_call_and_the_assignment_does_not_happen():
+    # Only W13 is exempt from escalation: the legacy keyword, read and assignment raise.
+    parsed = ParsedToolCall(thought="t", tool_name="a", args={}, final_answer=None)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(cantus.CantusDeprecationWarning):
+            ParsedToolCall(thought="t", skill_name="a", args={}, final_answer=None)
+        with pytest.raises(cantus.CantusDeprecationWarning):
+            parsed.skill_name
+        with pytest.raises(cantus.CantusDeprecationWarning):
+            parsed.skill_name = "b"
+    assert parsed.tool_name == "a"
+

@@ -177,3 +177,29 @@ def test_grammar_unregistered_name_with_an_apostrophe_keeps_the_literal_quotes()
             _raw({"tool_name": "it'z", "args": {}}), registry=Registry(tools=[Quoted()])
         )
     assert str(err.value) == "tool_name 'it'z' not registered; available: [\"it's\"]"
+
+
+def test_final_answer_must_be_a_string_even_next_to_a_tool_name():
+    # C2-F9-d on the grammar side: the final answer wins, then is checked as one.
+    reg = _two_tool_registry()
+    with pytest.raises(GrammarError) as null_final:
+        parse_tool_call(_raw({"tool_name": "alpha", "final_answer": None}), registry=reg)
+    assert str(null_final.value) == "final_answer must be a string"
+    with pytest.raises(GrammarError) as empty_final:
+        parse_tool_call(_raw({"tool_name": "alpha", "final_answer": ""}), registry=reg)
+    assert str(empty_final.value) == "final_answer must be a non-empty string (minLength: 1)"
+
+
+@pytest.mark.parametrize(
+    ("raw", "message"),
+    [
+        ("[1]", "top-level must be an object"),
+        ('{"thought": "t"}', "missing required keys 'thought' or 'action'"),
+        ('{"thought": 1, "action": {}}', "thought must be a string"),
+        ('{"thought": "t", "action": "alpha"}', "action must be an object"),
+    ],
+)
+def test_structural_errors_keep_their_texts(raw, message):
+    with pytest.raises(GrammarError) as err:
+        parse_tool_call(raw, registry=_two_tool_registry())
+    assert str(err.value) == message

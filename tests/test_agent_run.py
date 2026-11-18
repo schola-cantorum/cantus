@@ -6,8 +6,7 @@ from dataclasses import dataclass
 
 from cantus import CantusDeprecationWarning, tool
 from cantus.core.action import CallToolAction, FinalAnswerAction
-from cantus.core.agent import Agent
-from cantus.core.agent import AgentState
+from cantus.core.agent import Agent, AgentState
 from cantus.core.observation import (
     MaxIterationsObservation,
     ToolErrorObservation,

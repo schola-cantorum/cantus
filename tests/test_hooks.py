@@ -1,8 +1,7 @@
 """Hook helper surface (v0.3.0) — cantus.hooks re-exports and dispatch behavior.
 
 Task 5 (this section): cantus.hooks imports succeed.
-Task 8 (later): pre_hook / post_hook dispatch behavior is added below once
-Agent._dispatch_tool is refactored.
+The second half covers pre_hook / post_hook dispatch behavior.
 """
 
 from __future__ import annotations
@@ -185,11 +184,12 @@ def test_hook_helpers_do_not_appear_in_tool_registry():
         """Echo."""
         return text
 
-    reg = Registry(tools=[echo])
-    tool_names = reg.names_for("tool")
-    assert "echo" in tool_names
-    assert "parse" not in tool_names
-    assert "check" not in tool_names
+    # Binding the helpers as hooks must not register them anywhere: neither in the
+    # process-wide registry (which the decorators could reach) nor through the tool.
+    global_registry = _get_global_registry()
+    for kind in ("tool", "analyzer", "validator", "workflow"):
+        assert global_registry.names_for(kind) == []
+    assert Registry(tools=[echo]).names_for("tool") == ["echo"]
 
 
 def test_pre_hook_exception_becomes_tool_error_with_label():

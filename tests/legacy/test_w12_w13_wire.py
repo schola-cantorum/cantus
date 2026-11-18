@@ -251,6 +251,33 @@ def test_parse_tool_call_without_registry_uses_the_global_one_with_one_w12_at_th
         _one_w12(caught, "parse_tool_call", line)
 
 
+def test_parse_tool_call_without_registry_checks_names_against_the_global_registry():
+    # The fallback really reads the global registry: a name it does not hold is rejected.
+    _fill_global_registry()
+    raw = json.dumps({"thought": "t", "action": {"tool_name": "nope", "args": {}}})
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(GrammarError) as excinfo:
+            parse_tool_call(raw)
+    assert str(excinfo.value) == "tool_name 'nope' not registered; available: ['gamma']"
+    assert len(cantus_records(caught)) == 1
+
+
+def test_parse_tool_call_reads_no_legacy_key_from_output_it_cannot_parse():
+    # C2-F9-h on the grammar side: the text names the legacy key, but no action key is read.
+    reg = Registry(tools=[other])
+    flat = json.dumps({"thought": "t", "skill_name": "other", "args": {}})  # legacy-alias
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(GrammarError, match="not valid JSON"):
+            parse_tool_call('{"action": {"skill_name": ', registry=reg)  # legacy-alias
+        with pytest.raises(GrammarError, match="missing required keys"):
+            parse_tool_call(flat, registry=reg)
+        with pytest.raises(GrammarError, match="action must be an object"):
+            parse_tool_call(json.dumps({"thought": "t", "action": "skill_name"}), registry=reg)  # legacy-alias
+    assert cantus_records(caught) == []
+
+
 def test_parse_tool_call_warns_w12_for_invalid_json_and_for_a_final_answer_too():
     _fill_global_registry()
     final = json.dumps({"thought": "t", "action": {"final_answer": "done"}})
@@ -386,6 +413,11 @@ def test_default_filters_show_the_warning_text_exactly_once_on_stderr(tmp_path, 
 
     assert result.returncode == 0, result.stderr
     assert result.stderr.count(EXPECTED[w_id]) == 1, result.stderr
+    if w_id.startswith("W12"):
+        # The helper fills the global registry with the legacy decorator, so W2 shows too.
+        assert result.stderr.count("CantusDeprecationWarning") == 2, result.stderr
+    else:
+        assert result.stderr.count("CantusDeprecationWarning") == 1, result.stderr
 
 
 # --- Rows 2, 3 and 8 (the parts that need the legacy key in the model output) ---

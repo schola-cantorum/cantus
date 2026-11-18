@@ -1,8 +1,8 @@
 """v0.2 -> v0.3 migration smoke whose subject is the legacy form `@skill(pre_hook=...)`.
 
 Moved out of tests/test_integration_smoke.py by T-0010: the script binds a hook with the
-legacy decorator and runs an Agent without tools=, so it belongs with the legacy tests.
-The subprocess isolation matches the rest of that file's pattern.
+legacy decorator and runs an Agent without tools= (W2, W11), so it belongs with the legacy
+tests. tests/test_integration_smoke.py keeps the same smoke in the new API.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ def test_v0_1_example_runs_after_migration():
 
     Extends ARCH-2 integration smoke audit row to cover the protocol-reorg surface:
     `cantus.hooks` import, `@skill(pre_hook=...)` binding, and `cantus.workflows`
-    building blocks must coexist with the existing Agent loop. Subprocess isolation
-    matches the rest of this file's pattern.
+    building blocks must coexist with the existing Agent loop, in the legacy spelling (it
+    emits W2 and W11). The new-API twin is in tests/test_integration_smoke.py.
     """
     script = """
 import json
