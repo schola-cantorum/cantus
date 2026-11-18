@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from cantus.core.registry import get_registry
-from cantus.protocols.skill import skill
+from cantus.core.registry import _get_global_registry
+from cantus import tool
 from cantus.workflows import Router
 
 
 def test_router_calls_only_selected_route():
     calls: list[str] = []
 
-    @skill
+    @tool
     def get_weather(query: str) -> str:
         """Weather."""
         calls.append("weather")
         return f"weather:{query}"
 
-    @skill
+    @tool
     def fetch_news(query: str) -> str:
         """News."""
         calls.append("news")
@@ -39,7 +39,7 @@ def test_router_calls_only_selected_route():
 
 
 def test_router_unknown_route_key_raises():
-    @skill
+    @tool
     def only(x: str) -> str:
         """Single."""
         return x
@@ -50,7 +50,7 @@ def test_router_unknown_route_key_raises():
 
 
 def test_router_does_not_pollute_registry():
-    @skill
+    @tool
     def route_a(x: str) -> str:
         """A."""
         return x
@@ -58,8 +58,7 @@ def test_router_does_not_pollute_registry():
     router = Router(routes={"a": route_a}, classifier=lambda _: "a")
     router.run("input")
 
-    assert "Router" not in get_registry().names_for("skill")
-    assert "router" not in get_registry().names_for("skill")
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_router_empty_routes_raises():

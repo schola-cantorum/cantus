@@ -1,4 +1,4 @@
-"""Router — classifier-driven dispatch to one of several Skills."""
+"""Router — classifier-driven dispatch to one of several Tools."""
 
 from __future__ import annotations
 

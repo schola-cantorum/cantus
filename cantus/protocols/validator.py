@@ -1,7 +1,7 @@
 """Validator — predicate that returns Result(ok, value, feedback).
 
 A validator is how you tell the agent "this output is wrong, here's
-why, please retry". Validators run *between* skill calls and the agent
+why, please retry". Validators run *between* tool calls and the agent
 loop turns ValidationError into an Observation that gets fed back.
 
     @validator
@@ -81,8 +81,8 @@ def validator(fn: Callable[..., Result]) -> Validator:
     """Decorator entry: wrap a function as a reusable `Validator` hook helper.
 
     v0.3.0: This decorator no longer mutates the runtime registry. Attach
-    the returned instance to a `Skill` via `@skill(post_hook=...)` to make
-    it run as part of skill dispatch. The reserved-name guard SHALL
+    the returned instance to a `Tool` via `@tool(post_hook=...)` to make
+    it run as part of tool dispatch. The reserved-name guard SHALL
     continue to apply.
     """
     _guard_reserved_name(fn.__name__)

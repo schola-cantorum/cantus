@@ -1,16 +1,16 @@
-"""AutoMemory — LLM-facing wrapper that exposes a Memory backend as 4 Skills.
+"""AutoMemory — LLM-facing wrapper that exposes a Memory backend as 4 Tools.
 
 `AutoMemory(backend=...)` holds any lower-tier `Memory` instance via
-composition (NOT inheritance) and surfaces a list of 4 cached `Skill`
+composition (NOT inheritance) and surfaces a list of 4 cached `Tool`
 instances — `view`, `create`, `str_replace`, `delete` — that mirror
-the Anthropic Memory tool spec actions. Each `Skill` carries the
+the Anthropic Memory tool spec actions. Each `Tool` carries the
 backend in a private closure and reports a `spec_for_llm()` shape
-identical to any other cantus skill (`{name, description,
+identical to any other cantus tool (`{name, description,
 args_schema}`); the backend reference never leaks into the LLM-facing
 spec.
 
 Pass `auto.tools` into an `Agent` so the LLM can drive memory CRUD
-itself as it would any other Skill.
+itself as it would any other Tool.
 """
 
 from __future__ import annotations
@@ -115,8 +115,7 @@ class AutoMemory:
 
         backend = MarkdownMemory("memo.md")
         auto = AutoMemory(backend=backend)
-        agent = Agent(model=m, ...)  # then pass tools as the agent
-                                     # exposes per host setup
+        agent = Agent(model, tools=auto.tools)
 
     `AutoMemory` is NOT a subclass of `Memory`. Host code still calls
     `backend.recall(...)` / `backend.remember(...)` directly for explicit
@@ -126,7 +125,7 @@ class AutoMemory:
 
     def __init__(self, backend: Memory) -> None:
         self._backend = backend
-        # Construct the 4 Skill instances eagerly so `tools` returns the
+        # Construct the 4 Tool instances eagerly so `tools` returns the
         # identical list object on every access (instance-level cache).
         self._tools: list[Tool] = [
             _ViewTool(backend),
@@ -144,9 +143,23 @@ class AutoMemory:
 
         WARNING: LLM has full CRUD access to the memory backend with no
         built-in content filter. The LLM can view, create, str_replace,
-        and delete memory entries on its own. For production use, wrap
-        individual tools with `@skill(post_hook=...)` to validate or
-        constrain the LLM's actions before they reach the backend.
+        and delete memory entries on its own.
+        For production use, put a tool of your own in front of a memory tool
+        and give the agent only the tools it needs:
+
+            from cantus import Agent, AutoMemory, tool
+
+            memory = AutoMemory(backend=backend)
+            view, create, str_replace, delete = memory.tools
+
+            @tool
+            def remember(user: str, assistant: str) -> str:
+                \"\"\"Save one turn, refusing anything that looks like a password.\"\"\"
+                if "password" in f"{user} {assistant}".lower():
+                    raise ValueError("refusing to store a password")
+                return create(user=user, assistant=assistant)
+
+            agent = Agent(model, tools=[view, remember])
         """
         return self._tools
 

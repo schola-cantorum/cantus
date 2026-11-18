@@ -1,12 +1,12 @@
-"""Hook helpers — Analyzer and Validator as Skill pre/post hook binding targets.
+"""Hook helpers — Analyzer and Validator as Tool pre/post hook binding targets.
 
 v0.3.0 demoted `Analyzer` and `Validator` from independent protocol kinds to
-reusable callable helpers that attach to a `Skill` via `pre_hook=` and
+reusable callable helpers that attach to a `Tool` via `pre_hook=` and
 `post_hook=` keyword arguments. They are imported from this submodule
 (`cantus.hooks`) rather than `cantus` top level to make the role explicit:
 hook helpers, not protocol kinds.
 
-    from cantus import skill
+    from cantus import tool
     from cantus.hooks import analyzer, validator, Result
 
     @analyzer
@@ -15,7 +15,7 @@ hook helpers, not protocol kinds.
     @validator
     def non_empty(value: str) -> Result: ...
 
-    @skill(pre_hook=parse_location, post_hook=non_empty)
+    @tool(pre_hook=parse_location, post_hook=non_empty)
     def get_weather(loc: Location) -> str: ...
 """
 

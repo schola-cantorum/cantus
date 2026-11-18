@@ -52,8 +52,8 @@ def analyzer(fn: Callable[..., Any]) -> Analyzer:
     """Decorator entry: wrap a function as a reusable `Analyzer` hook helper.
 
     v0.3.0: This decorator no longer mutates the runtime registry. Attach
-    the returned instance to a `Skill` via `@skill(pre_hook=...)` to make
-    it run as part of skill dispatch.
+    the returned instance to a `Tool` via `@tool(pre_hook=...)` to make
+    it run as part of tool dispatch.
     """
     return _from_function(fn)
 
