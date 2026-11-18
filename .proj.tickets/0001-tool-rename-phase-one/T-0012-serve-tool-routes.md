@@ -2,7 +2,7 @@
 id: T-0012
 title: cantus serve offers Tools under /tools, with deprecated /skills aliases
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0009]
 ---
 
@@ -92,6 +92,10 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
     error filter) is outside this ticket's criteria and is noted for T-0019.
   - `D8`: the session left `running` when the body is malformed JSON or missing (v0.6 behaviour) is
     neither fixed nor asserted here; see Comments.
+  - `D9` (V2-6): the stage-8 log is captured from the server's stderr with a registry module that
+    calls `logging.basicConfig` (plus one run without it); `PYTHONPATH` points at the run directory
+    outside the checkout; bearer mode uses the fixed test token the ticket names, written
+    `<redacted>` in evidence.
   - `D10`: on an application not built by `serve()`, the public `register_introspection_routes` and
     `register_dashboard_routes` still register the alias routes (same status, body and `deprecated`
     flag) without the headers and the log; AC-27 speaks of a `serve()` application.
@@ -113,10 +117,17 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
 `cantus serve` 改在 `/tools/...` 提供工具，舊的 `/skills/...`、`GET /skills`、`/introspection/skills`
 繼續可用，但會回 RFC 9745 的 `Deprecation`、`Link` header、在 OpenAPI 標成 deprecated，並在第一次
 被呼叫時寫一筆 log。round-2 的 V2-1 在這裡定案：log 以路由「樣板」計算（`/skills/add` 與
-`/skills/multiply` 合計一筆）；C2-F4 要求連 401／403／422／500 的回應也帶 header；V2-6 要求真實
+`/skills/multiply` 合計一筆）；C2-F4 要求連 401／403／422／500 的回應也帶 header（stage 5 量測後核准的讀法：目前沒有任何路徑會回 403 或 422，
+實際斷言的是 200、401、500 與 405；壞掉的 body 是 500）；V2-6 要求真實
 `cantus serve` 行程的驗證流程先寫好（也給 T-0013 的 TUI 用）。
 另外（2026-11-17，T-0006 stage 5 經使用者同意加入）：帶 hook 的工具經 HTTP 呼叫時只執行本體、不跑 hook，
 這一項也在這張票寫成測試。
+stage 5（2026-11-18）核准的讀法摘要：header 與 log 由包住整個 app 的 wrapper 加上，`serve()` 回傳 `FastAPI` 的
+私有子類別（D1）；請求只要被 alias 路由接走就算第一次使用，401、405、500 都算，404 與尾斜線的 307 不算（D3）；
+alias 在 OpenAPI 維持 v0.6 的 summary 與 `operationId`（D4）；snapshot 只給 `tools` 或舊欄位其中一個時，另一個
+取同一份（D6，比最小變更大，是你選的）；`PYTHONWARNINGS=error` 加 `--registry-import` 一個用 `@skill` 的模組
+維持 exit 1 加 traceback（D7）；壞掉的 body 留下永遠 `running` 的 session 不修也不斷言（D8）；host 自建的 app 上
+alias 沒有 header 與 log（D10）。
 
 ## Comments
 
@@ -155,10 +166,13 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
   none|bearer`, dashboard and introspection at their defaults (on); bearer mode uses a fixed test
   token made for this protocol, passed in `CANTUS_SERVE_BEARER_TOKEN` and written `<redacted>` in
   evidence. Requests, one round per mode, by an httpx script: `POST /tools/add`, `POST /skills/add`,
-  `POST /skills/multiply` (in bearer mode with and without the token), `GET /tools`, `GET /skills`,
+  `POST /skills/multiply` (in bearer mode each of these three is sent once without the token and
+  once with it), `POST /tools/add` with a missing argument, `GET /tools`, `GET /skills`,
   `GET /introspection`, `GET /introspection/tools`, `GET /introspection/skills`,
-  `GET /openapi.json`, and one malformed-JSON request to each family. Recorded: status, the
-  `Deprecation` and `Link` headers and the body of each. Checks: AC-41's items; the full
+  `GET /openapi.json`, and one malformed-JSON request to each family. Each request uses its own connection
+  (after a 500 uvicorn closes a kept-alive connection; v0.6.0 does the same). Recorded: status, the
+  `Deprecation` and `Link` headers and the body of each; the workflow trace of one successful and
+  one failed call; the server's stdout and stderr, captured through pipes by the driving script. Checks: AC-41's items; the full
   `Legacy route ...` text appears once per alias template used; only alias operations are
   deprecated in OpenAPI; introspection values equal section 2.3. Baseline: the `/skills` part of the
   same script against `cantus-agent[serve]==0.6.0` from PyPI with a v0.6-style registry module.
@@ -190,7 +204,7 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
 
   | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
-  | `serve()` primary routes over `TestClient` | `tests/serve/test_app.py`, `test_security.py`, `test_dashboard.py`: rows 1 to 5, 13, 14 | `cantus/serve/app.py` 97%, `dashboard.py` 77% | AC-26 (TR-100, 101), AC-28 (TR-106), AC-31 (TR-110), AC-32 (TR-111), C2-F5, C2-F12 (HTTP half), V2-11 | `app.py:172` is the defensive `continue`; the two partial branches are `tracker is None`; `dashboard.py` 116, 151, 159–164 are the `/events` persistence paths (unchanged, not this ticket's) |
+  | `serve()` primary routes over `TestClient` | `tests/serve/test_app.py`, `test_security.py`, `test_dashboard.py`: rows 1 to 5, 13, 14 | `cantus/serve/app.py` 97%, `dashboard.py` 77% | AC-26 (TR-100, 101), AC-28 (TR-106), AC-31 (TR-110), AC-32 (TR-111), C2-F5, C2-F12 (HTTP half), V2-11 | `app.py:171` is the defensive `continue`; the two partial branches are `tracker is None`; `dashboard.py:116` is the defensive `continue` of `_list_tool_specs`; 151 and 159–164 are the `/events` persistence paths (unchanged, not this ticket's) |
   | introspection routes and values | `tests/serve/test_introspection.py`: rows 3, 6 to 12, 19 | `cantus/serve/introspection.py` 95% | AC-29 (TR-107, 108), AC-30 (TR-109), C2-F16 | line 140 is the validator's non-mapping return; the rest are unchanged collector branches (evicted run, channel kinds) |
   | module names | `tests/serve/test_init_exports.py` rows 16, 17; `tests/legacy/test_w06_w16_serve.py` rows 20 to 22 | `cantus/serve/__init__.py` 100% | AC-16 (TR-61, 62), TR-77 to 79 shape, X9 | the subprocess cases are not measured |
   | alias routes, headers, log | `tests/legacy/test_alias_routes.py`: rows 13 (legacy half), 23 to 33 | `cantus/serve/_aliases.py` 100% | AC-27 (TR-102 to 105), V2-1, K2-F11, C2-F4, R2-16, V2-12, D10 | the lock is exercised but not shown necessary (see above); an application mounted under a prefix was measured in the prototype only |
@@ -215,8 +229,9 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
     `cantus._deprecation.GUIDE_URL`. `SkillEntry` and `collect_skills` are no longer in any
     `__all__`.
   - T-0017 / T-0018: pages that still name the legacy routes or values: `protocols/serve.md`
-    (13 lines), `quickstart-desktop.md`, `quickstart.md`, `protocols/analyzer.md` (one each), and
-    their zh-tw mirrors. No executed page changed its output.
+    (14 lines matching the legacy-path pattern, in each language) and `quickstart-desktop.md` (one);
+    `docs/api` copies are regenerated by `npm run docs:api` when the pages change. No executed page
+    changed its output.
   - T-0019: changes without an alias (K2-F1): the three collision texts, the primary OpenAPI
     summaries, the fallback description `Invoke cantus Tool '<name>'` (on both families), the
     OpenAPI component `ToolEntry`, the snapshot's new `tools` field, the reserved name `tools`
@@ -228,3 +243,73 @@ CLI flags and `Settings` do not change. `tests/serve/` migrated.
   - T-0020: re-run the stage-8 protocol on the branch build.
   - Close-out: the session left `running` after a malformed or missing body (D8) keeps that tool
     marked active in the TUI until 100 newer sessions push it out; v0.6 had it too.
+  - Added after stage 6: T-0013 takes over `tests/legacy/test_tui_source_bridge.py` when it turns
+    `active_skill_names` into the W15 alias (the calls there will then warn), and adds the
+    `tool:` source test for `active_tool_names` under `tests/tui`. The two new legacy modules
+    `test_alias_routes.py` and `test_tui_source_bridge.py` are not named after a W id because the
+    alias routes and the bridge have none. D6 covers mappings and JSON input only (the model does
+    not enable `from_attributes`). For T-0019: a host middleware that copies the ASGI scope hides
+    the route from the wrapper, so alias responses behind it are not marked.
+- **Stage 6 (2026-11-18), reviewed range `b17cf2f...ee63c0c`.** Two `harness-reviewer` axes.
+  Standards: 28 findings (5 medium, 23 low). Spec: 22 findings (5 medium, 17 low). Fixed in
+  `29e017f`: the missing or weak tests (rows 6 and 9 had no OpenAPI assertion although the executor
+  reported writing them; headers on the list aliases' 200 and 401; HEAD and OPTIONS as first use;
+  the 404 of a disabled group logging nothing; the set of deprecated operations; the alias fallback
+  description; the full snapshot key set; D6's tools-only, unmutated-input and required-in-OpenAPI
+  cases; `gated_routes` with introspection off; D10's flag, headers and log; an application mounted
+  under a prefix; credentials and bodies absent from every log record; a registry filled the v0.6
+  way served on both families; W6 and W16 counts on the introspection module; environment isolation
+  and a failing timeout in the legacy module; full `operationId` literals), the docstrings that
+  claimed more than the code does, `CantusFastAPI` building its own `AliasState`, the type import
+  name, the date comment, and this ticket's text (D9, the zh-TW summary, the coverage wording, the
+  page counts, the stage-8 protocol). Left as they are and shown to the user: S6-19 (a factory that
+  registers the primary and its alias in one call; the current parity is held by tests and
+  mutations), S6-16 (no `starlette.types` import, since starlette is not a declared dependency),
+  S6-18 (`routes[-1]` and `id(route)`: `APIRoute` is unhashable), S6-21, S6-12's lock test (it
+  would test a private class), S6-06 (the approved table stays in `.scratch/`), S6-27 (a CI matrix
+  entry for the FastAPI lower bound needs its own ticket), T0012-S6-19 (`python -m cantus` in the
+  CLI test). After the fixes: full suite `1699 passed, 3 skipped`; `ruff`, `mypy`,
+  `check_no_dev_paths`, `verify-project` pass; `docs/api` unchanged; the touched test modules pass
+  on Python 3.10 to 3.14 (418 each); the 37 mutations are all killed again.
+- **Stage 7 (2026-11-18).** Report:
+  `.proj.specs/0001-tool-rename-phase-one/review/security-T-0012.md`. Ten candidates, none
+  confirmed. For the close-out chain analysis: tool names are not checked for path syntax
+  (SEC-T0012-8, as in v0.6), an unauthenticated request can use up an alias template's one log
+  record (SEC-T0012-2, the approved D3), and HTTP calls run neither hooks nor `validate_args`
+  (R2-5).
+- **Stage 8 (2026-11-18), surface: a real `cantus serve` process under uvicorn on a loopback
+  port, driven by an httpx script; not covered: `cantus tui` (T-0013), a browser, Colab.** Ticket
+  build: `git archive 29e017f`, `uv build --wheel` (sha256
+  `fea5d33884dae175478f0cfb8ff994c0ce316a02ca2f7ecf19c8def3eff68b0c`), installed with `[serve]`
+  into a fresh virtual environment; the run directory, the script and `PYTHONPATH` were outside
+  the checkout; `cantus.__file__` was in that environment's `site-packages`; Python 3.13.11,
+  macOS 26.6.2 arm64. Script, registry modules and full output: `.scratch/T-0012/stage8.py`,
+  `t0012_registry.py`, `t0012_registry_v06.py`, `stage8-out-ticket.txt`, `stage8-out-baseline.txt`
+  (local). Observed, in auth modes none and bearer (token `<redacted>`):
+  - `POST /tools/add` 200 `{"result":7}` with neither header; `POST /skills/add` and
+    `POST /skills/multiply` 200 with `Deprecation: @1794441600` and the section 2.3 `Link`; in
+    bearer mode all three return 401 `{"detail":"Authentication required"}` without the token, the
+    two alias responses with both headers.
+  - `GET /tools` and `GET /introspection/tools` 200 without headers; `GET /skills` and
+    `GET /introspection/skills` 200 with both.
+  - Malformed JSON: 500 `Internal Server Error` on both families, the alias with both headers; a
+    missing argument on `/tools/add`: 500; the server printed one traceback per 500, as v0.6.0.
+  - `/openapi.json`: `deprecated` is true on exactly the alias operations (`/skills/add`,
+    `/skills/multiply`, `/skills`, `/introspection/skills`), with the v0.6 `operationId`s and
+    summaries; the primaries carry the section 2.3 names and summaries; the only entry component
+    is `ToolEntry`.
+  - `GET /introspection`: keys include `tools` and `skills`, equal lists (`add`, `multiply`);
+    dataflow nodes `tool:add` and `tool:multiply` of kind `tool`; session sources `tool:add` and
+    `tool:multiply` for calls through either family; traces
+    `CallToolAction tool='add' arg_keys=['a', 'b']`, `ToolObservation tool='add' result_type=int`
+    and, for the failed call, `CallToolAction tool='add' arg_keys=['a']`,
+    `ToolErrorObservation tool='add'`; `gated_routes` empty in mode none and listing both families
+    in bearer mode.
+  - Server stderr: exactly one `cantus.serve WARNING Legacy route ...` line for each of the three
+    alias templates per process, although `/skills/add`, `/skills/multiply` and `/skills` were each
+    requested more than once; without `logging.basicConfig` the same three messages appear without
+    the logger name. The token does not appear in the server's output.
+  - Baseline, `cantus-agent[serve]==0.6.0` from PyPI with a v0.6-style registry module: the
+    `/skills` family answers the same statuses and bodies with no header and no log line.
+  AC-41 is met on the ticket build; T-0020 repeats the protocol on the branch build.
+
