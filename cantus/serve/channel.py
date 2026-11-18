@@ -90,7 +90,7 @@ class WebhookChannel(Channel, Protocol):
     """Channel that registers its own FastAPI route to receive inbound events.
 
     Extends :class:`Channel` with a single ``mount(app)`` method invoked by
-    :func:`cantus.serve.serve` after Skill and dashboard routes are registered.
+    :func:`cantus.serve.serve` after Tool and dashboard routes are registered.
     LINE and Telegram webhook adapters implement this Protocol; in-process
     channels such as :class:`LocalMockReceiver` do not, and ``isinstance``
     correctly distinguishes the two so :func:`cantus.serve.serve` only calls

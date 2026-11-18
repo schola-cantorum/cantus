@@ -12,11 +12,8 @@ from typing import Any
 import pytest
 
 
-def _registry_with_two_skills() -> tuple[Any, Any, Any]:
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
-
-    registry = Registry()
+def _registry_with_two_tools() -> tuple[Any, Any, Any]:
+    from cantus import Registry, tool
 
     def search_book(title: str) -> dict[str, Any]:
         """Search books by title."""
@@ -26,30 +23,28 @@ def _registry_with_two_skills() -> tuple[Any, Any, Any]:
         """Summarize text."""
         return f"summary of {len(text)} chars"
 
-    s1 = register_skill(search_book)
-    s2 = register_skill(summarize)
-    registry.register("skill", s1)
-    registry.register("skill", s2)
-    return registry, s1, s2
+    s1 = tool(search_book)
+    s2 = tool(summarize)
+    return Registry(tools=[s1, s2]), s1, s2
 
 
-# --- GET /skills ---------------------------------------------------------
+# --- GET /tools ---------------------------------------------------------
 
 
-def test_get_skills_returns_byte_identical_spec_list() -> None:
+def test_get_tools_returns_byte_identical_spec_list() -> None:
     from fastapi.testclient import TestClient
 
     from cantus.serve import serve
 
-    registry, s1, s2 = _registry_with_two_skills()
+    registry, s1, s2 = _registry_with_two_tools()
     app = serve(registry)
     client = TestClient(app)
-    resp = client.get("/skills")
+    resp = client.get("/tools")
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
     assert len(body) == 2
-    # registry.names_for("skill") returns sorted names — anchor by name.
+    # registry.names_for("tool") returns sorted names — anchor by name.
     by_name = {b["name"]: b for b in body}
     assert by_name[s1.spec_for_llm()["name"]] == s1.spec_for_llm()
     assert by_name[s2.spec_for_llm()["name"]] == s2.spec_for_llm()
@@ -143,30 +138,27 @@ def test_get_events_respects_limit_query(tmp_path: Any) -> None:
 # --- dashboard=False -----------------------------------------------------
 
 
-def test_dashboard_disabled_404s_three_endpoints_but_skill_invoke_works() -> None:
+def test_dashboard_disabled_404s_three_endpoints_but_tool_invoke_works() -> None:
     from fastapi.testclient import TestClient
 
+    from cantus import Registry, tool
     from cantus.config import Settings
-    from cantus.core.registry import Registry
-    from cantus.protocols.skill import register_skill
     from cantus.serve import serve
 
     def echo(value: str) -> str:
         """Echo back."""
         return value
 
-    instance = register_skill(echo)
-    registry = Registry()
-    registry.register("skill", instance)
+    registry = Registry(tools=[tool(echo)])
 
     app = serve(registry, settings=Settings(dashboard=False))
     client = TestClient(app)
 
-    assert client.get("/skills").status_code == 404
+    assert client.get("/tools").status_code == 404
     assert client.get("/health").status_code == 404
     assert client.get("/events").status_code == 404
-    # Skill invoke endpoint must still work.
-    resp = client.post("/skills/echo", json={"value": "hi"})
+    # Tool invoke endpoint must still work.
+    resp = client.post("/tools/echo", json={"value": "hi"})
     assert resp.status_code == 200
     assert resp.json() == {"result": "hi"}
 
@@ -174,15 +166,22 @@ def test_dashboard_disabled_404s_three_endpoints_but_skill_invoke_works() -> Non
 # --- Reserved dashboard names --------------------------------------------
 
 
-@pytest.mark.parametrize("reserved_name", ["skills", "health", "events"])
-def test_skill_named_after_reserved_dashboard_path_is_rejected(
+@pytest.mark.parametrize(
+    "reserved_name",
+    [
+        "tools",
+        "health",
+        "events",
+    ],
+)
+def test_tool_named_after_reserved_dashboard_path_is_rejected(
     reserved_name: str,
 ) -> None:
     from cantus.core.registry import Registry
     from cantus.serve import serve
 
-    # Build a stub Skill-like object with a reserved name.
-    class _StubSkill:
+    # Build a stub Tool-like object with a reserved name.
+    class _StubTool:
         name = reserved_name
 
         def spec_for_llm(self) -> dict[str, Any]:
@@ -192,19 +191,47 @@ def test_skill_named_after_reserved_dashboard_path_is_rejected(
             return None
 
     registry = Registry()
-    registry.register("skill", _StubSkill())
-    with pytest.raises(ValueError, match="reserved dashboard path"):
+    registry.register("tool", _StubTool())
+    with pytest.raises(ValueError) as exc:
         serve(registry)
+    assert str(exc.value) == (
+        f"Tool name '{reserved_name}' collides with a reserved dashboard path "
+        "(reserved dashboard path)"
+    )
 
 
-def test_skill_named_channels_rejected_as_reserved_channel_path() -> None:
+def test_tool_named_tools_is_rejected_even_with_the_dashboard_off() -> None:
+    from cantus import Registry
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    class _StubTool:
+        name = "tools"
+
+        def spec_for_llm(self) -> dict[str, Any]:
+            return {"name": "tools", "description": "", "args_schema": {}}
+
+        def run(self, **kwargs: Any) -> Any:
+            return None
+
+    registry = Registry()
+    registry.register("tool", _StubTool())
+    with pytest.raises(ValueError) as exc:
+        serve(registry, settings=Settings(dashboard=False))
+    assert str(exc.value) == (
+        "Tool name 'tools' collides with a reserved dashboard path "
+        "(reserved dashboard path)"
+    )
+
+
+def test_tool_named_channels_rejected_as_reserved_channel_path() -> None:
     """v0.4.5: 'channels' joins the reserved top-level names; collision uses
     a distinct error string so dashboard vs channel collisions stay
     distinguishable in diagnostics."""
     from cantus.core.registry import Registry
     from cantus.serve import serve
 
-    class _StubSkill:
+    class _StubTool:
         name = "channels"
 
         def spec_for_llm(self) -> dict[str, Any]:
@@ -214,9 +241,13 @@ def test_skill_named_channels_rejected_as_reserved_channel_path() -> None:
             return None
 
     registry = Registry()
-    registry.register("skill", _StubSkill())
-    with pytest.raises(ValueError, match="reserved channel path"):
+    registry.register("tool", _StubTool())
+    with pytest.raises(ValueError) as exc:
         serve(registry)
+    assert str(exc.value) == (
+        "Tool name 'channels' collides with a reserved channel path "
+        "(reserved channel path)"
+    )
 
 
 def test_dashboard_routes_coexist_with_discord_interactions_route() -> None:
@@ -224,7 +255,7 @@ def test_dashboard_routes_coexist_with_discord_interactions_route() -> None:
 
     Mounting a DiscordRealtimeChannel registers POST /channels/discord/interactions
     beneath the v0.4.5 reserved /channels top-level prefix. The dashboard
-    routes (/skills, /health, /events) MUST continue to respond as documented
+    routes (/tools, /health, /events) MUST continue to respond as documented
     — the new sub-path is a sibling, not a shadower.
     """
     from fastapi.testclient import TestClient
@@ -241,7 +272,7 @@ def test_dashboard_routes_coexist_with_discord_interactions_route() -> None:
     client = TestClient(app)
 
     # Dashboard endpoints respond exactly as v0.4.5 documented.
-    assert client.get("/skills").status_code == 200
+    assert client.get("/tools").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/events").status_code == 200
 
@@ -263,7 +294,7 @@ def test_dashboard_requires_auth_default_true_gates_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Under auth_mode=bearer + default dashboard_requires_auth=True, anonymous
-    requests to /skills, /health, /events all return 401."""
+    requests to /tools, /health, /events all return 401."""
     import importlib
 
     from fastapi.testclient import TestClient
@@ -282,11 +313,11 @@ def test_dashboard_requires_auth_default_true_gates_endpoints(
     importlib.reload(config_mod)
     Settings = config_mod.Settings
 
-    registry, _s1, _s2 = _registry_with_two_skills()
+    registry, _s1, _s2 = _registry_with_two_tools()
     app = serve(registry, settings=Settings())
     client = TestClient(app)
 
-    for path in ("/skills", "/health", "/events"):
+    for path in ("/tools", "/health", "/events"):
         resp = client.get(path)
         assert resp.status_code == 401, (
             f"dashboard endpoint {path} must reject anonymous request "
@@ -302,7 +333,7 @@ def test_dashboard_requires_auth_false_opens_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Under auth_mode=bearer + dashboard_requires_auth=False, the three
-    dashboard endpoints accept anonymous requests while /skills/{name} still
+    dashboard endpoints accept anonymous requests while /tools/{name} still
     requires auth."""
     import importlib
 
@@ -323,17 +354,104 @@ def test_dashboard_requires_auth_false_opens_endpoints(
     importlib.reload(config_mod)
     Settings = config_mod.Settings
 
-    registry, s1, _s2 = _registry_with_two_skills()
+    registry, s1, _s2 = _registry_with_two_tools()
     app = serve(registry, settings=Settings())
     client = TestClient(app)
 
-    for path in ("/skills", "/health", "/events"):
+    for path in ("/tools", "/health", "/events"):
         resp = client.get(path)
         assert resp.status_code == 200, (
             f"dashboard endpoint {path} must accept anonymous request "
             f"when dashboard_requires_auth=False"
         )
 
-    skill_name = s1.spec_for_llm()["name"]
-    resp = client.post(f"/skills/{skill_name}", json={"title": "x"})
+    tool_name = s1.spec_for_llm()["name"]
+    resp = client.post(f"/tools/{tool_name}", json={"title": "x"})
     assert resp.status_code == 401
+
+
+# --- Row 5: GET /tools ----------------------------------------------------
+
+
+def test_get_tools_lists_literal_specs_sorted_by_name() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry, tool
+    from cantus.serve import serve
+
+    def zeta(text: str) -> str:
+        """Shout."""
+        return text.upper()
+
+    def alpha(n: int) -> int:
+        """Double."""
+        return n * 2
+
+    client = TestClient(serve(Registry(tools=[tool(zeta), tool(alpha)])))
+    resp = client.get("/tools")
+
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {
+            "name": "alpha",
+            "description": "Double.",
+            "args_schema": {
+                "properties": {"n": {"title": "N", "type": "integer"}},
+                "required": ["n"],
+                "title": "AlphaArgs",
+                "type": "object",
+            },
+        },
+        {
+            "name": "zeta",
+            "description": "Shout.",
+            "args_schema": {
+                "properties": {"text": {"title": "Text", "type": "string"}},
+                "required": ["text"],
+                "title": "ZetaArgs",
+                "type": "object",
+            },
+        },
+    ]
+
+
+def test_get_tools_on_an_empty_registry_is_an_empty_list() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry
+    from cantus.serve import serve
+
+    resp = TestClient(serve(Registry())).get("/tools")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_get_tools_openapi_summary_and_operation_id() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry
+    from cantus.serve import serve
+
+    operation = TestClient(serve(Registry())).get("/openapi.json").json()["paths"]["/tools"]["get"]
+
+    assert operation["summary"] == "List registered Tools"
+    assert operation["operationId"] == "dashboard_list_tools_tools_get"
+    assert not operation.get("deprecated")
+
+
+def test_get_tools_with_the_dashboard_off_is_404_and_invoke_still_works() -> None:
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry, tool
+    from cantus.config import Settings
+    from cantus.serve import serve
+
+    def echo(value: str) -> str:
+        """Echo back."""
+        return value
+
+    client = TestClient(serve(Registry(tools=[tool(echo)]), settings=Settings(dashboard=False)))
+
+    assert client.get("/tools").status_code == 404
+    assert client.post("/tools/echo", json={"value": "hi"}).json() == {"result": "hi"}

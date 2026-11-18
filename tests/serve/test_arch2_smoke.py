@@ -1,14 +1,14 @@
 """ARCH-2 cross-capability smoke test for cantus-serve-core.
 
-Constructs the minimal cross-cut: 1 Skill + 1 Memory + 1 Agent + 1
+Constructs the minimal cross-cut: 1 Tool + 1 Memory + 1 Agent + 1
 LocalMockReceiver, all wired through ``cantus.serve(registry, channels=[...])``,
 and verifies the FastAPI surface composes with the rest of cantus without
 mutating Memory or losing the Channel handle. Asserts:
 
-* the HTTP-served Skill response equals the direct ``Skill.run()`` output
+* the HTTP-served Tool response equals the direct ``Tool.run()`` output
   byte-identical;
 * the Memory state before ``serve()`` byte-equals the state after the
-  request when the invoked Skill does not touch Memory;
+  request when the invoked Tool does not touch Memory;
 * ``app.state.channels`` contains the original ``LocalMockReceiver``
   instance unchanged.
 
@@ -24,10 +24,9 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from cantus import Registry, tool
 from cantus.core.agent import Agent
-from cantus.core.registry import Registry
 from cantus.protocols.memory import ShortTermMemory
-from cantus.protocols.skill import register_skill
 from cantus.serve import serve
 from cantus.serve.channel import LocalMockReceiver
 
@@ -42,14 +41,13 @@ class _StubModel:
 def test_arch2_serve_composes_with_memory_and_agent_without_interference() -> None:
     start = time.monotonic()
 
-    # 1) Skill — pure function, never touches Memory.
+    # 1) Tool — pure function, never touches Memory.
     def reverse_text(text: str) -> dict[str, Any]:
         """Reverse the input text."""
         return {"reversed": text[::-1]}
 
-    skill_instance = register_skill(reverse_text)
-    registry = Registry()
-    registry.register("skill", skill_instance)
+    tool_instance = tool(reverse_text)
+    registry = Registry(tools=[tool_instance])
 
     # 2) Memory — v0.3.1 in-process implementation, no external IO.
     memory = ShortTermMemory(n=5)
@@ -67,14 +65,14 @@ def test_arch2_serve_composes_with_memory_and_agent_without_interference() -> No
     app = serve(registry, channels=[receiver])
     client = TestClient(app)
 
-    # 6) Invoke the Skill through the served endpoint and capture the HTTP response.
+    # 6) Invoke the Tool through the served endpoint and capture the HTTP response.
     payload = {"text": "cantus"}
-    http_resp = client.post("/skills/reverse_text", json=payload)
+    http_resp = client.post("/tools/reverse_text", json=payload)
     assert http_resp.status_code == 200
     http_result = http_resp.json()["result"]
 
-    # 6a) HTTP-served result byte-equals direct Skill.run() output.
-    direct_result = skill_instance.run(**payload)
+    # 6a) HTTP-served result byte-equals direct Tool.run() output.
+    direct_result = tool_instance.run(**payload)
     assert http_result == direct_result
 
     # 6b) Memory state untouched by the serve layer.

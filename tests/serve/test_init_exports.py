@@ -69,7 +69,7 @@ def test_introspection_symbols_exported() -> None:
         PermissionsSnapshot,
         QueueIntrospectable,
         SessionTracker,
-        SkillEntry,
+        ToolEntry,
         register_introspection_routes,
     )
 
@@ -84,7 +84,7 @@ def test_introspection_symbols_in_all() -> None:
         "register_introspection_routes",
         "SessionTracker",
         "IntrospectionSnapshot",
-        "SkillEntry",
+        "ToolEntry",
         "SessionEntry",
         "PermissionsSnapshot",
         "QueueEntry",
@@ -93,3 +93,59 @@ def test_introspection_symbols_in_all() -> None:
         "QueueIntrospectable",
     ):
         assert name in serve_pkg.__all__
+
+
+def test_tool_entry_is_exported_from_serve_and_introspection() -> None:
+    import cantus.serve as serve_pkg
+    import cantus.serve.introspection as introspection
+
+    assert "ToolEntry" in serve_pkg.__all__
+    assert "ToolEntry" in introspection.__all__
+    assert "collect_tools" in introspection.__all__
+    assert serve_pkg.ToolEntry is introspection.ToolEntry
+
+
+def test_collect_tools_returns_tool_entries_with_literal_fields() -> None:
+    from cantus import Registry, tool
+    from cantus.serve.introspection import ToolEntry, collect_tools
+
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    entries = collect_tools(Registry(tools=[tool(add)]))
+
+    assert len(entries) == 1
+    assert isinstance(entries[0], ToolEntry)
+    assert entries[0].name == "add"
+    assert entries[0].description == "Add two numbers."
+    assert entries[0].args_schema == {
+        "properties": {
+            "a": {"title": "A", "type": "integer"},
+            "b": {"title": "B", "type": "integer"},
+        },
+        "required": ["a", "b"],
+        "title": "AddArgs",
+        "type": "object",
+    }
+
+
+def test_importing_the_tool_names_emits_no_cantus_deprecation_warning(tmp_path) -> None:
+    """A fresh interpreter imports the new names with the cantus category escalated to an error."""
+    import subprocess
+    import sys
+
+    code = (
+        "import warnings, cantus\n"
+        "warnings.simplefilter('error', cantus.CantusDeprecationWarning)\n"
+        "import cantus.serve\n"
+        "from cantus.serve import ToolEntry, serve\n"
+        "from cantus.serve.introspection import collect_tools\n"
+        "print(ToolEntry.__name__, collect_tools.__name__)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, cwd=str(tmp_path), timeout=60
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.split() == ["ToolEntry", "collect_tools"]

@@ -1,16 +1,19 @@
 """cantus.serve.dashboard — read-only dashboard endpoints.
 
 Provides the constants and the route-registration helper used by
-:func:`cantus.serve.app.serve`. v0.4.0 ships three endpoints:
+:func:`cantus.serve.app.serve`. It registers three endpoints and one alias:
 
-* ``GET /skills``  — list each Skill's ``spec_for_llm()`` projection.
+* ``GET /tools``   — list each Tool's ``spec_for_llm()`` projection. The
+  v0.6 alias route registered through :mod:`cantus.serve._aliases` answers
+  the same list.
 * ``GET /health``  — liveness + cantus version.
 * ``GET /events``  — last N entries from the host-attached
   ``app.state.event_persistence`` (``[]`` when nothing is attached).
 
-When ``Settings.dashboard`` is False, the entire router is omitted and the
-three paths return 404 (FastAPI default behaviour for unregistered routes);
-Skill-invoke endpoints under ``/skills/<name>`` are unaffected.
+When ``Settings.dashboard`` is False, the entire router is omitted and these
+paths, the alias included, return 404 (FastAPI default behaviour for unregistered routes);
+Tool-invoke endpoints under ``/tools/<name>`` (and the v0.6 alias route for
+them) are unaffected.
 
 The skeleton wiring (constants + register_dashboard_routes) is established
 by task 5.2 of cantus-serve-core; the route handlers themselves are filled
@@ -26,8 +29,16 @@ from fastapi.params import Depends as DependsType
 
 from cantus.config import Settings
 from cantus.core.registry import Registry
+from cantus.serve._aliases import add_alias_route
 
-RESERVED_DASHBOARD_NAMES: frozenset[str] = frozenset({"skills", "health", "events"})
+RESERVED_DASHBOARD_NAMES: frozenset[str] = frozenset(
+    {
+        "tools",
+        "skills",  # legacy-alias
+        "health",
+        "events",
+    }
+)
 
 
 def register_dashboard_routes(
@@ -37,7 +48,7 @@ def register_dashboard_routes(
     *,
     dependencies: list[DependsType] | None = None,
 ) -> None:
-    """Attach the three read-only dashboard endpoints to ``app``.
+    """Attach the read-only dashboard endpoints (and the v0.6 list alias) to ``app``.
 
     Caller is responsible for honouring ``settings.dashboard``: if it is
     False this function SHOULD NOT be called (the absence of the routes is
@@ -52,14 +63,28 @@ def register_dashboard_routes(
 
     deps: list[DependsType] = list(dependencies) if dependencies else []
 
-    @app.get(
-        "/skills",
-        summary="List registered Skills",
-        name="dashboard_list_skills",
+    def list_tools() -> list[dict[str, Any]]:
+        return _list_tool_specs(registry)
+
+    app.add_api_route(
+        "/tools",
+        list_tools,
+        methods=["GET"],
+        summary="List registered Tools",
+        name="dashboard_list_tools",
         dependencies=deps,
     )
-    def list_skills() -> list[dict[str, Any]]:
-        return _list_skill_specs(registry)
+    add_alias_route(
+        app,
+        path="/skills",  # legacy-alias
+        alias_template="/skills",  # legacy-alias
+        primary_template="/tools",
+        endpoint=list_tools,
+        methods=["GET"],
+        summary="List registered Skills",  # legacy-alias
+        name="dashboard_list_skills",  # legacy-alias
+        dependencies=deps,
+    )
 
     @app.get(
         "/health",
@@ -83,7 +108,7 @@ def register_dashboard_routes(
         return _read_events(app, limit=limit, offset=offset)
 
 
-def _list_skill_specs(registry: Registry) -> list[dict[str, Any]]:
+def _list_tool_specs(registry: Registry) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name in registry.names_for("tool"):
         instance = registry.lookup("tool", name)
