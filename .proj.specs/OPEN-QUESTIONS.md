@@ -476,3 +476,33 @@ calling.
 
 **Revisit when.** The async-core epic reaches stage 1 (install hints); the tool-calling epic reaches
 stage 1 (`Args:` descriptions).
+
+## OQ-013 — How does the split loop keep a student's private dispatch override from being skipped silently?
+
+**Deferred on:** 2026-11-18
+**Status:** open
+
+**Reason.** Epic 1 renames the private method `Agent._dispatch_skill` to `_dispatch_tool` with no
+shim (X8). A subclass that still defines the old method would lose its override silently, and
+that override may be a student's only permission check, so T-0009 added a guard: defining such a
+subclass raises `TypeError` (finding R2-3, approved by the user on 2026-11-18). The guard covers
+this one rename. The async-core epic splits the loop into replaceable stages (ADR-0015) and makes
+`arun` the only implementation (ADR-0016), so `_dispatch_tool` itself may be renamed, split or
+made async there, and the same silent skip can return before the permission seam (OQ-008) exists.
+
+**Evidence.**
+- Verified: the guard is `Agent.__init_subclass__` in `cantus/core/agent.py`; its tests are in
+  `tests/legacy/test_dispatch_override_guard.py`. It does not cover a method assigned or
+  monkeypatched after the class exists.
+- Not verified: whether course material or a teacher's package teaches overriding the dispatch
+  method (the user could not confirm it on 2026-11-18).
+- The guard's message tells the student to override `_dispatch_tool`; that advice goes stale if
+  the method changes.
+
+**Blocks.** Nothing in epic 1.
+
+**Not blocked.** Epic 1.
+
+**Revisit when.** The async-core epic reaches stage 1: decide what happens to an override of
+`_dispatch_tool` (and of `_dispatch_skill`, while the guard exists) when the loop is split, and
+update or replace the guard's message in the same change.
