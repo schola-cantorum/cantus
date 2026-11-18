@@ -1,14 +1,19 @@
-"""The TUI still recognises the ``skill:`` session source a v0.6 server sends beside ``tool:``.
+"""The TUI against a v0.6 server: the ``skill:`` session source and the snapshot's ``skills`` list.
 
-``active_tool_names`` accepts both prefixes. The ``tool:`` cases live in
-``tests/tui/test_app.py``; this module keeps the legacy-prefix cases.
+``active_tool_names`` accepts both source prefixes; the cases that use only ``tool:`` sources live
+in ``tests/tui/test_app.py``. The application fills the Tools tab from the legacy list when the
+snapshot carries no ``tools``.
 """
+
+import warnings
 
 import pytest
 
 pytest.importorskip("textual")
 
+import cantus  # noqa: E402
 import cantus.tui.widgets  # noqa: E402
+from cantus.tui.client import FetchResult  # noqa: E402
 
 
 def _session(source, status="running"):
@@ -21,6 +26,11 @@ def test_a_v06_source_marks_its_tool_active():
 
 def test_a_v06_source_with_an_empty_name_is_skipped():
     assert cantus.tui.widgets.active_tool_names([_session("skill:")]) == set()  # legacy-alias
+
+
+def test_a_v06_source_that_is_not_running_is_skipped():
+    sessions = [_session("skill:sum", status="completed")]  # legacy-alias
+    assert cantus.tui.widgets.active_tool_names(sessions) == set()
 
 
 def test_a_mixed_list_returns_both_names():
@@ -52,18 +62,12 @@ class _FakeClient:
         self._data = data
 
     async def snapshot(self):
-        from cantus.tui.client import FetchResult
-
         return FetchResult(ok=True, data=self._data)
 
     async def health(self):
-        from cantus.tui.client import FetchResult
-
-        return FetchResult(ok=True, data={"status": "ok", "cantus_version": "0.7.0"})
+        return FetchResult(ok=True, data={"status": "ok", "cantus_version": "0.6.0"})
 
     async def workflow(self, run_id):
-        from cantus.tui.client import FetchResult
-
         return FetchResult(ok=True, data=None)
 
     async def aclose(self):
@@ -85,10 +89,13 @@ async def _table_rows(data):
     from cantus.tui.app import CantusTUI
 
     app = CantusTUI(url="http://x", client=_FakeClient(data), poll_interval=999)
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        table = app.query_one(cantus.tui.widgets.ToolsPane)
-        return [tuple(table.get_row_at(i)) for i in range(table.row_count)]
+    # The fallback itself must not reach a legacy name: a cantus warning fails the test.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", cantus.CantusDeprecationWarning)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            table = app.query_one(cantus.tui.widgets.ToolsPane)
+            return [tuple(table.get_row_at(i)) for i in range(table.row_count)]
 
 
 @pytest.mark.anyio("asyncio")

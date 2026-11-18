@@ -64,12 +64,24 @@ def test_from_import_of_skills_pane_prints_the_w14_text_once_under_default_filte
 
     assert result.returncode == 0, result.stderr
     assert result.stderr.count(EXPECTED["W14"]) == 1
+    assert result.stderr.count("is deprecated since cantus") == 1
+
+
+def test_from_import_in_a_student_module_prints_w14_once_at_that_module(tmp_path):
+    path = write_module(
+        tmp_path, "student_panes", "from cantus.tui.widgets import SkillsPane\n\nPANE = SkillsPane\n"
+    )
+    result = run_python(["-c", "import student_panes"], cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr.count(EXPECTED["W14"]) == 1
+    assert result.stderr.count("is deprecated since cantus") == 1
+    assert f"{path}:1: CantusDeprecationWarning" in result.stderr
 
 
 @pytest.mark.anyio("asyncio")
 async def test_a_subclass_of_the_legacy_pane_is_found_as_a_tools_pane():
     from textual.app import App
-    from textual.widgets import DataTable
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -86,7 +98,8 @@ async def test_a_subclass_of_the_legacy_pane_is_found_as_a_tools_pane():
         await pilot.pause()
         pane = app.query_one(cantus.tui.widgets.ToolsPane)
         assert isinstance(pane, Mine)
-        assert isinstance(pane, DataTable)
+        pane.update_tools([{"name": "echo", "description": "echo back", "args_schema": {}}], set())
+        assert tuple(pane.get_row_at(0)) == ("echo", "echo back", "—", "")
 
 
 # --- Row 10: active_skill_names (W15) ------------------------------------------
@@ -120,6 +133,7 @@ def test_from_import_of_active_skill_names_prints_the_w15_text_once(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert result.stderr.count(EXPECTED["W15"]) == 1
+    assert result.stderr.count("is deprecated since cantus") == 1
 
 
 def test_the_legacy_active_names_function_reads_v06_shaped_sessions():
@@ -172,7 +186,9 @@ async def test_update_skills_fills_the_rows_and_emits_one_w17_per_call_at_the_ca
             module.call_keywords(pane, _ROWS)
         records = cantus_records(caught)
         assert len(records) == 1
+        assert records[0].category is cantus.CantusDeprecationWarning
         assert str(records[0].message) == EXPECTED["W17"]
+        assert records[0].filename == str(tmp_path / "call_update_skills.py")
         assert records[0].lineno == 6
         assert tuple(pane.get_row_at(0)) == ("echo", "echo back", "text", "")
 

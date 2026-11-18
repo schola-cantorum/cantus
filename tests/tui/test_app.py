@@ -8,6 +8,7 @@ The pure formatting helpers are tested directly without the Textual runtime.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import warnings
@@ -16,6 +17,9 @@ from typing import Any
 import pytest
 
 from cantus.tui.client import FetchResult
+
+# No test in this module may reach a legacy name: a cantus deprecation warning is an error here.
+pytestmark = pytest.mark.filterwarnings("error::cantus.CantusDeprecationWarning")
 
 
 class FakeClient:
@@ -118,6 +122,7 @@ def test_active_tool_names_returns_the_running_tool() -> None:
         {"source": "channel:webhook", "status": "running"},
         {"source": "tool:", "status": "running"},
         {"source": 42, "status": "running"},
+        {"source": None, "status": "running"},
         {"status": "running"},
     ],
 )
@@ -270,7 +275,8 @@ async def test_tools_tab_lists_tools_and_marks_active() -> None:
 
         # A snapshot with no tools empties the table.
         client.snapshot_result = _snapshot(sessions=[], tools=[])
-        await app._fetch()
+        await pilot.press("r")
+        await pilot.pause()
         assert table.row_count == 0
 
         # A manual refresh shows exactly the one tool the server now reports.
@@ -302,14 +308,7 @@ async def test_tools_pane_title_and_columns() -> None:
 async def test_update_tools_rebuilds_the_rows() -> None:
     from cantus.tui.widgets import ToolsPane
 
-    tools = [
-        {
-            "name": "echo",
-            "description": "echo back",
-            "args_schema": {"type": "object", "properties": {"text": {}}},
-        },
-        {"name": "sum", "description": "add numbers", "args_schema": {}},
-    ]
+    tools = [_ECHO, _SUM]
     app = _app(FakeClient())
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -702,14 +701,14 @@ async def test_pause_works_on_non_dashboard_tab() -> None:
         assert client.snapshot_calls == baseline + 1
 
 
-def test_tools_names_are_in_all_and_the_legacy_names_are_not() -> None:
+def test_tools_names_are_in_all() -> None:
     import cantus.tui.widgets as widgets
 
     assert "ToolsPane" in widgets.__all__
     assert "active_tool_names" in widgets.__all__
 
 
-def test_importing_the_tui_modules_raises_no_deprecation_warning() -> None:
+def test_importing_the_tui_modules_raises_no_deprecation_warning(tmp_path: Any) -> None:
     code = (
         "import warnings, cantus\n"
         "warnings.simplefilter('error', cantus.CantusDeprecationWarning)\n"
@@ -717,9 +716,22 @@ def test_importing_the_tui_modules_raises_no_deprecation_warning() -> None:
         "from cantus.tui.widgets import ToolsPane, active_tool_names\n"
         "from cantus.tui.app import CantusTUI\n"
     )
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"PYTHONPATH", "PYTHONWARNINGS", "PYTHONDEVMODE"}
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        env=env,
+        timeout=120,
+    )
 
     assert result.returncode == 0, result.stderr
+    assert "CantusDeprecationWarning" not in result.stderr
 
 
 @pytest.mark.anyio("asyncio")
@@ -739,4 +751,5 @@ async def test_a_poll_raises_no_deprecation_warning() -> None:
         warnings.simplefilter("error", cantus.CantusDeprecationWarning)
         async with app.run_test() as pilot:
             await pilot.pause()
-            await app._fetch()
+            await pilot.press("r")
+            await pilot.pause()
