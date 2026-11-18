@@ -5,12 +5,12 @@ import warnings
 import pytest
 
 from cantus import Agent, CantusDeprecationWarning, Tool, tool
+from cantus.core.observation import ToolObservation
 from cantus.core.result import Result
 from cantus.protocols.analyzer import analyzer
 from cantus.protocols.debug import debug
 from cantus.protocols.validator import validator
 from tests.agent_helpers import ScriptedModel, call_json, final_json, tool_results
-from cantus.core.observation import ToolObservation
 
 _DEBUG_TYPE_ERROR = (
     "@debug can only wrap a Tool or hook helper (Tool, Analyzer, Validator); "
@@ -145,9 +145,15 @@ def test_debug_above_tool_with_pre_hook_runs_hook(capsys):
             """Echo."""
             return text
 
+        assert isinstance(echo, Tool)
+        capsys.readouterr()
         model = ScriptedModel([call_json("echo", text="hi"), final_json()])
         stream = Agent(model, tools=[echo]).run("q").stream
         assert tool_results(stream) == [("echo", "hi!")]
+        out = capsys.readouterr().out
+        assert '[debug] echo thought=\'\' args=[]/{"text": "hi!"} result="hi!"' in out.splitlines()
+        # the tool is traced, its plain hook is not: no hook label
+        assert "invoked from" not in out
 
 
 def test_debug_pre_hook_label_precedes_hook_trace(capsys):
@@ -202,7 +208,7 @@ def test_debug_post_hook_label_precedes_hook_trace(capsys):
 @pytest.mark.parametrize("role", ["pre_hook", "post_hook"])
 def test_unwrapped_hook_prints_no_invoked_from_label(role, capsys):
     def upper(text):
-        return {"text": text.upper()} if role == "pre_hook" else text
+        return {"text": text.upper()} if role == "pre_hook" else text.upper()
 
     @tool(**{role: upper})
     def echo(text: str) -> str:
@@ -212,5 +218,6 @@ def test_unwrapped_hook_prints_no_invoked_from_label(role, capsys):
     capsys.readouterr()
     model = ScriptedModel([call_json("echo", text="hi"), final_json()])
     stream = Agent(model, tools=[echo]).run("q").stream
-    assert len(tool_results(stream)) == 1
+    # the hook ran (it upper-cased the argument or the result) and printed no label
+    assert tool_results(stream) == [("echo", "HI")]
     assert "invoked from" not in capsys.readouterr().out

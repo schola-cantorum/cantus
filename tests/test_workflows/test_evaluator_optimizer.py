@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from cantus import tool
 from cantus.core.registry import _get_global_registry
 from cantus.core.result import Result
-from cantus import tool
 from cantus.workflows import EvaluatorOptimizer
 
 

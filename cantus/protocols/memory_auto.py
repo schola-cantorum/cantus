@@ -143,9 +143,9 @@ class AutoMemory:
 
         WARNING: LLM has full CRUD access to the memory backend with no
         built-in content filter. The LLM can view, create, str_replace,
-        and delete memory entries on its own.
-        For production use, put a tool of your own in front of a memory tool
-        and give the agent only the tools it needs:
+        and delete memory entries on its own. For production use, put a
+        tool of your own in front of a memory tool and give the agent only
+        the tools it needs:
 
             from cantus import Agent, AutoMemory, tool
 

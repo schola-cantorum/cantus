@@ -169,7 +169,11 @@ def test_tools_docstring_example_runs_and_refuses_password():
     assert isinstance(observed[0], ToolErrorObservation)
     assert observed[0].tool_name == "remember"
     assert observed[0].message == "ValueError: refusing to store a password"
+    assert len(observed) == 2
+    # `create` was not handed to the agent: the call is rejected before any dispatch
     assert isinstance(observed[1], ValidationErrorObservation)
+    assert observed[1].validator_name == "action_parse"
+    assert prompt_tool_names(model) == ["remember", "view"]
     assert tool_results(stream) == [("remember", "ok")]
     assert backend.writes == [("hi", "yo")]
     assert [(t.user, t.assistant) for t in backend.recall("hi")] == [("hi", "yo")]

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from cantus.core.registry import _get_global_registry
 from cantus import tool
+from cantus.core.registry import _get_global_registry
 from cantus.workflows import Parallel
 
 
