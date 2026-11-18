@@ -2,7 +2,7 @@
 id: T-0010
 title: Wire format and grammar speak Tool — tool_name, unknown_tool, build_schema, parse_tool_call
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0009]
 ---
 
