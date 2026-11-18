@@ -2,7 +2,7 @@
 id: T-0016
 title: ludus migration document corrected and the binding verified on v0.7
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0015]
 ---
 
@@ -201,3 +201,44 @@ transcript 的關鍵行寫進 Comments。不改 ADR 與 `CONTEXT.md`；第 3 項
   S-19 (S-15 by saving the evidence files and printing the document hash in the harness), P-02,
   P-11. The harness and its mutation check were re-run on the revised document: 7/7 rows green, 4/4
   mutants red (`doccheck-green-after-review.txt`, `doccheck-mutations-after-review.txt`).
+- **Stage 8 (2026-11-18), surface: ludus at `341769d` (a temporary clone with no remote; ludus
+  itself untouched) in a fresh virtual environment with the ticket build; driven by a script that
+  runs each command through `/bin/sh -c`, with the environment's `bin` first on `PATH` and
+  `PYTHONPATH` and `PYTHONWARNINGS` unset, cwd = the clone.** Ticket build: `32bf17f` (the
+  document's final text; `git diff 72250f1 32bf17f -- cantus/ pyproject.toml` is empty), wheel
+  `cantus_agent-0.6.0-py3-none-any.whl` sha256
+  `edc3130b5e82078e2d26fa249c6f14d892707112364554075229275cda4d337e` (its 95 members, `RECORD`
+  aside, are identical to a wheel of `13b77ad`); Python 3.13.11 on macOS 26.6.2 arm64;
+  `cantus.__file__` in the environment's site-packages. The document's commands were extracted
+  from its text at `32bf17f`.
+  - E1, AC-43: with only the two `"SkillObservation"` comparisons changed,
+    `python skills/ludus_skill/tests/test_submit_gate.py` exits 0 and its stdout ends with
+    `[gate] ALL GATE CHECKS PASSED`; stderr carries W3 (`skills/ludus_skill/skill.py:119`, `:148`,
+    `:149`), W11 and W13 (`test_submit_gate.py:161`) and W7 (`:167`, `:177`, `:193`). **AC-43
+    holds.** The document's check 1 on the same clone stops with a W3 traceback (exit 1); its
+    check 2 exits 0 with `ALL GATE CHECKS PASSED` and fails on the output condition.
+  - E2, the pass proof: a fresh general-purpose subagent received the document's agent prompt
+    verbatim, wrapped only by its environment (the clone, the interpreter, the build's 0.6.0
+    version string, the maintainer's defaults, no commit, push, install or network, no files
+    outside the clone). It changed 10 files (+159/−69), all within the per-file section; kept
+    `register_ludus_skills` unchanged; the gate checks' conditions changed only by renames; no
+    `warnings` call was added; its tool calls name no path outside the clone and the environment.
+    The main session's runs on its result: check 1 exit 0, last line `[gate] ALL GATE CHECKS
+    PASSED`, stderr empty; check 2 exit 0, the same last line, no `CantusDeprecationWarning` in the
+    output; check 3's hits are all allowed (`Agent(model=...)` calls that pass `tools=`; the kept
+    wrapper, `skill.py:190`, `:200`, `:229`, `:230`, and the docstring sentence describing it,
+    `skill.py:21`; `docs/open-questions.md:38`; `openspec/changes/archive/`). **The pass proof
+    holds.**
+  - E3, the can-fail proof: the unchanged clone — check 1 exit 1 (W3 traceback), check 2 exit 1
+    (`[gate] 2 GATE CHECK(S) FAILED`, W3, W7, W11, W13); the AC-43 variant — check 1 exit 1, check 2
+    exit 0 with `ALL GATE CHECKS PASSED` but W3, W7, W11 and W13 in the output, so it fails; the E2
+    result with its scripted `tool_name` changed back to `skill_name` — check 1 exit 0 with `ALL GATE
+    CHECKS PASSED` (W13 is never raised, as the document says), check 2 exit 0 with the same last
+    line and W13 in the output, so it fails. **The can-fail proof holds.**
+  - Not covered: a real LLM, Luanti and the broker (the test is offline), Windows, ludus CI (ludus
+    has none), installing `cantus-agent>=0.7` from PyPI (not published; a local wheel that reports
+    0.6.0), GitHub's Markdown renderer. The subagent also reported Skill wording in ludus files the
+    document does not list (`examples/ludus_skill_template/README.md:19`, `:27`,
+    `WALKTHROUGH.md:91`, ludus's own `openspec/specs/cantus-skill-binding/spec.md`, install lines
+    without `>=0.7`); none calls a legacy name and check 3 does not match them. Transcripts:
+    `.scratch/T-0016/stage8/` (local).
