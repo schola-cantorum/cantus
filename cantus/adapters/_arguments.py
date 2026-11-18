@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from cantus._deprecation import warn_legacy
@@ -9,7 +10,7 @@ from cantus.protocols.tool import Tool
 
 
 def resolve_tool(fn_name: str, tool: Any, legacy: Any) -> Tool:
-    """Return the `Tool` a ``expose_as_*`` call asked for.
+    """Return the `Tool` an ``expose_as_*`` call asked for.
 
     Args:
         fn_name: The public function name, used in error messages.
@@ -37,26 +38,38 @@ def resolve_tool(fn_name: str, tool: Any, legacy: Any) -> Tool:
     return tool
 
 
-def resolve_tools(fn_name: str, tools: Any, legacy: Any) -> Any:
-    """Merge ``tools`` and the deprecated list keyword into one value.
+def resolve_tools(
+    fn_name: str,
+    tools: Any,
+    legacy: Any,
+    check: Callable[[Any], list[Tool]],
+) -> list[Tool]:
+    """Return the Tools an MCP entry point asked for.
 
-    Only the two keywords are merged; the caller checks the container and its
-    elements, then calls :func:`warn_legacy_tools_keyword` if ``legacy`` was the
-    one given, so a wrong value raises without a warning.
+    The order matches :func:`resolve_tool`: a wrong value of the deprecated
+    keyword raises without a warning, then both keywords raise, then W18.
+
+    Args:
+        fn_name: The public name, used in error messages.
+        tools: The value of ``tools`` (``None`` when not given).
+        legacy: The value of the deprecated keyword (``None`` when not given).
+        check: The entry point's own container and element rule; it returns the
+            validated list or raises.
+
+    Returns:
+        The validated list of Tools.
 
     Raises:
-        TypeError: If both keywords were given.
+        TypeError: If both keywords were given, or ``check`` raises it.
+        ValueError: If ``check`` raises it.
     """
-    if legacy is not None and tools is not None:
-        raise TypeError(
-            f"{fn_name}: pass either tools= or skills=, not both; "  # legacy-alias
-            "skills= is deprecated, use tools="  # legacy-alias
-        )
-    if legacy is None:
-        return tools
-    return legacy
-
-
-def warn_legacy_tools_keyword() -> None:
-    """Emit W18 for the deprecated list keyword."""
-    warn_legacy("W18", variant="skills")  # legacy-alias
+    if legacy is not None:
+        checked = check(legacy)
+        if tools is not None:
+            raise TypeError(
+                f"{fn_name}: pass either tools= or skills=, not both; "  # legacy-alias
+                "skills= is deprecated, use tools="  # legacy-alias
+            )
+        warn_legacy("W18", variant="skills")  # legacy-alias
+        return checked
+    return check(tools)

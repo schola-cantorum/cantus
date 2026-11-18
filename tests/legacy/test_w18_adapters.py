@@ -24,8 +24,6 @@ from tests.legacy.support import (
 
 _ADAPTER_MODULES = ("langchain", "dspy", "huggingface", "openhands")
 
-_ONE_AT_A_TIME = "pass either tool= or skill=, not both"
-_LISTS_ONE_AT_A_TIME = "pass either tools= or skills=, not both"
 _EMPTY_MESSAGE = "export_as_mcp_server requires at least one Tool in the input list"
 
 _ALPHA_BETA = [
@@ -155,25 +153,27 @@ def test_skill_keyword_converts_and_warns_once(fake_sdks, echo, fn_name, module_
 _STUB_CALLER = '''\
 import cantus.adapters
 {tools}
-converted = cantus.adapters.expose_as_langchain_tool(skill=alpha)
+converted = cantus.adapters.{fn}(skill=alpha)
 '''
 
 _MODULE_CALLER = '''\
-import cantus.adapters.openhands
+import cantus.adapters.{module}
 {tools}
-converted = cantus.adapters.openhands.expose_as_openhands_action(skill=alpha)
+converted = cantus.adapters.{module}.{fn}(skill=alpha)
 '''
 
 
+@pytest.mark.parametrize("fn_name, module_name", _EXPOSERS, ids=_EXPOSER_IDS)
 @pytest.mark.parametrize(
     "name, source",
     [("w18_stub_caller", _STUB_CALLER), ("w18_module_caller", _MODULE_CALLER)],
     ids=["stub-path", "module-path"],
 )
 def test_skill_keyword_is_attributed_to_the_calling_line(
-    fake_sdks, tmp_path, name, source
+    fake_sdks, tmp_path, name, source, fn_name, module_name
 ):  # row 17
-    text = source.format(tools=_TOOLS_SOURCE)
+    name = f"{name}_{module_name}"
+    text = source.format(tools=_TOOLS_SOURCE, fn=fn_name, module=module_name)
     path = write_module(tmp_path, name, text)
     call_line = next(
         i for i, line in enumerate(text.splitlines(), 1) if line.startswith("converted =")
@@ -194,6 +194,12 @@ from cantus.adapters import export_as_mcp_server
 server = export_as_mcp_server(skills=[alpha, beta], name="demo", version="1.0")
 '''
 
+_MCP_EXPORT_MODULE_CALLER = '''\
+from cantus.adapters.mcp_server import export_as_mcp_server
+{tools}
+server = export_as_mcp_server(skills=[alpha, beta], name="demo", version="1.0")
+'''
+
 _MCP_CLASS_CALLER = '''\
 from cantus.adapters.mcp_server import McpServer
 {tools}
@@ -203,8 +209,12 @@ server = McpServer(skills=[alpha, beta], name="demo", version="1.0")
 
 @pytest.mark.parametrize(
     "name, source",
-    [("w18_export_caller", _MCP_EXPORT_CALLER), ("w18_class_caller", _MCP_CLASS_CALLER)],
-    ids=["export_as_mcp_server", "McpServer"],
+    [
+        ("w18_export_caller", _MCP_EXPORT_CALLER),
+        ("w18_export_module_caller", _MCP_EXPORT_MODULE_CALLER),
+        ("w18_class_caller", _MCP_CLASS_CALLER),
+    ],
+    ids=["export_as_mcp_server", "export_as_mcp_server-module-path", "McpServer"],
 )
 def test_skills_keyword_converts_and_is_attributed(tmp_path, name, source):  # row 18
     text = source.format(tools=_TOOLS_SOURCE)
@@ -254,7 +264,10 @@ def test_both_keywords_raise_without_warning(fake_sdks, echo, fn_name, module_na
         for call in (lambda: fn(tool=echo, skill=echo), lambda: fn(echo, skill=echo)):
             error = _no_cantus_warning(call)
             assert isinstance(error, TypeError)
-            assert _ONE_AT_A_TIME in str(error)
+            assert str(error) == (
+                f"{fn_name}: pass either tool= or skill=, not both; "
+                "skill= is deprecated, use tool="
+            )
 
 
 def test_both_list_keywords_raise_without_warning(two_tools):  # row 19
@@ -262,13 +275,29 @@ def test_both_list_keywords_raise_without_warning(two_tools):  # row 19
     from cantus.adapters.mcp_server import McpServer
 
     alpha, _ = two_tools
-    for call in (
-        lambda: export_as_mcp_server([alpha], skills=[alpha], name="demo", version="1.0"),
-        lambda: McpServer([alpha], skills=[alpha], name="demo", version="1.0"),
+    for call, label in (
+        (
+            lambda: export_as_mcp_server([alpha], skills=[alpha], name="demo", version="1.0"),
+            "export_as_mcp_server",
+        ),
+        (
+            lambda: export_as_mcp_server(
+                tools=[alpha], skills=[alpha], name="demo", version="1.0"
+            ),
+            "export_as_mcp_server",
+        ),
+        (lambda: McpServer([alpha], skills=[alpha], name="demo", version="1.0"), "McpServer"),
+        (
+            lambda: McpServer(tools=[alpha], skills=[alpha], name="demo", version="1.0"),
+            "McpServer",
+        ),
     ):
         error = _no_cantus_warning(call)
         assert isinstance(error, TypeError)
-        assert _LISTS_ONE_AT_A_TIME in str(error)
+        assert str(error) == (
+            f"{label}: pass either tools= or skills=, not both; "
+            "skills= is deprecated, use tools="
+        )
 
 
 @pytest.mark.parametrize("fn_name, module_name", _EXPOSERS, ids=_EXPOSER_IDS)
@@ -301,9 +330,35 @@ def test_wrong_skills_value_raises_without_warning(two_tools):  # row 20
         assert isinstance(error, TypeError)
         assert f"{label} expects list[Tool], got element of type int" in str(error)
 
-    for empty in ([], (alpha,)):
+    # A wrong legacy value is reported before the both-keywords error, as in Agent.
+    for call, label in (
+        (
+            lambda: export_as_mcp_server(
+                [alpha], skills=[alpha, 42], name="demo", version="1.0"
+            ),
+            "export_as_mcp_server",
+        ),
+        (lambda: McpServer([alpha], skills=[42], name="demo", version="1.0"), "McpServer"),
+    ):
+        error = _no_cantus_warning(call)
+        assert isinstance(error, TypeError)
+        assert f"{label} expects list[Tool], got element of type int" in str(error)
+
+    error = _no_cantus_warning(lambda: McpServer(skills=42, name="demo", version="1.0"))
+    assert isinstance(error, TypeError)
+    assert str(error) == "McpServer expects list[Tool], got int"
+
+    for build in (
+        lambda: export_as_mcp_server([alpha], skills=None, name="demo", version="1.0"),
+        lambda: McpServer([alpha], skills=None, name="demo", version="1.0"),
+    ):
+        server, records = _record(build)
+        assert [entry["name"] for entry in server.tools] == ["alpha"]
+        assert records == []
+
+    for rejected in ([], (alpha,)):
         error = _no_cantus_warning(
-            lambda: export_as_mcp_server(skills=empty, name="demo", version="1.0")
+            lambda: export_as_mcp_server(skills=rejected, name="demo", version="1.0")
         )
         assert isinstance(error, ValueError)
         assert str(error) == _EMPTY_MESSAGE
@@ -344,6 +399,8 @@ def test_skills_keyword_fails_under_error_filter(tmp_path):  # row 21
     proc = run_python(["-W", "error::DeprecationWarning", "script.py"], cwd=tmp_path)
     assert proc.returncode != 0
     assert "CantusDeprecationWarning" in proc.stderr
+    assert EXPECTED["W18:skills"] in proc.stderr
+    assert "converted" not in proc.stdout
 
 
 def test_tools_keyword_is_clean_under_error_filter(tmp_path):  # row 21

@@ -111,6 +111,9 @@ def test_mcp_server_class_requires_tools():
         McpServer(name="demo", version="1.0")
     with pytest.raises(TypeError, match=r"McpServer expects list\[Tool\], got NoneType"):
         McpServer(None, name="demo", version="1.0")
+    with pytest.raises(TypeError) as excinfo:
+        McpServer(42, name="demo", version="1.0")
+    assert str(excinfo.value) == "McpServer expects list[Tool], got int"
 
 
 def test_export_rejects_empty_list():
@@ -121,7 +124,7 @@ def test_export_rejects_empty_list():
 
 def test_export_rejects_anything_but_a_nonempty_list():
     a_tool = _SearchBookTool()
-    for bad in ((a_tool,), (), iter([a_tool]), a_tool, None, "ab"):
+    for bad in ((a_tool,), (), iter([a_tool]), (t for t in [a_tool]), a_tool, None, "ab"):
         with pytest.raises(ValueError) as excinfo:
             export_as_mcp_server(bad, name="x", version="0.0.1")  # type: ignore[arg-type]
         assert str(excinfo.value) == _EMPTY_MESSAGE

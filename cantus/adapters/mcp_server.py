@@ -17,7 +17,7 @@ import socket
 from collections.abc import Iterable
 from typing import Any, Literal
 
-from cantus.adapters._arguments import resolve_tools, warn_legacy_tools_keyword
+from cantus.adapters._arguments import resolve_tools
 from cantus.protocols.tool import Tool
 
 # Alphanumeric leader followed by alphanumeric, dot, underscore, or hyphen.
@@ -45,6 +45,38 @@ def _validate_name_or_version(value: Any, *, field: str) -> None:
         )
 
 
+def _checked_iterable(value: Any) -> list[Tool]:
+    """`McpServer`'s rule: any iterable of Tools, an empty one included."""
+    try:
+        items = list(value)
+    except TypeError:
+        raise TypeError(
+            f"McpServer expects list[Tool], got {type(value).__name__}"
+        ) from None
+    for item in items:
+        if not isinstance(item, Tool):
+            raise TypeError(
+                "McpServer expects list[Tool], "
+                f"got element of type {type(item).__name__}"
+            )
+    return items
+
+
+def _checked_nonempty_list(value: Any) -> list[Tool]:
+    """`export_as_mcp_server`'s rule: a non-empty list of Tools."""
+    if not isinstance(value, list) or len(value) == 0:
+        raise ValueError(
+            "export_as_mcp_server requires at least one Tool in the input list"
+        )
+    for item in value:
+        if not isinstance(item, Tool):
+            raise TypeError(
+                f"export_as_mcp_server expects list[Tool], "
+                f"got element of type {type(item).__name__}"
+            )
+    return value
+
+
 class McpServer:
     """Thin holder for a list of MCP tool dicts derived from cantus Tools.
 
@@ -60,8 +92,8 @@ class McpServer:
         version: The server version, stored as given.
 
     Raises:
-        TypeError: If no tools are given, an element is not a Tool, or both
-            ``tools`` and the deprecated keyword are given.
+        TypeError: If no tools are given, the value is not iterable, an element
+            is not a Tool, or both ``tools`` and the deprecated keyword are given.
     """
 
     def __init__(
@@ -72,21 +104,11 @@ class McpServer:
         name: str,
         version: str,
     ) -> None:
-        value = resolve_tools("McpServer", tools, skills)  # legacy-alias
-        if value is None:
-            raise TypeError("McpServer expects list[Tool], got NoneType")
-        items = list(value)
-        for item in items:
-            if not isinstance(item, Tool):
-                raise TypeError(
-                    "McpServer expects list[Tool], "
-                    f"got element of type {type(item).__name__}"
-                )
-        if skills is not None:  # legacy-alias
-            warn_legacy_tools_keyword()
+        self._tools: list[Tool] = resolve_tools(
+            "McpServer", tools, skills, _checked_iterable  # legacy-alias
+        )
         self.name = name
         self.version = version
-        self._tools: list[Tool] = items
 
     @property
     def tools(self) -> list[dict[str, Any]]:
@@ -172,20 +194,9 @@ def export_as_mcp_server(
     _validate_name_or_version(name, field="name")
     _validate_name_or_version(version, field="version")
 
-    resolved = resolve_tools("export_as_mcp_server", tools, skills)  # legacy-alias
-    if not isinstance(resolved, list) or len(resolved) == 0:
-        raise ValueError(
-            "export_as_mcp_server requires at least one Tool in the input list"
-        )
-    for item in resolved:
-        if not isinstance(item, Tool):
-            raise TypeError(
-                f"export_as_mcp_server expects list[Tool], "
-                f"got element of type {type(item).__name__}"
-            )
-    if skills is not None:  # legacy-alias
-        warn_legacy_tools_keyword()
-
+    resolved = resolve_tools(
+        "export_as_mcp_server", tools, skills, _checked_nonempty_list  # legacy-alias
+    )
     return McpServer(resolved, name=name, version=version)
 
 

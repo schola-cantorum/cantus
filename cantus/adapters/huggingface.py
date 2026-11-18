@@ -6,14 +6,14 @@ cantus[huggingface]``) so a missing SDK surfaces immediately as a clear
 :func:`expose_as_hf_tool` / :func:`import_hf_tool`. ``smolagents`` is the
 successor to the pre-migration target ``transformers.Tool``, which was removed
 in transformers 4.53. Both directions preserve the v0.3.0
-``Tool.spec_for_llm()`` JSON shape — every field declared in a HF Tool's
+cantus ``Tool.spec_for_llm()`` JSON shape — every field declared in a HF Tool's
 ``inputs`` dict is treated as required because ``smolagents.Tool`` has no
 "optional input" concept.
 
 Export builds a dynamic ``smolagents.Tool`` subclass per cantus Tool: ``name`` /
 ``description`` / ``inputs`` become class attributes, ``output_type`` is
 ``"any"``, and a generated ``forward(self, <a>, <b>, ...)`` dispatches through
-``Tool.__call__``. That call runs ``run()`` directly — pre/post hooks are
+the cantus ``Tool.__call__``. That call runs ``run()`` directly — pre/post hooks are
 applied only by the cantus Agent dispatcher, never by the exported tool.
 Import accepts any ``smolagents.Tool`` instance, including
 ``@smolagents.tool``-decorated functions.

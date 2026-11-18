@@ -1,7 +1,8 @@
 """Importing cantus.adapters must not alter Tool.spec_for_llm() JSON shape.
 
 This is the adapter-side counterpart to the v0.3.0
-`tests/test_tool.py::test_spec_for_llm_shape_unchanged*` contract: even
+`tests/test_tool.py::test_spec_for_llm_matches_v0_2_1_fixture_with_and_without_hooks`
+contract: even
 after every `cantus.adapters.*` submodule is imported, every pre-existing
 Tool's `spec_for_llm()` output remains byte-for-byte identical.
 
@@ -115,7 +116,7 @@ def test_adapter_import_does_not_change_plain_tool_spec(monkeypatch):
 
 
 def test_adapter_import_does_not_change_hooked_tool_spec(monkeypatch):
-    """Mirror of v0.3.0 `test_spec_for_llm_shape_unchanged_with_hooks`."""
+    """The same invariant for a Tool built with hooks."""
 
     def parse(title: str) -> str:
         return title.strip()

@@ -93,6 +93,7 @@ def _bad_inputs(a_tool: Tool) -> list[tuple[Any, str]]:
     return [
         (None, "NoneType"),
         ("x", "str"),
+        (42, "int"),
         ({}, "dict"),
         (_plain_function, "function"),
         (Tool, "type"),

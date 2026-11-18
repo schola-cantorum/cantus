@@ -1,7 +1,7 @@
 """Shared base class for all `cantus.adapters.import_*` adapters.
 
-`_RemoteToolBase` lifts the three load-bearing patterns from v0.3.2
-`cantus.adapters.mcp_client._RemoteTool` into a private, framework-internal
+`_RemoteToolBase` lifts the three load-bearing patterns of the MCP client's
+remote tool class (written in v0.3.2) into a private, framework-internal
 base so that LangChain / DSPy / future cross-framework import adapters
 inherit the same v0.3.0 `Tool.spec_for_llm()` shape contract instead of
 duplicating it per adapter:

@@ -67,7 +67,7 @@ def test_remote_tool_base_is_not_public():
     assert "_RemoteToolBase" not in adapters.__all__
     assert "_RemoteToolBase" not in vars(adapters)
     assert issubclass(_RemoteToolBase, Tool)
-    assert _RemoteToolBase.__name__ == "_RemoteToolBase"
+    assert _RemoteToolBase.__module__ == "cantus.adapters._remote_tool"
 
 
 def test_registry_kinds_unchanged_after_import():
