@@ -91,7 +91,7 @@ class _ScriptedModel:
 
 def _action(name: str, args=None):
     return json.dumps(
-        {"thought": "", "action": {"skill_name": name, "args": args or {}}}  # T-0010 switches this key
+        {"thought": "", "action": {"tool_name": name, "args": args or {}}}
     )
 
 

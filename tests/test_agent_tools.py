@@ -379,7 +379,7 @@ def test_a_tool_subclass_instance_in_tools_is_dispatched_and_stays_out_of_the_gl
 
 
 def test_prompt_lists_tools_under_the_tool_key_and_shows_the_new_event_reprs(records):
-    # Row 8: the model output is built here (thought 'add them'); T-0010 switches its key.
+    # Row 8: the model output is built here (thought 'add them').
     import json
 
     @tool
@@ -393,7 +393,7 @@ def test_prompt_lists_tools_under_the_tool_key_and_shows_the_new_event_reprs(rec
         raise ValueError("no")
 
     def call(name, **args):
-        action = {"skill_name": name, "args": args}  # T-0010 switches this key
+        action = {"tool_name": name, "args": args}
         return json.dumps({"thought": "add them", "action": action})
 
     stream, model = run_agent(

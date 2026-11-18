@@ -2,7 +2,7 @@
 
 Task 5 (this section): cantus.hooks imports succeed.
 Task 8 (later): pre_hook / post_hook dispatch behavior is added below once
-Agent._dispatch_skill is refactored.
+Agent._dispatch_tool is refactored.
 """
 
 from __future__ import annotations
@@ -12,13 +12,13 @@ from dataclasses import dataclass
 
 from cantus.core.agent import Agent
 from cantus.core.observation import (
-    SkillObservation,
     ToolErrorObservation,
+    ToolObservation,
     ValidationErrorObservation,
 )
-from cantus.core.registry import get_registry
+from cantus.core.registry import Registry, _get_global_registry
 from cantus.hooks import Result, analyzer, validator
-from cantus.protocols.skill import skill
+from cantus.protocols.tool import tool
 
 
 # --- cantus.hooks surface ------------------------------------------------
@@ -76,8 +76,8 @@ def test_hook_decorators_do_not_mutate_registry():
         """OK."""
         return Result.success(value)
 
-    reg = get_registry()
-    for kind in ("skill", "analyzer", "validator", "workflow"):
+    reg = _get_global_registry()
+    for kind in ("tool", "analyzer", "validator", "workflow"):
         assert reg.names_for(kind) == [], (
             f"hook decorator polluted registry under kind {kind!r}: "
             f"{reg.names_for(kind)}"
@@ -100,7 +100,7 @@ class _ScriptedModel:
 
 def _action(name: str, args=None):
     return json.dumps(
-        {"thought": "", "action": {"skill_name": name, "args": args or {}}}
+        {"thought": "", "action": {"tool_name": name, "args": args or {}}}
     )
 
 
@@ -108,8 +108,8 @@ def _final(text: str):
     return json.dumps({"thought": "", "action": {"final_answer": text}})
 
 
-def test_pre_hook_transforms_args_before_skill_body():
-    """pre_hook receives validated args, its return value flows into the skill body."""
+def test_pre_hook_transforms_args_before_tool_body():
+    """pre_hook receives validated args, its return value flows into the tool body."""
     captured = {"received": None}
 
     @analyzer
@@ -117,7 +117,7 @@ def test_pre_hook_transforms_args_before_skill_body():
         """Upper-case the input."""
         return text.upper()
 
-    @skill(pre_hook=parse_upper)
+    @tool(pre_hook=parse_upper)
     def echo(text: str) -> str:
         """Echo whatever the pre_hook produced."""
         captured["received"] = text
@@ -126,11 +126,12 @@ def test_pre_hook_transforms_args_before_skill_body():
     agent = Agent(
         model=_ScriptedModel(
             [_action("echo", {"text": "tainan"}), _final("done")]
-        )
+        ),
+        tools=[echo],
     )
     state = agent.run("q")
 
-    successes = [e for e in state.stream if isinstance(e, SkillObservation)]
+    successes = [e for e in state.stream if isinstance(e, ToolObservation)]
     assert len(successes) == 1
     assert successes[0].result == "TAINAN"
     assert captured["received"] == "TAINAN"
@@ -144,7 +145,7 @@ def test_post_hook_validation_failure_emits_validation_error():
         """Reject empty strings."""
         return Result.success(value) if value else Result.failure("empty")
 
-    @skill(post_hook=non_empty)
+    @tool(post_hook=non_empty)
     def get_summary(topic: str) -> str:
         """Always returns empty."""
         return ""
@@ -152,21 +153,22 @@ def test_post_hook_validation_failure_emits_validation_error():
     agent = Agent(
         model=_ScriptedModel(
             [_action("get_summary", {"topic": "anything"}), _final("done")]
-        )
+        ),
+        tools=[get_summary],
     )
     state = agent.run("q")
 
     val_errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
-    successes = [e for e in state.stream if isinstance(e, SkillObservation)]
+    successes = [e for e in state.stream if isinstance(e, ToolObservation)]
     assert len(val_errors) == 1
     assert val_errors[0].feedback == "empty"
     assert val_errors[0].validator_name == "non_empty"
-    assert successes == []  # post_hook failure suppresses the SkillObservation
+    assert successes == []  # post_hook failure suppresses the ToolObservation
 
 
-def test_hook_helpers_do_not_appear_in_skill_registry():
-    """Even when @analyzer/@validator are referenced by a Skill via pre_hook/post_hook,
-    they SHALL NOT appear in get_registry().names_for("skill")."""
+def test_hook_helpers_do_not_appear_in_tool_registry():
+    """Even when @analyzer/@validator are referenced by a Tool via pre_hook/post_hook,
+    they SHALL NOT appear in the registry's names_for("tool")."""
 
     @analyzer
     def parse(text: str) -> str:
@@ -178,16 +180,16 @@ def test_hook_helpers_do_not_appear_in_skill_registry():
         """OK."""
         return Result.success(value)
 
-    @skill(pre_hook=parse, post_hook=check)
+    @tool(pre_hook=parse, post_hook=check)
     def echo(text: str) -> str:
         """Echo."""
         return text
 
-    reg = get_registry()
-    skill_names = reg.names_for("skill")
-    assert "echo" in skill_names
-    assert "parse" not in skill_names
-    assert "check" not in skill_names
+    reg = Registry(tools=[echo])
+    tool_names = reg.names_for("tool")
+    assert "echo" in tool_names
+    assert "parse" not in tool_names
+    assert "check" not in tool_names
 
 
 def test_pre_hook_exception_becomes_tool_error_with_label():
@@ -198,13 +200,14 @@ def test_pre_hook_exception_becomes_tool_error_with_label():
         """Always raises."""
         raise RuntimeError("kaboom-pre")
 
-    @skill(pre_hook=explode)
+    @tool(pre_hook=explode)
     def echo(text: str) -> str:
         """Echo."""
         return text
 
     agent = Agent(
-        model=_ScriptedModel([_action("echo", {"text": "x"}), _final("done")])
+        model=_ScriptedModel([_action("echo", {"text": "x"}), _final("done")]),
+        tools=[echo],
     )
     state = agent.run("q")
     errors = [e for e in state.stream if isinstance(e, ToolErrorObservation)]
@@ -221,13 +224,14 @@ def test_post_hook_exception_becomes_tool_error_with_label():
         """Always raises."""
         raise RuntimeError("kaboom-post")
 
-    @skill(post_hook=explode)
+    @tool(post_hook=explode)
     def echo(text: str) -> str:
         """Echo."""
         return text
 
     agent = Agent(
-        model=_ScriptedModel([_action("echo", {"text": "x"}), _final("done")])
+        model=_ScriptedModel([_action("echo", {"text": "x"}), _final("done")]),
+        tools=[echo],
     )
     state = agent.run("q")
     errors = [e for e in state.stream if isinstance(e, ToolErrorObservation)]

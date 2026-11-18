@@ -1,9 +1,11 @@
-"""Private helper: keep the legacy keyword and attribute working on the event classes.
+"""Private helper: keep the legacy keyword and attribute working on classes with ``tool_name``.
 
 The three event classes (`CallToolAction`, `ToolObservation`, `ToolErrorObservation`)
-are plain frozen dataclasses with the generated ``__init__``. `accepts_legacy_keyword`
-wraps that ``__init__`` so a v0.6 call with the old keyword still works for one
-deprecation window, and adds a read-only property for the old attribute. Both emit W7.
+are plain frozen dataclasses with the generated ``__init__``; the grammar's
+`ParsedToolCall` is a plain mutable one. `accepts_legacy_keyword` wraps that ``__init__`` so
+a v0.6 call with the old keyword still works for one deprecation window, and adds a
+property for the old attribute: read-only on a frozen class, with a setter on a mutable
+one. Keyword, read and assignment each emit W7.
 """
 
 from __future__ import annotations
@@ -37,10 +39,12 @@ def _from_replace(cls: type, tool_name: Any, caller: FrameType) -> bool:
 
 
 def accepts_legacy_keyword(cls: type[_T]) -> type[_T]:
-    """Class decorator, applied above ``@dataclass(frozen=True)``.
+    """Class decorator, applied above ``@dataclass`` or ``@dataclass(frozen=True)``.
 
     The class keeps its generated ``__init__`` signature (as seen by type checkers and
-    ``help()``); the wrapper only adds the legacy keyword on top.
+    ``help()``); the wrapper only adds the legacy keyword on top. A frozen class gets a
+    read-only legacy property (assignment still raises ``FrozenInstanceError``); a mutable
+    class gets a setter that emits W7 and assigns ``tool_name``.
     """
     generated = cls.__init__
     init_names = [f.name for f in dataclasses.fields(cls) if f.init]  # type: ignore[arg-type]
@@ -61,12 +65,17 @@ def accepts_legacy_keyword(cls: type[_T]) -> type[_T]:
             kwargs["tool_name"] = kwargs.pop("skill_name")  # legacy-alias
         generated(self, *args, **kwargs)
 
-    def skill_name(self: Any) -> str:  # legacy-alias
+    def skill_name(self: Any) -> str | None:  # legacy-alias
         warn_legacy("W7")
-        tool_name: str = self.tool_name
+        tool_name: str | None = self.tool_name
         return tool_name
 
+    def set_skill_name(self: Any, value: str) -> None:  # legacy-alias
+        warn_legacy("W7")
+        self.tool_name = value
+
     skill_name.__doc__ = "Deprecated; use tool_name."  # legacy-alias
+    frozen = cls.__dataclass_params__.frozen  # type: ignore[attr-defined]
     setattr(cls, "__init__", __init__)
-    setattr(cls, "skill_name", property(skill_name))  # legacy-alias
+    setattr(cls, "skill_name", property(skill_name, None if frozen else set_skill_name))  # legacy-alias
     return cls

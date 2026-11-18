@@ -42,8 +42,8 @@ for ev in state.stream:
         for line in ev.feedback.splitlines()[:2]:
             print(line)
 # -> action_parse
-# -> error_type: unknown_skill
-# -> detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+# -> error_type: unknown_tool
+# -> detail: tool_name 'serch_book' not in current tool registry; available: ['search_book']
 ```
 
 修法：把正確名字加進 system prompt 的範例，或調 `max_retries` 讓 LLM 自己更正。
@@ -211,8 +211,8 @@ except GrammarError as e:
 
 ```text
 action_parse
-error_type: unknown_skill
-detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+error_type: unknown_tool
+detail: tool_name 'serch_book' not in current tool registry; available: ['search_book']
 Validator ensure_isbn must return Result, got bool
 TypeError
 no @memory decorator

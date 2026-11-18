@@ -18,19 +18,23 @@ Five behaviors merged into `agent-runtime` canonical spec:
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import dataclass
 
 import pytest
 
+from cantus import CantusDeprecationWarning
 from cantus.core.action import FinalAnswerAction
 from cantus.core.agent import Agent
 from cantus.core.observation import (
     MaxIterationsObservation,
+    ToolErrorObservation,
     ValidationErrorObservation,
 )
 from cantus.core.result import Result
+from cantus.core.registry import Registry
 from cantus.grammar.tool_call import GrammarError, build_schema, parse_tool_call
-from cantus.protocols.skill import skill
+from cantus.protocols.tool import Tool, tool
 from cantus.protocols.validator import (
     RESERVED_VALIDATOR_NAMES,
     ReservedValidatorNameError,
@@ -56,9 +60,9 @@ def _final(text: str) -> str:
     return json.dumps({"thought": "", "action": {"final_answer": text}})
 
 
-def _skill_call(name: str, args: dict | None = None) -> str:
+def _tool_call(name: str, args: dict | None = None) -> str:
     return json.dumps(
-        {"thought": "", "action": {"skill_name": name, "args": args or {}}}
+        {"thought": "", "action": {"tool_name": name, "args": args or {}}}
     )
 
 
@@ -67,7 +71,7 @@ def _skill_call(name: str, args: dict | None = None) -> str:
 
 def test_schema_final_answer_has_minlength_one():
     """Grammar-constrained decoder MUST reject empty final_answer at decode."""
-    schema = build_schema()
+    schema = build_schema(registry=Registry())
     fa = schema["properties"]["action"]["oneOf"][1]["properties"]["final_answer"]
     assert fa.get("minLength") == 1
 
@@ -79,7 +83,7 @@ def test_parse_tool_call_rejects_empty_final_answer():
     """
     raw = json.dumps({"thought": "", "action": {"final_answer": ""}})
     with pytest.raises(GrammarError, match="non-empty"):
-        parse_tool_call(raw)
+        parse_tool_call(raw, registry=Registry())
 
 
 def test_runtime_empty_final_answer_appends_non_empty_validation_error():
@@ -88,7 +92,8 @@ def test_runtime_empty_final_answer_appends_non_empty_validation_error():
     or whitespace-only final_answer, and the loop SHALL continue.
     """
     agent = Agent(
-        model=ScriptedModel([_final(""), _final("   "), _final("real answer")])
+        model=ScriptedModel([_final(""), _final("   "), _final("real answer")]),
+        tools=[],
     )
     state = agent.run("q", max_iterations=8)
     val_errors = [
@@ -105,7 +110,8 @@ def test_runtime_empty_final_answer_appends_non_empty_validation_error():
 
 def test_malformed_json_appends_action_parse_with_json_syntax():
     agent = Agent(
-        model=ScriptedModel(["Sorry, I cannot help with that", _final("ok")])
+        model=ScriptedModel(["Sorry, I cannot help with that", _final("ok")]),
+        tools=[],
     )
     state = agent.run("q", max_iterations=4)
     val_errors = [
@@ -129,34 +135,35 @@ def test_malformed_json_appends_action_parse_with_json_syntax():
 
 def test_empty_action_object_appends_action_parse_with_missing_field():
     raw = json.dumps({"thought": "reasoning", "action": {}})
-    agent = Agent(model=ScriptedModel([raw, _final("ok")]))
+    agent = Agent(model=ScriptedModel([raw, _final("ok")]), tools=[])
     state = agent.run("q", max_iterations=4)
     val_errors = [
         e for e in state.stream if isinstance(e, ValidationErrorObservation)
     ]
     bad = next(e for e in val_errors if e.validator_name == "action_parse")
     assert bad.feedback.startswith("error_type: missing_field")
-    assert "skill_name" in bad.feedback
+    assert "tool_name" in bad.feedback
     assert "final_answer" in bad.feedback
 
 
-def test_unknown_skill_at_parse_appends_action_parse_with_unknown_skill():
-    @skill
+def test_unknown_tool_at_parse_appends_action_parse_with_unknown_tool():
+    @tool
     def search_book(title: str) -> str:
-        """Known skill."""
+        """Known tool."""
         return title
 
     agent = Agent(
         model=ScriptedModel(
-            [_skill_call("search_books", {"title": "x"}), _final("ok")]
-        )
+            [_tool_call("search_books", {"title": "x"}), _final("ok")]
+        ),
+        tools=[search_book],
     )
     state = agent.run("q", max_iterations=4)
     val_errors = [
         e for e in state.stream if isinstance(e, ValidationErrorObservation)
     ]
     bad = next(e for e in val_errors if e.validator_name == "action_parse")
-    assert bad.feedback.startswith("error_type: unknown_skill")
+    assert bad.feedback.startswith("error_type: unknown_tool")
     assert "search_books" in bad.feedback
     assert "search_book" in bad.feedback
 
@@ -166,7 +173,7 @@ def test_raw_output_preview_truncated_at_500_chars():
     truncated and the literal token `…[truncated]` appended.
     """
     huge = "x" * 800  # Not valid JSON, will trigger json_syntax.
-    agent = Agent(model=ScriptedModel([huge, _final("ok")]))
+    agent = Agent(model=ScriptedModel([huge, _final("ok")]), tools=[])
     state = agent.run("q", max_iterations=4)
     bad = next(
         e
@@ -192,7 +199,7 @@ def test_no_silent_fallback_to_final_answer_from_raw():
     `final_answer` JSON parse, never from raw text.
     """
     raw_text = "just chatting, no JSON here"
-    agent = Agent(model=ScriptedModel([raw_text, _final("real")]))
+    agent = Agent(model=ScriptedModel([raw_text, _final("real")]), tools=[])
     state = agent.run("q", max_iterations=4)
     finals = [e for e in state.stream if isinstance(e, FinalAnswerAction)]
     # Exactly one FinalAnswerAction, with the second-iteration answer.
@@ -205,21 +212,21 @@ def test_no_silent_fallback_to_final_answer_from_raw():
 
 @dataclass
 class LoopingModel:
-    """Always asks to call a registered skill, never finalizes."""
+    """Always asks to call a registered tool, never finalizes."""
 
-    skill_name: str
+    tool_name: str
 
     def generate(self, prompt: str, **kwargs):
-        return _skill_call(self.skill_name, {})
+        return _tool_call(self.tool_name, {})
 
 
 def test_max_iterations_exhaustion_appends_max_iter_observation():
-    @skill
+    @tool
     def noop() -> str:
         """Stub."""
         return "."
 
-    agent = Agent(model=LoopingModel("noop"))
+    agent = Agent(model=LoopingModel("noop"), tools=[noop])
     state = agent.run("q", max_iterations=2)
     assert isinstance(state.stream[-1], MaxIterationsObservation)
     assert state.stream[-1].iterations == 2
@@ -232,12 +239,12 @@ def test_max_iterations_partial_state_is_deep_copy():
     """Mutating `partial_state` after `agent.run` returns MUST NOT affect
     subsequent invocations or the canonical stream the framework holds.
     """
-    @skill
+    @tool
     def noop() -> str:
         """Stub."""
         return "."
 
-    agent = Agent(model=LoopingModel("noop"))
+    agent = Agent(model=LoopingModel("noop"), tools=[noop])
     state = agent.run("q", max_iterations=2)
     max_obs = state.stream[-1]
     assert isinstance(max_obs, MaxIterationsObservation)
@@ -328,3 +335,162 @@ def test_reserved_name_check_is_case_sensitive():
 
     # Registration succeeded without raising.
     assert Non_Empty_Final_Answer is not None
+
+
+# ---- Parse-error texts (traceability 2.2), written out in full -------------------
+
+
+def _tool_pair():
+    @tool
+    def beta(x: int = 0) -> int:
+        """Beta."""
+        return x
+
+    @tool
+    def alpha(x: int = 0) -> int:
+        """Alpha."""
+        return x
+
+    return [beta, alpha]  # registered in this order; the message lists them sorted
+
+
+def _only_parse_error(raw, tools):
+    model = ScriptedModel([raw, _final("ok")])
+    stream = Agent(model, tools=tools).run("q").stream
+    errors = [e for e in stream if isinstance(e, ValidationErrorObservation)]
+    assert len(errors) == 1
+    return errors[0]
+
+
+_ACTION_MISSING = (
+    "error_type: missing_field\n"
+    "detail: action object missing or not a JSON object; "
+    "required keys: tool_name or final_answer\n"
+)
+
+
+@pytest.mark.parametrize(
+    "raw, head",
+    [
+        (json.dumps({"thought": "t"}), _ACTION_MISSING),
+        (json.dumps({"thought": "t", "action": "alpha"}), _ACTION_MISSING),
+        (
+            json.dumps({"thought": "t", "action": {"args": {}}}),
+            "error_type: missing_field\n"
+            "detail: action object must contain either 'tool_name' or 'final_answer'\n",
+        ),
+        (
+            json.dumps({"thought": "t", "action": {"tool_name": 5, "args": {}}}),
+            "error_type: missing_field\ndetail: tool_name must be a string, got int\n",
+        ),
+        (
+            json.dumps({"thought": "t", "action": {"tool_name": None, "args": {}}}),
+            "error_type: missing_field\ndetail: tool_name must be a string, got NoneType\n",
+        ),
+        (
+            json.dumps({"thought": "t", "action": {"tool_name": "nope", "args": {}}}),
+            "error_type: unknown_tool\n"
+            "detail: tool_name 'nope' not in current tool registry; "
+            "available: ['alpha', 'beta']\n",
+        ),
+    ],
+)
+def test_parse_error_texts_are_exact(raw, head):
+    error = _only_parse_error(raw, _tool_pair())
+    assert error.validator_name == "action_parse"
+    assert error.feedback == head + f"raw_output_preview: {raw}"
+    assert len(error.feedback.split("\n")) == 3
+
+
+def test_unknown_tool_name_with_an_apostrophe_is_shown_with_repr():
+    class Quoted(Tool):
+        name = "it's"
+
+        def run(self) -> str:
+            """Run."""
+            return "q"
+
+    raw = json.dumps({"thought": "t", "action": {"tool_name": "it'z", "args": {}}})
+    error = _only_parse_error(raw, [Quoted()])
+    assert error.feedback.split("\n")[1] == (
+        "detail: tool_name \"it'z\" not in current tool registry; available: [\"it's\"]"
+    )
+
+
+def test_empty_final_answer_text_is_exact():
+    raw = json.dumps({"thought": "t", "action": {"final_answer": "  "}})
+    error = _only_parse_error(raw, _tool_pair())
+    assert error.validator_name == "non_empty_final_answer"
+    assert error.feedback == (
+        "FinalAnswerAction.answer must be non-empty after str.strip(); "
+        "call a tool or write a substantive answer"
+    )
+
+
+def test_json_syntax_texts_are_unchanged_and_a_flat_output_is_a_missing_action():
+    not_json = '{"tool_name": broken'
+    top_list = '[{"tool_name": "alpha"}]'
+    action_string = json.dumps({"thought": "t", "action": "tool_name"})
+    flat = json.dumps({"thought": "t", "tool_name": "alpha", "args": {}})
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        first = _only_parse_error(not_json, _tool_pair())
+        second = _only_parse_error(top_list, _tool_pair())
+        third = _only_parse_error(action_string, _tool_pair())
+        fourth = _only_parse_error(flat, _tool_pair())
+
+    lines = first.feedback.split("\n")
+    assert lines[0] == "error_type: json_syntax"
+    assert lines[1].startswith("detail: expected JSON object, got JSONDecodeError: ")
+    assert second.feedback.split("\n")[:2] == [
+        "error_type: json_syntax",
+        "detail: top-level must be a JSON object, got list",
+    ]
+    assert third.feedback.split("\n")[:2] == [
+        "error_type: missing_field",
+        "detail: action object missing or not a JSON object; "
+        "required keys: tool_name or final_answer",
+    ]
+    assert fourth.feedback.split("\n")[:2] == [
+        "error_type: missing_field",
+        "detail: action object missing or not a JSON object; "
+        "required keys: tool_name or final_answer",
+    ]
+    assert [w for w in caught if issubclass(w.category, CantusDeprecationWarning)] == []
+
+
+def test_failing_tool_stages_name_the_tool_and_the_stage_in_the_message():
+    def bad_pre(value: int) -> int:
+        raise KeyError("pre")
+
+    def bad_post(value: int) -> int:
+        raise KeyError("post")
+
+    @tool(pre_hook=bad_pre)
+    def with_pre(value: int = 0) -> int:
+        """With pre."""
+        return value
+
+    @tool(post_hook=bad_post)
+    def with_post(value: int = 0) -> int:
+        """With post."""
+        return value
+
+    @tool
+    def typed(value: int) -> int:
+        """Typed."""
+        return value
+
+    tools = [with_pre, with_post, typed]
+    outputs = [
+        json.dumps({"thought": "", "action": {"tool_name": "typed", "args": {"value": "x"}}}),
+        json.dumps({"thought": "", "action": {"tool_name": "with_pre", "args": {}}}),
+        json.dumps({"thought": "", "action": {"tool_name": "with_post", "args": {}}}),
+        _final("ok"),
+    ]
+    stream = Agent(ScriptedModel(outputs), tools=tools).run("q").stream
+    errors = [e for e in stream if isinstance(e, ToolErrorObservation)]
+    assert [e.tool_name for e in errors] == ["typed", "with_pre", "with_post"]
+    assert errors[0].message.startswith("args validation failed: ValidationError: ")
+    assert errors[1].message == "pre_hook KeyError: 'pre'"
+    assert errors[2].message == "post_hook KeyError: 'post'"
