@@ -2,7 +2,7 @@
 id: T-0014
 title: Protocols around the Tool — debug, AutoMemory, analyzer, validator, hooks, workflows
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0010]
 ---
 
