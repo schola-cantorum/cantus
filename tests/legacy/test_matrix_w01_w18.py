@@ -10,6 +10,7 @@ nothing in ``cantus/`` is expected to change, so every case is a guard that pass
 
 from __future__ import annotations
 
+import importlib
 import sys
 import warnings
 from pathlib import Path
@@ -80,6 +81,7 @@ _GLOBAL_ADD = (
 )
 _SERVE = ("fastapi",)
 _TUI = ("textual",)
+_PRELOAD = {"fastapi": "cantus.serve.introspection", "textual": "cantus.tui.widgets"}
 _INTRO = "__import__('cantus.serve.introspection', fromlist=['x'])"
 _WIDGETS = "__import__('cantus.tui.widgets', fromlist=['x'])"
 
@@ -135,50 +137,53 @@ case("W16 attr", "W16", "x = m.collect_skills", "x is m.collect_tools",
 # --- row 2: legacy functions (W2, W3, W8) and the three star-import cases -------------------
 
 _F_DEF = "@skill\ndef f(a: int) -> int:\n    'F.'\n    return a"
-case("W2 @skill", "W2", _F_DEF, "isinstance(f, Tool)", [("W2", "cantus", "decorator")],
+# The legacy entries build a Tool AND put it in the global registry (TR-53, TR-54).
+_F_REGISTERED = "isinstance(f, Tool) and __import__('cantus.core.registry', fromlist=['x'])._get_global_registry().lookup('tool', 'f') is f"
+_T_REGISTERED = "isinstance(t, Tool) and __import__('cantus.core.registry', fromlist=['x'])._get_global_registry().lookup('tool', 'g') is t"
+case("W2 @skill", "W2", _F_DEF, _F_REGISTERED, [("W2", "cantus", "decorator")],
      setup="from cantus import skill")
 case("W2 @skill()", "W2", "@skill()\ndef f(a: int) -> int:\n    'F.'\n    return a",
-     "isinstance(f, Tool)", [("W2", "cantus", "decorator")], setup="from cantus import skill")
+     _F_REGISTERED, [("W2", "cantus", "decorator")], setup="from cantus import skill")
 case("W2 @skill(pre_hook=)", "W2",
      "@skill(pre_hook=lambda a: {'a': a})\ndef f(a: int) -> int:\n    'F.'\n    return a",
-     "isinstance(f, Tool)", [("W2", "cantus", "decorator-with-hook")],
+     _F_REGISTERED, [("W2", "cantus", "decorator-with-hook")],
      setup="from cantus import skill")
-case("W2 skill(fn)", "W2", "t = skill(g)", "isinstance(t, Tool)", [("W2", "cantus", "call")],
+case("W2 skill(fn)", "W2", "t = skill(g)", _T_REGISTERED, [("W2", "cantus", "call")],
      setup="from cantus import skill\n" + _G_DEF)
-case("W2 cantus.skill attr call", "W2", "t = cantus.skill(g)", "isinstance(t, Tool)",
+case("W2 cantus.skill attr call", "W2", "t = cantus.skill(g)", _T_REGISTERED,
      [("W2", "cantus", "call")], setup=_G_DEF)
 case("W2 @ps.skill", "W2", "@ps.skill\ndef f(a: int) -> int:\n    'F.'\n    return a",
-     "isinstance(f, Tool)", [("W2", "cantus.protocols.skill", "decorator")],
+     _F_REGISTERED, [("W2", "cantus.protocols.skill", "decorator")],
      setup="import cantus.protocols.skill as ps")
-case("W2 from protocols.skill import skill", "W2", _F_DEF, "isinstance(f, Tool)",
+case("W2 from protocols.skill import skill", "W2", _F_DEF, _F_REGISTERED,
      [("W2", "cantus.protocols.skill", "decorator")],
      setup="from cantus.protocols.skill import skill")
 case("W2 @ps.skill(post_hook=)", "W2",
      "@ps.skill(post_hook=lambda v: v)\ndef f(a: int) -> int:\n    'F.'\n    return a",
-     "isinstance(f, Tool)", [("W2", "cantus.protocols.skill", "decorator-with-hook")],
+     _F_REGISTERED, [("W2", "cantus.protocols.skill", "decorator-with-hook")],
      setup="import cantus.protocols.skill as ps")
-case("W2 protocols.skill.skill(fn)", "W2", "t = ps.skill(g)", "isinstance(t, Tool)",
+case("W2 protocols.skill.skill(fn)", "W2", "t = ps.skill(g)", _T_REGISTERED,
      [("W2", "cantus.protocols.skill", "call")],
      setup="import cantus.protocols.skill as ps\n" + _G_DEF)
-case("W3 register_skill", "W3", "t = register_skill(g)", "isinstance(t, Tool)",
+case("W3 register_skill", "W3", "t = register_skill(g)", _T_REGISTERED,
      [("W3", "cantus", "call")], setup="from cantus import register_skill\n" + _G_DEF)
-case("W3 cantus.register_skill attr", "W3", "t = cantus.register_skill(g)", "isinstance(t, Tool)",
+case("W3 cantus.register_skill attr", "W3", "t = cantus.register_skill(g)", _T_REGISTERED,
      [("W3", "cantus", "call")], setup=_G_DEF)
-case("W3 protocols.skill.register_skill", "W3", "t = ps.register_skill(g)", "isinstance(t, Tool)",
+case("W3 protocols.skill.register_skill", "W3", "t = ps.register_skill(g)", _T_REGISTERED,
      [("W3", "cantus.protocols.skill", "call")],
      setup="import cantus.protocols.skill as ps\n" + _G_DEF)
-case("W8 cantus.get_registry", "W8", "r = get_registry()", "isinstance(r, Registry)",
+case("W8 cantus.get_registry", "W8", "r = get_registry()", "r is __import__('cantus.core.registry', fromlist=['x'])._get_global_registry()",
      [("W8", "cantus", "call")], setup="from cantus import get_registry")
-case("W8 cantus.get_registry attr", "W8", "r = cantus.get_registry()", "isinstance(r, Registry)",
+case("W8 cantus.get_registry attr", "W8", "r = cantus.get_registry()", "r is __import__('cantus.core.registry', fromlist=['x'])._get_global_registry()",
      [("W8", "cantus", "call")])
-case("W8 core.registry.get_registry", "W8", "r = get_registry()", "isinstance(r, Registry)",
+case("W8 core.registry.get_registry", "W8", "r = get_registry()", "r is __import__('cantus.core.registry', fromlist=['x'])._get_global_registry()",
      [("W8", "cantus.core.registry", "call")], setup="from cantus.core.registry import get_registry")
-case("star import then @skill", "W2", _F_DEF, "isinstance(f, Tool)", [("W2", "cantus", "star")],
+case("star import then @skill", "W2", _F_DEF, _F_REGISTERED, [("W2", "cantus", "star")],
      setup="from cantus import *")
-case("star import then register_skill", "W3", "t = register_skill(g)", "isinstance(t, Tool)",
+case("star import then register_skill", "W3", "t = register_skill(g)", _T_REGISTERED,
      [("W3", "cantus", "star")], setup="from cantus import *\n" + _G_DEF)
 case("star import then get_registry()", "W8", "r = get_registry()",
-     "r.names_for('tool') == []", [("W8", "cantus", "star")], setup="from cantus import *")
+     "r is __import__('cantus.core.registry', fromlist=['x'])._get_global_registry()", [("W8", "cantus", "star")], setup="from cantus import *")
 
 # --- row 3: W7 --------------------------------------------------------------------------
 
@@ -255,10 +260,14 @@ case("W11 agent.tools = None", "W11", "a.tools = None",
          "from cantus.core.registry import _get_global_registry\n"
          "a = Agent(M([FINAL]), tools=[])\n_get_global_registry().register('tool', add)"
      ))
-case("W12 build_schema()", "W12:build_schema", "s = build_schema()", "isinstance(s, dict)",
+# The fallback schema lists the global registry's tool names.
+_SCHEMA_NAMES_ADD = (
+    "s['properties']['action']['oneOf'][0]['properties']['tool_name']['enum'] == ['add']"
+)
+case("W12 build_schema()", "W12:build_schema", "s = build_schema()", _SCHEMA_NAMES_ADD,
      [("W12:build_schema", _TC, "omitted")], setup=_G)
 case("W12 build_schema(registry=None)", "W12:build_schema", "s = build_schema(registry=None)",
-     "isinstance(s, dict)", [("W12:build_schema", _TC, "none")], setup=_G)
+     _SCHEMA_NAMES_ADD, [("W12:build_schema", _TC, "none")], setup=_G)
 case("W12 parse_tool_call(raw)", "W12:parse_tool_call", "p = parse_tool_call(RAW)",
      "p.tool_name == 'add'", [("W12:parse_tool_call", _TC, "omitted")], setup=_G + "\n" + _RAW)
 case("W12 parse_tool_call(raw, registry=None)", "W12:parse_tool_call",
@@ -282,17 +291,23 @@ case("W13 parse_tool_call legacy key", "W13", "p = parse_tool_call(LEG, registry
 # --- row 8: compound statements (one warning per legacy name used) ---------------------------
 
 case("two names in one from-import", ["W1", "W4"], "from cantus import Skill, CallSkillAction",
-     "Skill is Tool", [])
+     "Skill is Tool and CallSkillAction is cantus.CallToolAction",
+     [("V2-14", "from cantus import Skill, CallSkillAction", "in-process")])
 case("three names in one from-import", ["W1", "W4", "W5"],
-     "from cantus import Skill, CallSkillAction, SkillObservation", "Skill is Tool", [])
+     "from cantus import Skill, CallSkillAction, SkillObservation",
+     "Skill is Tool and CallSkillAction is cantus.CallToolAction "
+     "and SkillObservation is cantus.ToolObservation", [])
 case("registry=get_registry() has no W11", ["W8", "W10"],
-     "a = Agent(M([FINAL]), registry=get_registry())", "True", [],
+     "a = Agent(M([FINAL]), registry=get_registry())", "a.registry.names_for('tool') == ['add']",
+     [("V2-14", "Agent(m, registry=get_registry())", "in-process")],
      setup="from cantus import get_registry\n" + _GLOBAL_ADD)
 case("ludus form W11 then W13", ["W11", "W13"], "r = Agent(model=M([LEG, FINAL])).run('q')",
-     "len(r.stream) >= 2", [], setup=_LEG + "\n" + _GLOBAL_ADD)
+     "[(type(e).__name__, getattr(e, 'result', None)) for e in r.stream][:2] "
+     "== [('CallToolAction', None), ('ToolObservation', 3)]",
+     [("V2-14", "Agent(model=...).run(...)", "in-process")], setup=_LEG + "\n" + _GLOBAL_ADD)
 case("legacy class with legacy keyword", ["W4", "W7"],
      "e = cantus.CallSkillAction(skill_name='add', args={})", "e.tool_name == 'add'", [])
-case("@skill emits W2 only", ["W2"], _F_DEF, "True", [], setup="from cantus import skill")
+case("@skill emits W2 only", ["W2"], _F_DEF, _F_REGISTERED, [], setup="from cantus import skill")
 case("legacy key without registry W12 then W13", ["W12:parse_tool_call", "W13"],
      "p = parse_tool_call(LEG)", "p.tool_name == 'add'", [], setup=_LEG + "\n" + _G)
 
@@ -321,6 +336,8 @@ def _assert_five(records: list[Any], caught: list[Any], texts: list[str], path: 
 def test_matrix_row(tmp_path, case_):
     for package in case_.needs:
         pytest.importorskip(package)
+        # Load the cantus side too, so a third-party warning at first import is not recorded.
+        importlib.import_module(_PRELOAD[package])
     source, line = _source_and_line(case_)
     name = "student_matrix"
     path = write_module(tmp_path, name, source)
@@ -335,11 +352,16 @@ def test_matrix_row(tmp_path, case_):
 
 # --- row 6: W17 --------------------------------------------------------------------------
 
-W17_COVERS: list[Cover] = [("W17", "ToolsPane.update_skills", "call")]
+# (statement inside the student function, cover)
+W17_CASES: list[tuple[str, Cover]] = [
+    ("pane.update_skills(rows, {'echo'})", ("W17", "ToolsPane.update_skills", "call")),
+]
+W17_COVERS: list[Cover] = [c[1] for c in W17_CASES]
 
 
 @pytest.mark.anyio("asyncio")
-async def test_matrix_w17_update_skills(tmp_path):
+@pytest.mark.parametrize("statement", [c[0] for c in W17_CASES])
+async def test_matrix_w17_update_skills(tmp_path, statement):
     pytest.importorskip("textual")
     import cantus.tui.widgets
     from textual.app import App
@@ -355,7 +377,7 @@ async def test_matrix_w17_update_skills(tmp_path):
     path = write_module(
         tmp_path,
         "matrix_w17",
-        "def call(pane, rows):\n    pane.update_skills(rows, {'echo'})\n",
+        f"def call(pane, rows):\n    {statement}\n",
     )
     module = import_module_from(tmp_path, "matrix_w17")
 
@@ -414,29 +436,33 @@ class W18Case(NamedTuple):
     covers: Cover
 
 
+# The converted object is named after the tool (the OpenHands action calls it tool_name).
+_CONVERTED_ALPHA = "(getattr(converted, 'name', None) or converted.tool_name) == 'alpha'"
+_SERVER_HOLDS_BOTH = "[entry['name'] for entry in server.tools] == ['alpha', 'beta']"
+
 W18_CASES: list[W18Case] = []
 for _fn, _module in _EXPOSERS:
     W18_CASES.append(W18Case(
         f"{_fn} package path", "import cantus.adapters",
-        f"converted = cantus.adapters.{_fn}(skill=alpha)", "converted", "W18:skill",
+        f"converted = cantus.adapters.{_fn}(skill=alpha)", _CONVERTED_ALPHA, "W18:skill",
         ("W18:skill", _fn, "package")))
     W18_CASES.append(W18Case(
         f"{_fn} module path", f"import cantus.adapters.{_module}",
-        f"converted = cantus.adapters.{_module}.{_fn}(skill=alpha)", "converted", "W18:skill",
+        f"converted = cantus.adapters.{_module}.{_fn}(skill=alpha)", _CONVERTED_ALPHA, "W18:skill",
         ("W18:skill", _fn, "module")))
 W18_CASES.append(W18Case(
     "export_as_mcp_server package path", "from cantus.adapters import export_as_mcp_server",
     'server = export_as_mcp_server(skills=[alpha, beta], name="demo", version="1.0")',
-    "server", "W18:skills", ("W18:skills", "export_as_mcp_server", "package")))
+    _SERVER_HOLDS_BOTH, "W18:skills", ("W18:skills", "export_as_mcp_server", "package")))
 W18_CASES.append(W18Case(
     "export_as_mcp_server module path",
     "from cantus.adapters.mcp_server import export_as_mcp_server",
     'server = export_as_mcp_server(skills=[alpha, beta], name="demo", version="1.0")',
-    "server", "W18:skills", ("W18:skills", "export_as_mcp_server", "module")))
+    _SERVER_HOLDS_BOTH, "W18:skills", ("W18:skills", "export_as_mcp_server", "module")))
 W18_CASES.append(W18Case(
     "McpServer skills=", "from cantus.adapters.mcp_server import McpServer",
     'server = McpServer(skills=[alpha, beta], name="demo", version="1.0")',
-    "server", "W18:skills", ("W18:skills", "McpServer", "keyword")))
+    _SERVER_HOLDS_BOTH, "W18:skills", ("W18:skills", "McpServer", "keyword")))
 
 W18_COVERS: list[Cover] = [c.covers for c in W18_CASES]
 
@@ -464,7 +490,7 @@ def test_matrix_w18_adapter_keywords(fake_sdks, tmp_path, case_):
         module = import_module_from(tmp_path, name)
     records = cantus_records(caught)
     _assert_five(records, caught, [EXPECTED[case_.warning]], path, line)
-    assert getattr(module, case_.result) is not None
+    assert eval(case_.result, vars(module)) is True, case_.result
 
 
 # --- row 9: subprocess, Python's real default filters ---------------------------------------
@@ -508,7 +534,9 @@ _SUBPROCESS_CASES = [
     ids=[c[0] for c in _SUBPROCESS_CASES],
 )
 def test_matrix_default_filters_in_a_subprocess(tmp_path, before, last, counts):
-    write_module(tmp_path, "helper", PRE + before + last + "\n")
+    source = PRE + before + last + "\n"
+    write_module(tmp_path, "helper", source)
+    last_line = source.count("\n")
     write_module(tmp_path, "main", "import helper\n")
     result = run_python(["main.py"], cwd=tmp_path)
     assert result.returncode == 0, result.stderr
@@ -516,7 +544,7 @@ def test_matrix_default_filters_in_a_subprocess(tmp_path, before, last, counts):
         assert result.stderr.count(EXPECTED[key]) == expected, (key, result.stderr)
     lines = [ln for ln in result.stderr.splitlines() if "is deprecated since cantus 0.7.0" in ln]
     assert len(lines) == sum(counts.values()), result.stderr
-    assert all("helper.py:" in ln for ln in lines), lines
+    assert all(f"helper.py:{last_line}: " in ln for ln in lines), lines
 
 
 # --- row 10: completeness guard ------------------------------------------------------------
@@ -572,6 +600,12 @@ REQUIRED: set[Cover] = (
     }
     | {("W18:skills", "export_as_mcp_server", f) for f in ("package", "module")}
     | {("W18:skills", "McpServer", "keyword")}
+    # the statements V2-14 names: two legacy names in one statement
+    | {
+        ("V2-14", "from cantus import Skill, CallSkillAction", "in-process"),
+        ("V2-14", "Agent(m, registry=get_registry())", "in-process"),
+        ("V2-14", "Agent(model=...).run(...)", "in-process"),
+    }
 )
 
 

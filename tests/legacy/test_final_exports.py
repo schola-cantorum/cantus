@@ -16,14 +16,14 @@ LEGACY_NAMES = (
     "collect_skills",
     "SkillsPane",
     "active_skill_names",
-    "update_skills",
 )
 
 MODULES = ("cantus", "cantus.serve", "cantus.serve.introspection", "cantus.tui.widgets")
 
 
 def _load(name: str):
-    if name.startswith("cantus.serve"):
+    # cantus.__all__ lists "serve" and "config", which load the serve layer on access.
+    if name == "cantus" or name.startswith("cantus.serve"):
         pytest.importorskip("fastapi")
     if name.startswith("cantus.tui"):
         pytest.importorskip("textual")

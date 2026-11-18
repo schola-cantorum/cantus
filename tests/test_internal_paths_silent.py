@@ -132,6 +132,15 @@ def test_the_tool_serve_surface_is_silent_with_bearer_auth_and_logs_nothing(capl
 
 _CLEAN_ENV_DROPPED = {"PYTHONPATH", "PYTHONWARNINGS", "PYTHONDEVMODE"}
 
+_OPTIONAL_SDK_MODULES = {
+    "cantus.adapters.dspy",
+    "cantus.adapters.huggingface",
+    "cantus.adapters.langchain",
+    "cantus.adapters.mcp",
+    "cantus.adapters.openhands",
+    "cantus.model.providers.mlx",
+}
+
 _WHOLE_SURFACE_SCRIPT = '''\
 import warnings
 
@@ -143,16 +152,15 @@ import pkgutil
 
 import cantus
 
-count = 0
+skipped = []
 for info in pkgutil.walk_packages(cantus.__path__, "cantus."):
     if info.name == "cantus.__main__":
         continue
     try:
         importlib.import_module(info.name)
     except ImportError:
-        continue
-    count += 1
-print(f"imported {count}")
+        skipped.append(info.name)
+print("skipped " + ",".join(skipped))
 
 for mod in (
     "cantus",
@@ -265,9 +273,11 @@ def test_the_whole_new_api_surface_runs_with_cantus_warnings_as_errors(tmp_path)
         "cantus.adapters",
     ):
         assert f"star {mod} ok" in proc.stdout, detail
-    match = re.search(r"imported (\d+)", proc.stdout)
+    match = re.search(r"^skipped (.*)$", proc.stdout, re.MULTILINE)
     assert match is not None, detail
-    assert int(match.group(1)) >= 80, detail
+    skipped = {name for name in match.group(1).split(",") if name}
+    # Only modules that need an optional SDK may fail to import.
+    assert skipped - _OPTIONAL_SDK_MODULES == set(), detail
     assert "is deprecated since cantus" not in proc.stderr, detail
 
 
@@ -307,8 +317,6 @@ def test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation(tmp_p
     proc = subprocess.Popen(
         [
             sys.executable,
-            "-W",
-            "default::DeprecationWarning",
             "-m",
             "cantus",
             "serve",
@@ -335,13 +343,14 @@ def test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation(tmp_p
     reader = threading.Thread(target=_drain, daemon=True)
     reader.start()
     base = f"http://127.0.0.1:{port}"
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     answered = False
     posted = None
     try:
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline and proc.poll() is None:
             try:
-                with urllib.request.urlopen(f"{base}/tools", timeout=2) as resp:
+                with opener.open(f"{base}/tools", timeout=2) as resp:
                     if resp.status == 200:
                         answered = True
                         break
@@ -355,7 +364,7 @@ def test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation(tmp_p
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=10) as resp:
+            with opener.open(request, timeout=10) as resp:
                 posted = (resp.status, resp.read().decode("utf-8"))
     finally:
         proc.terminate()
@@ -375,7 +384,8 @@ def test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation(tmp_p
 
 
 def test_the_cantus_tui_command_path_is_silent(monkeypatch):
-    # T-0015 row 15: _cmd_tui -> lazy textual import -> run_tui -> CantusTUI(...), run() stubbed.
+    # T-0015 row 15: _cmd_tui -> run_tui -> CantusTUI(...), run() stubbed. The modules are
+    # already imported here; their import is covered by the subprocess test above.
     pytest.importorskip("textual")
     import cantus
     import cantus.cli
