@@ -242,3 +242,9 @@ transcript 的關鍵行寫進 Comments。不改 ADR 與 `CONTEXT.md`；第 3 項
     `WALKTHROUGH.md:91`, ludus's own `openspec/specs/cantus-skill-binding/spec.md`, install lines
     without `>=0.7`); none calls a legacy name and check 3 does not match them. Transcripts:
     `.scratch/T-0016/stage8/` (local).
+- **Open items the user saw and did not answer (2026-11-18, push approved).** Left as they are:
+  (1) three optional sentences the false-positive checks suggested (the self-check is a teaching
+  gate and the broker decides; check 1 printing `cantus.__file__`; stop when no suitable
+  interpreter exists), each wider than the smallest change; (2) Skill wording in ludus files the
+  document does not list (`examples/ludus_skill_template/README.md`, `WALKTHROUGH.md:91`, ludus's
+  own `openspec/specs/`), which call no legacy name. Raise again at the retrospective.
