@@ -4,7 +4,7 @@ Each pane is a thin Textual widget over a small pure-formatting helper so the
 data→display mapping can be unit-tested without driving the full app:
 
 - :class:`SessionsPane` — master list of recent runs (the focus target).
-- :class:`SkillsPane` — registered skills with an active-run marker.
+- :class:`ToolsPane` — registered tools with an active-run marker.
 - :class:`PermissionsPane` — effective auth posture (never a token).
 - :class:`DataflowPane` — component topology as a textual adjacency listing.
 - :class:`QueuePane` — per-channel queue depth.
@@ -17,6 +17,8 @@ from __future__ import annotations
 from typing import Any
 
 from textual.widgets import DataTable, Static
+
+from cantus._deprecation import warn_legacy
 
 PLACEHOLDER = "—"
 NO_TRACE_TEXT = "(no recorded steps for this run)"
@@ -54,7 +56,7 @@ def format_step(step: dict[str, Any]) -> str:
     return f"[{index}] {kind} :: {type_} :: {summary}"
 
 
-def active_skill_names(sessions: list[dict[str, Any]]) -> set[str]:
+def active_tool_names(sessions: list[dict[str, Any]]) -> set[str]:
     """Tool names with at least one currently-running session.
 
     Derived entirely client-side from the sessions slice (no extra request):
@@ -114,7 +116,7 @@ def format_inspector_header(run_id: str, session: dict[str, Any] | None) -> str:
     """Build a one-line header identifying the run shown in the Inspector.
 
     With a matching session, reads its source/status for context (e.g.
-    ``run a1b2c3d4 · skill:echo · completed``); without one, just the short id.
+    ``run a1b2c3d4 · tool:echo · completed``); without one, just the short id.
     """
     parts = [f"run {short_id(run_id)}"]
     if session is not None:
@@ -171,29 +173,32 @@ class SessionsPane(DataTable[str]):
         return self._sessions_by_id.get(run_id) if run_id else None
 
 
-class SkillsPane(DataTable[str]):
-    """Registered skills with an argument summary and an active-run marker."""
+class ToolsPane(DataTable[str]):
+    """Registered tools with an argument summary and an active-run marker."""
 
     def on_mount(self) -> None:
         self.cursor_type = "none"
-        self.border_title = "Skills"
-        self.add_columns("skill", "description", "args", "active")
+        self.border_title = "Tools"
+        self.add_columns("tool", "description", "args", "active")
 
-    def update_skills(
-        self, skills: list[dict[str, Any]], active: set[str]
-    ) -> None:
-        """Rebuild the rows; ``active`` is the set of currently-running skill names."""
+    def update_tools(self, tools: list[dict[str, Any]], active: set[str]) -> None:
+        """Rebuild the rows; ``active`` is the set of currently-running tool names."""
         self.clear()
-        for sk in skills:
-            name = str(sk.get("name", ""))
-            properties = (sk.get("args_schema") or {}).get("properties") or {}
+        for tool in tools:
+            name = str(tool.get("name", ""))
+            properties = (tool.get("args_schema") or {}).get("properties") or {}
             args_summary = ", ".join(properties.keys()) if properties else PLACEHOLDER
             self.add_row(
                 name,
-                str(sk.get("description", "")),
+                str(tool.get("description", "")),
                 args_summary,
                 "active" if name in active else "",
             )
+
+    def update_skills(self, skills: list[dict[str, Any]], active: set[str]) -> None:  # legacy-alias
+        """Deprecated name of :meth:`update_tools`."""
+        warn_legacy("W17")
+        self.update_tools(skills, active)
 
 
 class QueuePane(DataTable[str]):
@@ -326,9 +331,20 @@ class HealthPane(Static):
         self.update(self.body)
 
 
+def __getattr__(name: str) -> Any:
+    """Serve the legacy names as their Tool counterparts, with a deprecation warning."""
+    if name == "SkillsPane":  # legacy-alias
+        warn_legacy("W14")
+        return ToolsPane
+    if name == "active_skill_names":  # legacy-alias
+        warn_legacy("W15")
+        return active_tool_names
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "SessionsPane",
-    "SkillsPane",
+    "ToolsPane",
     "PermissionsPane",
     "DataflowPane",
     "QueuePane",
@@ -342,7 +358,7 @@ __all__ = [
     "session_counts",
     "max_queue_depth",
     "format_step",
-    "active_skill_names",
+    "active_tool_names",
     "format_dataflow",
     "format_replay",
     "format_inspector_header",

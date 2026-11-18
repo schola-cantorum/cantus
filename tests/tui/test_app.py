@@ -8,6 +8,9 @@ The pure formatting helpers are tested directly without the Textual runtime.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import warnings
 from typing import Any
 
 import pytest
@@ -51,7 +54,7 @@ def _snapshot(
     sessions: list[dict[str, Any]],
     queues: list[dict[str, Any]] | None = None,
     auth_mode: str = "none",
-    skills: list[dict[str, Any]] | None = None,
+    tools: list[dict[str, Any]] | None = None,
     dataflow: dict[str, Any] | None = None,
     permissions: dict[str, Any] | None = None,
 ) -> FetchResult:
@@ -61,7 +64,7 @@ def _snapshot(
             "sessions": sessions,
             "queues": queues or [],
             "permissions": permissions or {"auth_mode": auth_mode},
-            "skills": skills or [],
+            "tools": tools or [],
             "dataflow": dataflow or {"nodes": [], "edges": []},
         },
     )
@@ -102,26 +105,38 @@ def test_max_queue_depth() -> None:
     assert max_queue_depth([]) is None
 
 
-def test_active_skill_names_derives_from_running_skill_sessions() -> None:
-    from cantus.tui.widgets import active_skill_names
+def test_active_tool_names_returns_the_running_tool() -> None:
+    from cantus.tui.widgets import active_tool_names
 
-    # Spec example: s1(skill:echo, running) is active; s2(skill:sum, completed) is not.
+    assert active_tool_names([{"source": "tool:echo", "status": "running"}]) == {"echo"}
+
+
+@pytest.mark.parametrize(
+    "session",
+    [
+        {"source": "tool:sum", "status": "completed"},
+        {"source": "channel:webhook", "status": "running"},
+        {"source": "tool:", "status": "running"},
+        {"source": 42, "status": "running"},
+        {"status": "running"},
+    ],
+)
+def test_active_tool_names_skips_sessions_that_do_not_count(session: dict[str, Any]) -> None:
+    from cantus.tui.widgets import active_tool_names
+
+    assert active_tool_names([session]) == set()
+
+
+def test_active_tool_names_mixed_list_returns_exactly_the_running_tools() -> None:
+    from cantus.tui.widgets import active_tool_names
+
     sessions = [
-        {"source": "skill:echo", "status": "running"},
-        {"source": "skill:sum", "status": "completed"},
+        {"source": "channel:webhook", "status": "running"},
+        {"source": "tool:greet", "status": "running"},
+        {"source": "tool:done", "status": "completed"},
+        {"source": "tool:echo", "status": "running"},
     ]
-    assert active_skill_names(sessions) == {"echo"}
-
-
-def test_active_skill_names_ignores_non_skill_and_non_running() -> None:
-    from cantus.tui.widgets import active_skill_names
-
-    sessions = [
-        {"source": "channel:webhook", "status": "running"},  # not skill: -> skipped, no crash
-        {"source": "skill:greet", "status": "running"},
-        {"source": "skill:done", "status": "completed"},  # not running -> skipped
-    ]
-    assert active_skill_names(sessions) == {"greet"}
+    assert active_tool_names(sessions) == {"greet", "echo"}
 
 
 def test_format_dataflow_empty_returns_placeholder() -> None:
@@ -151,8 +166,8 @@ def test_format_dataflow_isolated_node_prints_header_and_label_falls_back_to_id(
     from cantus.tui.widgets import format_dataflow
 
     # No label key -> fall back to id; no edges -> the node header is still printed.
-    graph = {"nodes": [{"id": "lonely", "kind": "skill"}], "edges": []}
-    assert "lonely [skill]" in format_dataflow(graph)
+    graph = {"nodes": [{"id": "lonely", "kind": "tool"}], "edges": []}
+    assert "lonely [tool]" in format_dataflow(graph)
 
 
 def test_format_replay_renders_steps_in_order_untruncated() -> None:
@@ -160,12 +175,12 @@ def test_format_replay_renders_steps_in_order_untruncated() -> None:
 
     long_summary = "hi there " * 12
     steps = [
-        {"index": 0, "kind": "action", "type": "CallSkillAction", "summary": long_summary},
-        {"index": 1, "kind": "observation", "type": "SkillObservation", "summary": "hi"},
+        {"index": 0, "kind": "action", "type": "CallToolAction", "summary": long_summary},
+        {"index": 1, "kind": "observation", "type": "ToolObservation", "summary": "hi"},
     ]
     lines = format_replay(steps).splitlines()
-    assert "CallSkillAction" in lines[0]
-    assert "SkillObservation" in lines[1]
+    assert "CallToolAction" in lines[0]
+    assert "ToolObservation" in lines[1]
     # Untruncated: the full long summary survives intact.
     assert long_summary in format_replay(steps)
 
@@ -174,10 +189,10 @@ def test_format_inspector_header_with_and_without_session() -> None:
     from cantus.tui.widgets import format_inspector_header
 
     header = format_inspector_header(
-        "a1b2c3d4e5f6", {"source": "skill:echo", "status": "completed"}
+        "a1b2c3d4e5f6", {"source": "tool:echo", "status": "completed"}
     )
     assert "a1b2c3d4" in header  # short_id prefix
-    assert "skill:echo" in header
+    assert "tool:echo" in header
     assert "completed" in header
 
     bare = format_inspector_header("a1b2c3d4e5f6", None)
@@ -191,14 +206,15 @@ def test_format_inspector_header_with_and_without_session() -> None:
 async def test_tabbed_shell_has_five_tabs_and_number_keys_switch() -> None:
     from textual.widgets import TabbedContent, TabPane
 
-    from cantus.tui.widgets import HealthPane, QueuePane, SessionsPane
+    from cantus.tui.widgets import HealthPane, QueuePane, SessionsPane, ToolsPane
 
     app = _app(FakeClient())
     async with app.run_test() as pilot:
         await pilot.pause()
         tabs = app.query_one(TabbedContent)
         pane_ids = {p.id for p in app.query(TabPane)}
-        assert {"dashboard", "skills", "permissions", "dataflow", "inspector"} <= pane_ids
+        assert pane_ids == {"dashboard", "tools", "permissions", "dataflow", "inspector"}
+        assert str(tabs.get_tab("tools").label) == "Tools"
         # Dashboard is the default active tab and carries Sessions/Queue/Health.
         assert tabs.active == "dashboard"
         assert app.query_one(SessionsPane)
@@ -207,7 +223,9 @@ async def test_tabbed_shell_has_five_tabs_and_number_keys_switch() -> None:
         # Number keys 1-5 switch the active tab.
         await pilot.press("2")
         await pilot.pause()
-        assert tabs.active == "skills"
+        assert tabs.active == "tools"
+        assert app.active_bindings["2"].binding.description == "Tools"
+        assert isinstance(app.query_one("#skills-table"), ToolsPane)  # legacy-alias
         await pilot.press("5")
         await pilot.pause()
         assert tabs.active == "inspector"
@@ -216,46 +234,93 @@ async def test_tabbed_shell_has_five_tabs_and_number_keys_switch() -> None:
         assert tabs.active == "dashboard"
 
 
+_ECHO = {
+    "name": "echo",
+    "description": "echo back",
+    "args_schema": {"type": "object", "properties": {"text": {}}},
+}
+_SUM = {"name": "sum", "description": "add numbers", "args_schema": {}}
+
+
 @pytest.mark.anyio("asyncio")
-async def test_skills_tab_lists_skills_and_marks_active() -> None:
-    from cantus.tui.widgets import SkillsPane
+async def test_tools_tab_lists_tools_and_marks_active() -> None:
+    from cantus.tui.widgets import ToolsPane
 
     client = FakeClient(
         snapshot=_snapshot(
             sessions=[
                 {
                     "id": "r1",
-                    "source": "skill:echo",
+                    "source": "tool:echo",
                     "status": "running",
                     "started_at": "t",
                     "event_count": 1,
                 },
             ],
-            skills=[
-                {
-                    "name": "echo",
-                    "description": "echo back",
-                    "args_schema": {"type": "object", "properties": {"text": {}}},
-                },
-                {"name": "sum", "description": "add numbers", "args_schema": {}},
-            ],
+            tools=[_ECHO, _SUM],
         )
     )
     app = _app(client)
     async with app.run_test() as pilot:
         await pilot.pause()
-        table = app.query_one(SkillsPane)
+        table = app.query_one(ToolsPane)
         assert table.row_count == 2
-        by_name = {
-            str(table.get_row_at(i)[0]): table.get_row_at(i) for i in range(table.row_count)
-        }
-        assert set(by_name) == {"echo", "sum"}
-        # name + description are listed.
-        assert "echo back" in by_name["echo"]
-        assert "add numbers" in by_name["sum"]
-        # echo has a running session -> active; sum does not (active marker in last column).
-        assert "active" in str(by_name["echo"][-1])
-        assert "active" not in str(by_name["sum"][-1])
+        assert tuple(table.get_row_at(0)) == ("echo", "echo back", "text", "active")
+        assert tuple(table.get_row_at(1)) == ("sum", "add numbers", "—", "")
+
+        # A snapshot with no tools empties the table.
+        client.snapshot_result = _snapshot(sessions=[], tools=[])
+        await app._fetch()
+        assert table.row_count == 0
+
+        # A manual refresh shows exactly the one tool the server now reports.
+        client.snapshot_result = _snapshot(sessions=[], tools=[_SUM])
+        await pilot.press("r")
+        await pilot.pause()
+        assert table.row_count == 1
+        assert tuple(table.get_row_at(0)) == ("sum", "add numbers", "—", "")
+
+
+@pytest.mark.anyio("asyncio")
+async def test_tools_pane_title_and_columns() -> None:
+    from cantus.tui.widgets import ToolsPane
+
+    app = _app(FakeClient())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        pane = app.query_one(ToolsPane)
+        assert pane.border_title == "Tools"
+        assert [str(c.label) for c in pane.ordered_columns] == [
+            "tool",
+            "description",
+            "args",
+            "active",
+        ]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_update_tools_rebuilds_the_rows() -> None:
+    from cantus.tui.widgets import ToolsPane
+
+    tools = [
+        {
+            "name": "echo",
+            "description": "echo back",
+            "args_schema": {"type": "object", "properties": {"text": {}}},
+        },
+        {"name": "sum", "description": "add numbers", "args_schema": {}},
+    ]
+    app = _app(FakeClient())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        pane = app.query_one(ToolsPane)
+        pane.update_tools(tools, {"echo"})
+        assert pane.row_count == 2
+        assert tuple(pane.get_row_at(0)) == ("echo", "echo back", "text", "active")
+        assert tuple(pane.get_row_at(1)) == ("sum", "add numbers", "—", "")
+        pane.update_tools(tools[:1], set())
+        assert pane.row_count == 1
+        assert tuple(pane.get_row_at(0)) == ("echo", "echo back", "text", "")
 
 
 @pytest.mark.anyio("asyncio")
@@ -335,8 +400,8 @@ async def test_inspector_shows_selected_run_trace_and_header() -> None:
             data={
                 "run_id": "run-2",
                 "steps": [
-                    {"index": 0, "kind": "action", "type": "CallSkillAction", "summary": "echo"},
-                    {"index": 1, "kind": "observation", "type": "SkillObservation", "summary": "hi"},
+                    {"index": 0, "kind": "action", "type": "CallToolAction", "summary": "echo"},
+                    {"index": 1, "kind": "observation", "type": "ToolObservation", "summary": "hi"},
                 ],
             },
         )
@@ -344,8 +409,8 @@ async def test_inspector_shows_selected_run_trace_and_header() -> None:
     client = FakeClient(
         snapshot=_snapshot(
             sessions=[
-                {"id": "run-1", "source": "skill:a", "status": "completed", "started_at": "t", "event_count": 2},
-                {"id": "run-2", "source": "skill:b", "status": "running", "started_at": "t", "event_count": 2},
+                {"id": "run-1", "source": "tool:a", "status": "completed", "started_at": "t", "event_count": 2},
+                {"id": "run-2", "source": "tool:b", "status": "running", "started_at": "t", "event_count": 2},
             ]
         ),
         workflows=workflows,
@@ -362,11 +427,11 @@ async def test_inspector_shows_selected_run_trace_and_header() -> None:
         await pilot.press("down")
         await pilot.pause()
         # Full ordered trace is shown.
-        assert "CallSkillAction" in inspector.body
-        assert "SkillObservation" in inspector.body
+        assert "CallToolAction" in inspector.body
+        assert "ToolObservation" in inspector.body
         # Header identifies the selected run (short id + source + status).
         assert "run-2" in inspector.body
-        assert "skill:b" in inspector.body
+        assert "tool:b" in inspector.body
         assert "running" in inspector.body
 
 
@@ -390,7 +455,7 @@ async def test_enter_on_session_jumps_to_inspector_tab() -> None:
     client = FakeClient(
         snapshot=_snapshot(
             sessions=[
-                {"id": "run-1", "source": "skill:a", "status": "completed", "started_at": "t", "event_count": 1},
+                {"id": "run-1", "source": "tool:a", "status": "completed", "started_at": "t", "event_count": 1},
             ]
         )
     )
@@ -415,14 +480,14 @@ async def test_all_panes_present() -> None:
         PermissionsPane,
         QueuePane,
         SessionsPane,
-        SkillsPane,
+        ToolsPane,
     )
 
     app = _app(FakeClient())
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.query_one(SessionsPane)
-        assert app.query_one(SkillsPane)
+        assert app.query_one(ToolsPane)
         assert app.query_one(PermissionsPane)
         assert app.query_one(DataflowPane)
         assert app.query_one(QueuePane)
@@ -439,7 +504,7 @@ async def test_sessions_pane_lists_runs() -> None:
             [
                 {
                     "id": "run-1",
-                    "source": "skill:echo",
+                    "source": "tool:echo",
                     "status": "completed",
                     "started_at": "2026-05-29T00:00:00Z",
                     "event_count": 2,
@@ -453,7 +518,7 @@ async def test_sessions_pane_lists_runs() -> None:
         table = app.query_one(SessionsPane)
         assert table.row_count == 1
         row = table.get_row_at(0)
-        assert "skill:echo" in row
+        assert "tool:echo" in row
         assert "completed" in row
 
 
@@ -537,7 +602,7 @@ async def test_unreachable_server_degrades_then_recovers() -> None:
 
     client = FakeClient(
         snapshot=_snapshot(
-            [{"id": "r1", "source": "skill:echo", "status": "completed", "started_at": "t", "event_count": 2}]
+            [{"id": "r1", "source": "tool:echo", "status": "completed", "started_at": "t", "event_count": 2}]
         )
     )
     app = _app(client)
@@ -559,8 +624,8 @@ async def test_unreachable_server_degrades_then_recovers() -> None:
         # Connectivity restored on a later fetch.
         client.snapshot_result = _snapshot(
             [
-                {"id": "r1", "source": "skill:echo", "status": "completed", "started_at": "t", "event_count": 2},
-                {"id": "r2", "source": "skill:b", "status": "running", "started_at": "t", "event_count": 0},
+                {"id": "r1", "source": "tool:echo", "status": "completed", "started_at": "t", "event_count": 2},
+                {"id": "r2", "source": "tool:b", "status": "running", "started_at": "t", "event_count": 0},
             ]
         )
         client.health_result = FetchResult(ok=True, data={"status": "ok", "cantus_version": "0.4.8"})
@@ -571,14 +636,14 @@ async def test_unreachable_server_degrades_then_recovers() -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_new_tabs_retain_last_good_data_on_outage() -> None:
-    from cantus.tui.widgets import DataflowPane, PermissionsPane, SkillsPane
+    from cantus.tui.widgets import DataflowPane, PermissionsPane, ToolsPane
 
     client = FakeClient(
         snapshot=_snapshot(
             sessions=[
-                {"id": "r1", "source": "skill:echo", "status": "running", "started_at": "t", "event_count": 1},
+                {"id": "r1", "source": "tool:echo", "status": "running", "started_at": "t", "event_count": 1},
             ],
-            skills=[{"name": "echo", "description": "echo back", "args_schema": {}}],
+            tools=[{"name": "echo", "description": "echo back", "args_schema": {}}],
             permissions={
                 "auth_mode": "bearer",
                 "dashboard_requires_auth": True,
@@ -591,11 +656,11 @@ async def test_new_tabs_retain_last_good_data_on_outage() -> None:
     app = _app(client)
     async with app.run_test() as pilot:
         await pilot.pause()
-        skills = app.query_one(SkillsPane)
+        tools = app.query_one(ToolsPane)
         permissions = app.query_one(PermissionsPane)
         dataflow = app.query_one(DataflowPane)
         # Populated after the first successful poll.
-        assert skills.row_count == 1
+        assert tools.row_count == 1
         assert "bearer" in permissions.body
         assert "serve [app]" in dataflow.body
 
@@ -605,7 +670,7 @@ async def test_new_tabs_retain_last_good_data_on_outage() -> None:
         await app._fetch()
 
         # The new tabs retain their last-good content: no blanking, no crash.
-        assert skills.row_count == 1
+        assert tools.row_count == 1
         assert "bearer" in permissions.body
         assert "serve [app]" in dataflow.body
 
@@ -635,3 +700,43 @@ async def test_pause_works_on_non_dashboard_tab() -> None:
         await pilot.press("r")
         await pilot.pause()
         assert client.snapshot_calls == baseline + 1
+
+
+def test_tools_names_are_in_all_and_the_legacy_names_are_not() -> None:
+    import cantus.tui.widgets as widgets
+
+    assert "ToolsPane" in widgets.__all__
+    assert "active_tool_names" in widgets.__all__
+
+
+def test_importing_the_tui_modules_raises_no_deprecation_warning() -> None:
+    code = (
+        "import warnings, cantus\n"
+        "warnings.simplefilter('error', cantus.CantusDeprecationWarning)\n"
+        "from cantus.tui.widgets import *\n"
+        "from cantus.tui.widgets import ToolsPane, active_tool_names\n"
+        "from cantus.tui.app import CantusTUI\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.anyio("asyncio")
+async def test_a_poll_raises_no_deprecation_warning() -> None:
+    import cantus
+
+    client = FakeClient(
+        snapshot=_snapshot(
+            sessions=[
+                {"id": "r1", "source": "tool:echo", "status": "running", "started_at": "t", "event_count": 1}
+            ],
+            tools=[{"name": "echo", "description": "echo back", "args_schema": {}}],
+        )
+    )
+    app = _app(client)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", cantus.CantusDeprecationWarning)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app._fetch()

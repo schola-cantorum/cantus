@@ -1,7 +1,7 @@
 """cantus.tui.app — the Textual application that composes the tabbed dashboard.
 
 ``CantusTUI`` organizes its panes into a :class:`~textual.widgets.TabbedContent`
-shell with five tabs (Dashboard / Skills / Permissions / Dataflow / Inspector),
+shell with five tabs (Dashboard / Tools / Permissions / Dataflow / Inspector),
 switchable with the number keys 1-5. The Dashboard tab carries the Sessions
 master list plus the Queue and Health panes; the Inspector tab follows the
 Sessions row cursor. The app polls the injected
@@ -25,8 +25,8 @@ from cantus.tui.widgets import (
     PermissionsPane,
     QueuePane,
     SessionsPane,
-    SkillsPane,
-    active_skill_names,
+    ToolsPane,
+    active_tool_names,
 )
 
 
@@ -56,7 +56,7 @@ class CantusTUI(App[None]):
 
     BINDINGS = [
         ("1", "show_tab('dashboard')", "Dashboard"),
-        ("2", "show_tab('skills')", "Skills"),
+        ("2", "show_tab('tools')", "Tools"),
         ("3", "show_tab('permissions')", "Permissions"),
         ("4", "show_tab('dataflow')", "Dataflow"),
         ("5", "show_tab('inspector')", "Inspector"),
@@ -92,8 +92,8 @@ class CantusTUI(App[None]):
                         id="right",
                     ),
                 )
-            with TabPane("Skills", id="skills"):
-                yield SkillsPane(id="skills-table")
+            with TabPane("Tools", id="tools"):
+                yield ToolsPane(id="skills-table")  # legacy-alias
             with TabPane("Permissions", id="permissions"):
                 yield PermissionsPane(id="permissions-body")
             with TabPane("Dataflow", id="dataflow"):
@@ -106,7 +106,7 @@ class CantusTUI(App[None]):
         if self._client is None:
             self._client = IntrospectionClient(self._url, auth_mode=self._auth_mode)
         self._sessions = self.query_one(SessionsPane)
-        self._skills = self.query_one(SkillsPane)
+        self._tools = self.query_one(ToolsPane)
         self._permissions = self.query_one(PermissionsPane)
         self._dataflow = self.query_one(DataflowPane)
         self._inspector = self.query_one(InspectorPane)
@@ -136,9 +136,10 @@ class CantusTUI(App[None]):
         if snap.ok and snap.data is not None:
             sessions = snap.data.get("sessions", [])
             self._sessions.update_sessions(sessions)
-            self._skills.update_skills(
-                snap.data.get("skills", []), active_skill_names(sessions)
-            )
+            rows = snap.data.get("tools")
+            if rows is None:
+                rows = snap.data.get("skills", [])  # legacy-alias
+            self._tools.update_tools(rows, active_tool_names(sessions))
             self._permissions.update_permissions(snap.data.get("permissions") or {})
             self._dataflow.update_dataflow(snap.data.get("dataflow") or {})
             self._queue.update_queues(snap.data.get("queues", []))
