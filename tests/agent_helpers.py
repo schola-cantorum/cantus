@@ -1,7 +1,6 @@
 """Shared helpers for tests that drive an Agent with a scripted model.
 
-The model output still uses the v0.6 action key until T-0010; `call_json` holds it, on a
-line marked with that ticket.
+`call_json` builds a model output with the `tool_name` action key.
 """
 
 import json
@@ -27,7 +26,7 @@ class ScriptedModel:
 
 
 def call_json(name, **args):
-    action = {"skill_name": name, "args": args}  # T-0010 switches this key
+    action = {"tool_name": name, "args": args}
     return json.dumps({"thought": "t", "action": action})
 
 

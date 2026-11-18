@@ -42,8 +42,8 @@ for ev in state.stream:
         for line in ev.feedback.splitlines()[:2]:
             print(line)
 # -> action_parse
-# -> error_type: unknown_skill
-# -> detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+# -> error_type: unknown_tool
+# -> detail: tool_name 'serch_book' not in current tool registry; available: ['search_book']
 ```
 
 Fix: add the correct name to an example in the system prompt, or raise `max_retries` so the LLM can correct itself.
@@ -219,8 +219,8 @@ You should see, across the runnable examples in sections 1 to 7:
 
 ```text
 action_parse
-error_type: unknown_skill
-detail: skill_name 'serch_book' not in current skill registry; available: ['search_book']
+error_type: unknown_tool
+detail: tool_name 'serch_book' not in current tool registry; available: ['search_book']
 Validator ensure_isbn must return Result, got bool
 TypeError
 no @memory decorator

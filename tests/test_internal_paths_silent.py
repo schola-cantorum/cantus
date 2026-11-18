@@ -53,9 +53,9 @@ def test_grammar_with_an_explicit_registry_is_silent(records):
     reg = _registry()
     schema = build_schema(registry=reg)
     call_branch = schema["properties"]["action"]["oneOf"][0]
-    assert call_branch["properties"]["skill_name"]["enum"] == ["echo"]
+    assert call_branch["properties"]["tool_name"]["enum"] == ["echo"]
     parsed = parse_tool_call(_call_json("echo", value="x"), registry=reg)
-    assert parsed.skill_name == "echo"  # T-0010 switches this attribute
+    assert parsed.tool_name == "echo"
     _assert_no_cantus_warning(records)
 
 
@@ -68,10 +68,10 @@ def test_serve_routes_are_silent(records):
     app = serve(_registry())
     client = TestClient(app)
 
-    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}
-    assert client.get("/skills").status_code == 200
+    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}  # T-0012 renames this route
+    assert client.get("/skills").status_code == 200  # T-0012 renames this route
     for path in (
-        "/introspection/skills",
+        "/introspection/skills",  # T-0012 renames this route
         "/introspection/sessions",
         "/introspection/permissions",
         "/introspection/queues",

@@ -1,17 +1,17 @@
-"""Error closure: skill raise, unknown name, validator failure all → Observation."""
+"""Error closure: tool raise, unknown name, validator failure all → Observation."""
 
 import json
 from dataclasses import dataclass
 
 from cantus.core.agent import Agent
 from cantus.core.observation import (
-    SkillObservation,
     ToolErrorObservation,
+    ToolObservation,
     ValidationErrorObservation,
 )
 from cantus.core.result import Result
 from cantus.hooks import validator
-from cantus.protocols.skill import skill
+from cantus.protocols.tool import tool
 
 
 @dataclass
@@ -27,7 +27,7 @@ class ScriptedModel:
 
 def _action(name: str, args=None):
     return json.dumps(
-        {"thought": "", "action": {"skill_name": name, "args": args or {}}}
+        {"thought": "", "action": {"tool_name": name, "args": args or {}}}
     )
 
 
@@ -35,13 +35,13 @@ def _final(text: str):
     return json.dumps({"thought": "", "action": {"final_answer": text}})
 
 
-def test_skill_internal_raise_becomes_tool_error():
-    @skill
+def test_tool_internal_raise_becomes_tool_error():
+    @tool
     def boom() -> str:
         """Always raises."""
         raise RuntimeError("kaboom")
 
-    agent = Agent(model=ScriptedModel([_action("boom"), _final("ok")]))
+    agent = Agent(model=ScriptedModel([_action("boom"), _final("ok")]), tools=[boom])
     state = agent.run("q")
     errors = [e for e in state.stream if isinstance(e, ToolErrorObservation)]
     assert any("kaboom" in e.message for e in errors)
@@ -49,33 +49,34 @@ def test_skill_internal_raise_becomes_tool_error():
     assert any(getattr(e, "answer", None) == "ok" for e in state.stream)
 
 
-def test_unknown_skill_name_at_parse_emits_action_parse_validation_error():
-    """v0.1.2 BREAKING: unknown skill_name at parse-time produces
+def test_unknown_tool_name_at_parse_emits_action_parse_validation_error():
+    """An unknown tool_name at parse time produces
     `ValidationErrorObservation(validator_name="action_parse",
-    feedback="error_type: unknown_skill\\n...")` rather than the v0.1.1
+    feedback="error_type: unknown_tool\\n...")` rather than a
     `ToolErrorObservation`. This implements the
     `Action parse failures fall back to ValidationErrorObservation`
-    requirement's `unknown_skill` vocabulary entry. `ToolErrorObservation`
+    requirement's `unknown_tool` vocabulary entry. `ToolErrorObservation`
     remains the response for dispatch-level failures (e.g. a registered
-    skill that raises at call time).
+    tool that raises at call time).
     """
-    @skill
+    @tool
     def search_book(title: str) -> str:
         """Search."""
         return title
 
     agent = Agent(
-        model=ScriptedModel([_action("search_books", {"title": "x"}), _final("done")])
+        model=ScriptedModel([_action("search_books", {"title": "x"}), _final("done")]),
+        tools=[search_book],
     )
     state = agent.run("q")
     val_errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
     assert any(e.validator_name == "action_parse" for e in val_errors)
-    assert any("error_type: unknown_skill" in e.feedback for e in val_errors)
+    assert any("error_type: unknown_tool" in e.feedback for e in val_errors)
     assert any("search_book" in e.feedback for e in val_errors)
 
 
 def test_validator_post_hook_failure_emits_validation_error_and_retries():
-    """v0.3.0: Validator attaches as a Skill post_hook; Result(ok=False) yields ValidationErrorObservation."""
+    """A validator attaches as a Tool post_hook; Result(ok=False) yields ValidationErrorObservation."""
     fail_count = {"n": 0}
 
     @validator
@@ -86,7 +87,7 @@ def test_validator_post_hook_failure_emits_validation_error_and_retries():
             return Result.failure("not yet")
         return Result.success(value)
 
-    @skill(post_hook=always_fails)
+    @tool(post_hook=always_fails)
     def passthrough(value: int) -> int:
         """Pass the value through."""
         return value
@@ -98,11 +99,12 @@ def test_validator_post_hook_failure_emits_validation_error_and_retries():
                 _action("passthrough", {"value": 1}),
                 _final("done"),
             ]
-        )
+        ),
+        tools=[passthrough],
     )
     state = agent.run("q", max_retries=3)
     val_errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
-    successes = [e for e in state.stream if isinstance(e, SkillObservation)]
+    successes = [e for e in state.stream if isinstance(e, ToolObservation)]
     assert len(val_errors) == 1
     assert val_errors[0].feedback == "not yet"
     assert val_errors[0].validator_name == "always_fails"

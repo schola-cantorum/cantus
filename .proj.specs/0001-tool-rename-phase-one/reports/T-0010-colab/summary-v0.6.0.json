@@ -1,0 +1,457 @@
+{
+ "build": "v0.6.0",
+ "build_info": {
+  "cantus_version": "0.6.0",
+  "cantus_file": "/usr/local/lib/python3.13/dist-packages/cantus/__init__.py",
+  "direct_url": null,
+  "has_tool": false,
+  "python": "3.13.16 (main, Oct  1 2026, 15:40:24) [GCC 13.3.0]",
+  "platform": "Linux-6.6.159+-x86_64-with-glibc2.39",
+  "pid": 1028
+ },
+ "env": {
+  "torch": "2.14.1+cu130",
+  "transformers": "5.22.1",
+  "bitsandbytes": "0.50.2",
+  "accelerate": "1.15.0",
+  "huggingface_hub": "1.33.0",
+  "tokenizers": "0.23.3",
+  "safetensors": "0.8.0",
+  "pydantic": "2.14.2",
+  "torch_cuda": "13.0",
+  "cuda_available": true,
+  "gpu": "NVIDIA L4",
+  "nvidia_smi": "NVIDIA L4, 580.82.07, 23034 MiB"
+ },
+ "probe": {
+  "label": "v0.6.0",
+  "sha256": [
+   "132214dab6fcb8bbeeb207b70fa68abbab71c74907d6513459b3a4ddcc14457b",
+   "132214dab6fcb8bbeeb207b70fa68abbab71c74907d6513459b3a4ddcc14457b"
+  ],
+  "outputs": [
+   "\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\":",
+   "\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\": \"ok\"}\n{\"probe\":"
+  ],
+  "same_within_run": true
+ },
+ "queries": [
+  {
+   "query_index": 0,
+   "query": "What is 3 + 4?",
+   "turns": 12,
+   "parse_errors": 12,
+   "error_types": {
+    "error_type: json_syntax": 12
+   },
+   "other_validation_errors": 0,
+   "tool_calls": [],
+   "tool_errors": 0,
+   "w13": 0,
+   "warning_categories": [],
+   "final_answer": null,
+   "ended_in_max_iterations": true,
+   "events": [
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "MaxIterationsObservation",
+     "iterations": 12,
+     "last_action_summary": "ValidationErrorObservation(validator_name='action_parse', feedback='error_type: json_syntax\\ndetail: expected JSON object, got JSONDecodeError: Expecting value\\nraw_output_preview: ')"
+    }
+   ]
+  },
+  {
+   "query_index": 1,
+   "query": "What is 12 times 7?",
+   "turns": 12,
+   "parse_errors": 12,
+   "error_types": {
+    "error_type: json_syntax": 12
+   },
+   "other_validation_errors": 0,
+   "tool_calls": [],
+   "tool_errors": 0,
+   "w13": 0,
+   "warning_categories": [],
+   "final_answer": null,
+   "ended_in_max_iterations": true,
+   "events": [
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "MaxIterationsObservation",
+     "iterations": 12,
+     "last_action_summary": "ValidationErrorObservation(validator_name='action_parse', feedback='error_type: json_syntax\\ndetail: expected JSON object, got JSONDecodeError: Expecting value\\nraw_output_preview: ')"
+    }
+   ]
+  },
+  {
+   "query_index": 2,
+   "query": "Add 15 and 27, then multiply the result by 2.",
+   "turns": 12,
+   "parse_errors": 12,
+   "error_types": {
+    "error_type: json_syntax": 12
+   },
+   "other_validation_errors": 0,
+   "tool_calls": [],
+   "tool_errors": 0,
+   "w13": 0,
+   "warning_categories": [],
+   "final_answer": null,
+   "ended_in_max_iterations": true,
+   "events": [
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "MaxIterationsObservation",
+     "iterations": 12,
+     "last_action_summary": "ValidationErrorObservation(validator_name='action_parse', feedback='error_type: json_syntax\\ndetail: expected JSON object, got JSONDecodeError: Expecting value\\nraw_output_preview: ')"
+    }
+   ]
+  },
+  {
+   "query_index": 3,
+   "query": "What is 9 + 10?",
+   "turns": 12,
+   "parse_errors": 12,
+   "error_types": {
+    "error_type: json_syntax": 12
+   },
+   "other_validation_errors": 0,
+   "tool_calls": [],
+   "tool_errors": 0,
+   "w13": 0,
+   "warning_categories": [],
+   "final_answer": null,
+   "ended_in_max_iterations": true,
+   "events": [
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "MaxIterationsObservation",
+     "iterations": 12,
+     "last_action_summary": "ValidationErrorObservation(validator_name='action_parse', feedback='error_type: json_syntax\\ndetail: expected JSON object, got JSONDecodeError: Expecting value\\nraw_output_preview: ')"
+    }
+   ]
+  },
+  {
+   "query_index": 4,
+   "query": "Multiply 6 by 8.",
+   "turns": 12,
+   "parse_errors": 12,
+   "error_types": {
+    "error_type: json_syntax": 12
+   },
+   "other_validation_errors": 0,
+   "tool_calls": [],
+   "tool_errors": 0,
+   "w13": 0,
+   "warning_categories": [],
+   "final_answer": null,
+   "ended_in_max_iterations": true,
+   "events": [
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "ValidationErrorObservation",
+     "validator_name": "action_parse",
+     "feedback": "error_type: json_syntax\ndetail: expected JSON object, got JSONDecodeError: Expecting value\nraw_output_preview: "
+    },
+    {
+     "type": "MaxIterationsObservation",
+     "iterations": 12,
+     "last_action_summary": "ValidationErrorObservation(validator_name='action_parse', feedback='error_type: json_syntax\\ndetail: expected JSON object, got JSONDecodeError: Expecting value\\nraw_output_preview: ')"
+    }
+   ]
+  }
+ ],
+ "total_parse_errors": 60,
+ "total_w13": 0
+}

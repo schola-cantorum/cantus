@@ -4,7 +4,7 @@
 `agent.run(workflow, query, max_iterations=8, max_retries=3)` drives the
 loop until a `FinalAnswerAction` or the iteration bound is hit.
 
-All errors (skill exceptions, unknown skill names, validator failures)
+All errors (tool exceptions, unknown tool names, validator failures)
 are wrapped as Observations and appended to the EventStream — they do
 not propagate out of `run`. The LLM sees the error feedback in the next
 prompt and is expected to self-correct.
@@ -33,6 +33,7 @@ from cantus.core.observation import (
     ValidationErrorObservation,
 )
 from cantus.core.registry import Registry, _get_global_registry
+from cantus.grammar.tool_call import _action_name
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -330,20 +331,24 @@ class Agent:
         """Parse LLM output into an Action or a parse-error Observation.
 
         Expected JSON shape:
-            {"thought": str, "action": {"skill_name": str, "args": object}}
+            {"thought": str, "action": {"tool_name": str, "args": object}}
         or
             {"thought": str, "action": {"final_answer": str}}
+
+        A model output that still names the tool with the old action key is
+        accepted for one deprecation window (the shared name rule lives in
+        ``cantus.grammar.tool_call``); ``final_answer`` wins over any name key.
 
         On failure the framework appends a `ValidationErrorObservation`
         per the `agent-runtime` failure-handling Requirements:
 
         - malformed JSON → `validator_name="action_parse"`,
           `error_type: json_syntax`
-        - action object missing both `skill_name` and `final_answer`
+        - action object missing both `tool_name` and `final_answer`
           → `validator_name="action_parse"`, `error_type: missing_field`
-        - `skill_name` present but not in the current registry and no
+        - `tool_name` present but not in the current registry and no
           `final_answer` key → `validator_name="action_parse"`,
-          `error_type: unknown_skill`
+          `error_type: unknown_tool`
         - `final_answer` present but empty after `str.strip()` →
           `validator_name="non_empty_final_answer"`
 
@@ -379,21 +384,21 @@ class Agent:
                 validator_name="action_parse",
                 feedback=self._format_parse_feedback(
                     error_type="missing_field",
-                    detail="action object missing or not a JSON object; required keys: skill_name or final_answer",
+                    detail="action object missing or not a JSON object; required keys: tool_name or final_answer",
                     raw=raw,
                 ),
             )
 
         has_final = "final_answer" in action
-        has_skill = "skill_name" in action
+        has_name, tool_name = (False, None) if has_final else _action_name(action)
 
         # Missing both required keys.
-        if not has_final and not has_skill:
+        if not has_final and not has_name:
             return ValidationErrorObservation(
                 validator_name="action_parse",
                 feedback=self._format_parse_feedback(
                     error_type="missing_field",
-                    detail="action object must contain either 'skill_name' or 'final_answer'",
+                    detail="action object must contain either 'tool_name' or 'final_answer'",
                     raw=raw,
                 ),
             )
@@ -407,31 +412,30 @@ class Agent:
                     validator_name="non_empty_final_answer",
                     feedback=(
                         "FinalAnswerAction.answer must be non-empty after "
-                        "str.strip(); call a skill or write a substantive answer"
+                        "str.strip(); call a tool or write a substantive answer"
                     ),
                 )
             return FinalAnswerAction(thought=thought, answer=str(answer))
 
-        # CallToolAction path: skill_name is present (no final_answer).
-        skill_name = action.get("skill_name", "")
-        if not isinstance(skill_name, str):
+        # CallToolAction path: a name key is present (no final_answer).
+        if not isinstance(tool_name, str):
             return ValidationErrorObservation(
                 validator_name="action_parse",
                 feedback=self._format_parse_feedback(
                     error_type="missing_field",
-                    detail=f"skill_name must be a string, got {type(skill_name).__name__}",
+                    detail=f"tool_name must be a string, got {type(tool_name).__name__}",
                     raw=raw,
                 ),
             )
 
         registered = self.registry.names_for("tool")
-        if registered and skill_name not in registered:
+        if registered and tool_name not in registered:
             return ValidationErrorObservation(
                 validator_name="action_parse",
                 feedback=self._format_parse_feedback(
-                    error_type="unknown_skill",
+                    error_type="unknown_tool",
                     detail=(
-                        f"skill_name {skill_name!r} not in current skill registry; "
+                        f"tool_name {tool_name!r} not in current tool registry; "
                         f"available: {registered}"
                     ),
                     raw=raw,
@@ -443,7 +447,7 @@ class Agent:
             args = {}
         return CallToolAction(
             thought=thought,
-            tool_name=skill_name,
+            tool_name=tool_name,
             args=dict(args),
         )
 
@@ -452,7 +456,7 @@ class Agent:
         """Build the three-part feedback block for `action_parse` errors.
 
         Layout (case-sensitive, newline-separated):
-            error_type: <json_syntax|missing_field|unknown_skill>
+            error_type: <json_syntax|missing_field|unknown_tool>
             detail: <human-readable explanation>
             raw_output_preview: <≤500 chars; appends `…[truncated]` if longer>
 
