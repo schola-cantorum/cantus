@@ -4,27 +4,27 @@ from __future__ import annotations
 
 import pytest
 
-from cantus.core.registry import get_registry
-from cantus.protocols.skill import skill
+from cantus import tool
+from cantus.core.registry import _get_global_registry
 from cantus.workflows import PromptChain
 
 
 def test_prompt_chain_runs_steps_in_order_threading_output():
     calls: list[tuple[str, str]] = []
 
-    @skill
+    @tool
     def outline(topic: str) -> str:
         """Outline."""
         calls.append(("outline", topic))
         return f"outline:{topic}"
 
-    @skill
+    @tool
     def draft(seed: str) -> str:
         """Draft."""
         calls.append(("draft", seed))
         return f"draft:{seed}"
 
-    @skill
+    @tool
     def polish(seed: str) -> str:
         """Polish."""
         calls.append(("polish", seed))
@@ -40,7 +40,7 @@ def test_prompt_chain_runs_steps_in_order_threading_output():
 
 
 def test_prompt_chain_does_not_pollute_registry():
-    @skill
+    @tool
     def step(x: str) -> str:
         """No-op."""
         return x
@@ -48,8 +48,7 @@ def test_prompt_chain_does_not_pollute_registry():
     chain = PromptChain(steps=[step])
     chain.run("x")
 
-    assert "PromptChain" not in get_registry().names_for("skill")
-    assert "chain" not in get_registry().names_for("skill")
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_prompt_chain_empty_steps_raises():

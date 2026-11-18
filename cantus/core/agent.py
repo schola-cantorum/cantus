@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from cantus.protocols.tool import Tool
 
 
-def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
+def _emit_hook_debug_label(role: str, hook: Any, tool_name: str) -> None:
     """Print a `[debug] <role> '<hook_name>' …` line for @debug-wrapped hooks.
 
     Called from `_dispatch_tool` when a `pre_hook` / `post_hook` has been
@@ -55,7 +55,7 @@ def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
     """
     hook_name = getattr(hook, "name", None) or getattr(hook, "__name__", "?")
     sys.stdout.write(
-        f"[debug] {role} '{hook_name}' invoked from skill '{skill_name}'\n"
+        f"[debug] {role} '{hook_name}' invoked from tool '{tool_name}'\n"
     )
 
 

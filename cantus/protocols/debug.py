@@ -1,12 +1,12 @@
-"""@debug — stack on top of a Skill (or hook helper) to print a structured trace.
+"""@debug — stack on top of a Tool (or hook helper) to print a structured trace.
 
     @debug
-    @skill
+    @tool
     def search_book(title: str) -> str: ...
 
 v0.3.0: `@workflow` was removed; orchestration is now via `cantus.workflows`
-building blocks which are plain Python — wrap their underlying Skills with
-`@debug` if you want to trace orchestration steps. `@debug` accepts `Skill`,
+building blocks which are plain Python — wrap their underlying Tools with
+`@debug` if you want to trace orchestration steps. `@debug` accepts `Tool`,
 `Analyzer`, and `Validator` (the latter two as hook helpers).
 """
 
@@ -26,10 +26,10 @@ _TRACEABLE = (Tool, Analyzer, Validator)
 def debug(target: Any) -> Any:
     """Decorator: wrap a registered protocol instance to print a trace on each call.
 
-    Stack on top of `@skill`, `@analyzer`, or `@validator`:
+    Stack on top of `@tool`, `@analyzer`, or `@validator`:
 
         @debug
-        @skill
+        @tool
         def f(x): ...
 
     `target` will be the protocol instance returned by the inner
@@ -37,9 +37,9 @@ def debug(target: Any) -> Any:
     """
     if not isinstance(target, _TRACEABLE):
         raise TypeError(
-            f"@debug can only wrap a Skill or hook helper "
-            f"(Skill, Analyzer, Validator); got {type(target).__name__}. "
-            f"Make sure @debug is on top: `@debug` then `@skill`."
+            f"@debug can only wrap a Tool or hook helper "
+            f"(Tool, Analyzer, Validator); got {type(target).__name__}. "
+            f"Make sure @debug is on top: `@debug` then `@tool`."
         )
 
     original_run = target.run

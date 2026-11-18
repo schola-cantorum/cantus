@@ -1,4 +1,4 @@
-"""Parallel — apply every branch Skill to the same input, collect outputs."""
+"""Parallel — apply every branch Tool to the same input, collect outputs."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable
 
 
 class Parallel:
-    """Fan out the same input to multiple Skills and gather their results in order.
+    """Fan out the same input to multiple Tools and gather their results in order.
 
     Pure Python composition — SHALL NOT touch the runtime registry. Execution is
     sequential under v0.3.0; concurrency (asyncio / threads) is a host concern.

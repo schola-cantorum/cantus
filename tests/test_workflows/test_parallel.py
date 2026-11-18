@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from cantus.core.registry import get_registry
-from cantus.protocols.skill import skill
+from cantus import tool
+from cantus.core.registry import _get_global_registry
 from cantus.workflows import Parallel
 
 
 def test_parallel_runs_every_branch_with_same_input():
     calls: list[str] = []
 
-    @skill
+    @tool
     def en(text: str) -> str:
         """EN."""
         calls.append(f"en:{text}")
         return f"en-{text}"
 
-    @skill
+    @tool
     def zh(text: str) -> str:
         """ZH."""
         calls.append(f"zh:{text}")
@@ -33,17 +33,17 @@ def test_parallel_runs_every_branch_with_same_input():
 
 
 def test_parallel_preserves_branch_order():
-    @skill
+    @tool
     def a(x: str) -> str:
         """A."""
         return "A"
 
-    @skill
+    @tool
     def b(x: str) -> str:
         """B."""
         return "B"
 
-    @skill
+    @tool
     def c(x: str) -> str:
         """C."""
         return "C"
@@ -53,14 +53,13 @@ def test_parallel_preserves_branch_order():
 
 
 def test_parallel_does_not_pollute_registry():
-    @skill
+    @tool
     def b(x: str) -> str:
         """B."""
         return x
 
     Parallel(branches=[b]).run("x")
-    assert "Parallel" not in get_registry().names_for("skill")
-    assert "fanout" not in get_registry().names_for("skill")
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_parallel_empty_branches_raises():

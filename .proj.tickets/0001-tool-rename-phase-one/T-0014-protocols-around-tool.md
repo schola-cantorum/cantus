@@ -2,7 +2,7 @@
 id: T-0014
 title: Protocols around the Tool — debug, AutoMemory, analyzer, validator, hooks, workflows
 epic: 0001-tool-rename-phase-one
-status: todo
+status: done
 blocked_by: [T-0010]
 ---
 
@@ -31,6 +31,24 @@ workflows package. They need the new wire format (T-0010) for their tests. Read 
   label, with its case decided (V2-9); `@debug` stacked on `@tool` in both orders.
 - **R2-7 / C2-F19**: the AutoMemory hardening example in the docstring runs as written on the ticket
   build (checked by a test).
+- **Readings approved at stage 5** (2026-11-18; ticket-rules section 1). Test plan rows 1–13; the
+  table and its decisions D1–D10 are in the Comments.
+  - `C2-F6-a` (X12): `debug()` given anything that is not a `Tool`, `Analyzer` or `Validator` raises
+    `TypeError` with the text
+    ``@debug can only wrap a Tool or hook helper (Tool, Analyzer, Validator); got <type name>. Make sure @debug is on top: `@debug` then `@tool`.``
+    (rows 1, 2).
+  - `C2-F6-b` / `V2-9`: the hook label is lower case,
+    `[debug] <role> '<hook name>' invoked from tool '<tool name>'`, printed before the hook's own
+    trace line (rows 5–7).
+  - `C2-F6-c`: both orders keep today's behaviour. `@debug` above `@tool` returns the `Tool` and
+    traces its calls; `@tool` above `@debug` raises the `C2-F6-a` error (rows 2, 3).
+  - `R2-7` / `C2-F19`: the docstring of `AutoMemory.tools` shows one code block, with its own import
+    line: a `@tool` function of the student's that checks its arguments and then calls the memory
+    tool, and an agent that receives only the tools it needs. No hook is involved. "Runs as written"
+    means: the block, taken from the docstring with `inspect.getdoc`, is executed in a namespace
+    that holds only `model` and `backend`, and the `agent` it builds is the one the test drives
+    (row 10).
+  - AC-35 already held before this ticket; rows 8 and 9 pin it.
 
 ## Review findings carried
 
@@ -44,7 +62,138 @@ workflows package. They need the new wire format (T-0010) for their tests. Read 
 用 `@skill(post_hook=...)` 包工具，新 API 下會直接 `TypeError`，改成能跑的寫法。analyzer、validator、
 hooks、workflows 的說明與測試也改用新 API。
 
+stage 5 核准的讀法（2026-11-18）：`@debug` 包錯對象時的 `TypeError` 改稱 Tool 與 `@tool`（C2-F6-a）；hook 標籤
+用小寫 `invoked from tool`（C2-F6-b、V2-9）；兩種堆疊順序維持現在的行為，`@debug` 在上可用、`@tool` 在上報錯
+（C2-F6-c）；`AutoMemory.tools` 的 docstring 改放一段不用 hook 的範例：自己寫一個 `@tool` 先檢查再轉呼叫記憶
+工具，並只把需要的工具交給 agent，測試會把這段範例原樣取出來執行（R2-7、C2-F19）。AC-35 在本票之前就成立，
+本票補上測試。test plan 共 13 列，決策 D1–D10 全部採最小變更，細節在 Comments。
+
 ## Comments
 
 - Stage 8 surface (ticket build): a script running an agent with `memory.tools` and a
   `@debug`-wrapped tool, showing the debug output.
+- **Stage 5 decisions** (approved by the user on 2026-11-18, all as the smallest change that meets
+  the acceptance criteria; the full table, the challenger report and the objection table stay in
+  `.scratch/T-0014/`, which is not committed). D1 lower-case label. D2 the `TypeError` text above.
+  D3 both orders keep today's behaviour. D4 pattern A (a tool of the student's in front of the
+  memory tool, a subset handed to the agent); no extra explanatory sentences (D4b). D5 the test
+  extracts the single code block with `inspect.getdoc` and executes it with
+  `compile(..., dont_inherit=True)`. D6 the class docstring's usage line is reworded, not executed.
+  D7 the migrated "nothing is written to the registry" tests read the global registry through the
+  private `cantus.core.registry._get_global_registry()`: the user extended the exception T-0007
+  approved (spec "Testing Decisions") to `tests/test_analyzer.py`, `tests/test_validator.py` and
+  `tests/test_workflows/`. D8 no module-level warning filter in the migrated modules. D9 and D10:
+  see "Left as they are".
+- **Test plan rows** (R = red first, G = guard that passes when written, checked by mutation):
+  1 `debug()` rejects a function, an `int`, `None` and the `Tool` class with the full text (R);
+  2 `@tool` above `@debug` raises it (R); 3 `@debug` above `@tool`: direct call, call through
+  `Agent(model, tools=[t])`, a class-first instance, `@tool(pre_hook=...)`, no cantus warning (G);
+  4 no `@debug`, no output (G); 5 `pre_hook` label line, its position and a `ToolObservation` (R);
+  6 the same for `post_hook` (R); 7 no label without `@debug` on the hook (G); 8 the four memory
+  tools are `Tool` instances in order (G); 9 `Agent(model, tools=memory.tools)` calls all four,
+  AC-35 (G); 10 the docstring example runs as written (R); 11 workflow behaviour tests on `@tool`
+  (G); 12 building blocks leave the global registry empty (G); 13 analyzer and validator helpers
+  leave it empty (G).
+- **How the loop ran.** Rows 1, 2, 5, 6 and 10 were red before their code (the old texts, the
+  missing code block); rows 3, 4, 7, 8, 9, 11, 12 and 13 passed when written, as planned. A
+  mutation check (`.scratch/T-0014/mutate.py`, 38 mutations over the package files after the stage-6 fixes, every
+  one turned at least one test red) covers the rows never seen failing. One brief value was wrong and
+  the test carries the measured one: the prompt's catalog lists tool names alphabetically
+  (`create`, `delete`, `str_replace`, `view`), while `memory.tools` keeps its own order.
+- **Self-check** (ticket-rules section 3; traceability 4.2 patterns over the 21 touched files under
+  `cantus/` and `tests/`): all clean. No `# legacy-alias` line was added and no module under
+  `tests/legacy/` changed. `docs/api` is unchanged after `npm run docs:api`.
+- **Left as they are** (decisions D9 and D10; none matches a section 4.2 pattern, so the sweep
+  will not find them):
+  - `cantus/protocols/_common.py:4` ("used by skill / analyzer / validator") and
+    `cantus/core/result.py:15` ("skill input"). Traceability 4.4 lists both files, no ticket names
+    them, and T-0020's deliverable covers pattern matches only: **no later ticket owns these two
+    lines**; the user decides where they go.
+  - `cantus/protocols/debug.py`: the docstring says "wrap a registered protocol instance" and
+    "rebind `__call__`" (the code replaces `run`), and the runtime line
+    `[debug] registered <Class> '<name>'` is printed for a tool that no registry holds.
+    `cantus/workflows/__init__.py:5` says "registered `Tool` instances".
+  - The example in `cantus/hooks/__init__.py` now reads `@tool(pre_hook=parse_location, ...)` and
+    still does not run: the hook takes `text`, the tool takes `loc`, and dispatch calls
+    `pre_hook(**args)` (measured: `pre_hook TypeError: parse_location() got an unexpected keyword
+    argument 'loc'`). That is OQ-010's subject.
+  - `debug(SomeToolClass)` (the class, not an instance) says `got type` and tells the student to
+    use `@tool`, which a class-first definition never uses (same family as C2-F10). Applying
+    `@debug` twice wraps twice and prints the registration lines again. Both are v0.6 behaviour.
+- **For later tickets.**
+  - T-0015: this ticket adds and removes no module attribute (`_emit_hook_debug_label`'s third
+    parameter is now `tool_name`; the function is private and both call sites are positional).
+    `@debug` on a Tool and `Agent(model, tools=memory.tools)` emit no cantus warning (rows 3, 9).
+  - T-0017: `docs/site/protocols/debug.md:28` and its zh-tw mirror quote the old `TypeError`
+    text; `docs/site/protocols/memory.md:99-110` hardens a memory tool by assigning
+    `create_skill._post_hook` and should show the pattern the docstring now tests (a tool of the
+    student's in front of the memory tool, a subset handed to the agent).
+  - T-0018: `docs/site/cookbook/errors.md:131` and its zh-tw mirror quote the old text in a `#`
+    comment of an executed block (the page prints only the exception's type, so it still passes).
+  - T-0019 (X12): `@debug` `TypeError`, v0.6
+    ``@debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got <type>. Make sure @debug is on top: `@debug` then `@skill`.``
+    and v0.7 as in `C2-F6-a`; hook label, v0.6 `[debug] <role> '<hook>' invoked from skill '<name>'`
+    and v0.7 `... invoked from tool '<name>'` (lower case). This ticket adds nothing to the K2-F1
+    list of unlisted changes.
+- **Coverage report** (percentages are from the full suite in the local `.venv`, Python 3.13, `1738 passed, 3 skipped`; the skips need `mlx_lm`, `rank_bm25`
+  and `sentence_transformers`; the ten owned modules also pass on Python 3.10–3.14 with cantus
+  deprecations turned into errors, `57 passed` each):
+
+  | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
+  |---|---|---|---|---|
+  | `cantus.protocols.debug.debug` | `tests/test_debug.py` rows 1–4 (10 tests) | `cantus/protocols/debug.py` 85% | C2-F6-a, C2-F6-c, X12 | 54–59 the trace line for a tool that raises, 75–76 the `repr` fallback of `_safe_json`: unchanged code, not this ticket's cases |
+  | hook label in `Agent._dispatch_tool` | `tests/test_debug.py` rows 5–7 (4 tests) | `cantus/core/agent.py` 96% | C2-F6-b, V2-9, X12 | 72, 257, 272–273 and three partial branches at 254, 281, 286: the run loop and model-handle code, outside `_emit_hook_debug_label` and its two call sites, which are fully covered |
+  | `AutoMemory.tools` through `Agent` | `tests/test_memory_auto.py` rows 8, 9 (2 tests; 6 older tests, one with its loop variable renamed from `tool`, which now names the imported decorator) | `cantus/protocols/memory_auto.py` 90% | AC-35 (TR-45) | 74, 81, 84: `str_replace` with an empty `old`, an unchanged turn, an all-blank result (unchanged code) |
+  | docstring example of `AutoMemory.tools` | `tests/test_memory_auto.py` row 10 (1 test) | not a line measurement: the docstring's code block is executed by the test | R2-7, C2-F19 | the class docstring's usage line is reworded and not executed (D6) |
+  | workflow building blocks | `tests/test_workflows/` rows 11, 12 (21 tests) | `cantus/workflows/*` 100% | Deliverable | — |
+  | analyzer and validator helpers | `tests/test_analyzer.py`, `tests/test_validator.py` row 13 (5 migrated tests of 13) | `analyzer.py` 94%, `validator.py` 96%, `hooks/__init__.py` 100% | Deliverable | `analyzer.py:32`, `validator.py:56`: the base classes' `run` raising `NotImplementedError` (unchanged) |
+- **Stage 6** (code review on `a28ddbf..e1ccbb4`; Standards 17 findings, Spec 8, none high, one
+  medium; the Spec reviewer named a test for each of the 13 rows). Fixed in `3aa80ef`: the
+  `@tool(pre_hook=...)` case of row 3 now asserts the `Tool`, the trace line and the absence of a
+  hook label (S-01, P-01, P-02); row 7 asserts that the unwrapped hook ran (S-02); row 10 asserts
+  the tool list handed to the agent, the number of error observations and that the call to
+  `create` is rejected at parsing (S-08, S-09, P-03); import order (S-17, P-07); the "For
+  production use" sentence of the docstring rejoined its paragraph (P-08); this ticket's counts
+  and coverage rows (S-12, S-13, P-04). Shown to the user and left as they are: wording in lines
+  this ticket touched that was already inaccurate in v0.6 (S-05 `validator.py` says validators
+  run "between" tool calls and names a `ValidationError`; S-06 `memory_auto.py` says "private
+  closure" for an instance attribute; S-07 the warning says the LLM can delete, while the
+  `delete` tool only reports matches); the test name
+  `test_spec_for_llm_top_level_only_tool_after_building_blocks_instantiated`, as approved, no
+  longer describes its assertion (S-04); the migrated registry tests look only at kind `"tool"`
+  and rely on the autouse fixture that empties the global registry (S-03); the example needs
+  `model` and `backend` from the reader (S-10); rows 1 and 3 pin the `got type` text and the
+  `[debug] registered` line that "Left as they are" calls misleading (S-11, P-06); the approved
+  test plan table and the mutation script are not committed (S-14, P-05); the new tests build
+  their scripted agent inline where `tests/agent_helpers.py::run_agent` exists (S-15); two
+  assertions repeat what another test or the next line already shows (S-16).
+- **Stage 7**: `.proj.specs/0001-tool-rename-phase-one/review/security-T-0014.md`. Five
+  candidates, none confirmed as a security defect of this change; no finding at the report
+  threshold. For the close-out chain analysis: SEC-T0014-1 (the docstring's example refuses by the
+  substring `password`, which is easy to get around; the two reviewers differ on whether the
+  wording "refusing anything that looks like a password" should be toned down), SEC-T0014-2
+  (`view` returns stored text unfiltered), SEC-T0014-4 (`str_replace` also writes and is not
+  wrapped if a student hands it out).
+- **Stage 8** (ADR-0018; surface: the Python API in a script, run as a subprocess with the
+  build's interpreter, driven by the agent). Ticket build: commit
+  `3aa80ef09fa4145cbe591698523efdb41145ba44` (the last commit that changes `cantus/`),
+  `git archive` into an empty directory, `uv build --wheel` (sha256
+  `b39a088c97223db03f1642387f9a1f45cd0e206855eaf0d5f46b8b45c9f516a6`), installed into a new
+  virtual environment; working directory and script directory outside the checkout, `PYTHONPATH`
+  and `PYTHONWARNINGS` unset; `cantus.__file__` under that environment's `site-packages`; Python
+  3.12.12, macOS 26.6.2 arm64. The script (`.scratch/T-0014/stage8.py`, not committed) uses a
+  scripted model and does four things: (1) `Agent(model, tools=memory.tools)` calls `create`,
+  `view`, `str_replace` and `delete` and gets four `ToolObservation`s (`'ok'`, the stored turn,
+  `1`, `2`); (2) a `@debug`-wrapped tool and a tool with `@debug`-wrapped hooks run through an
+  agent, and stdout shows `[debug] search_book thought='' args=[]/{"title": "Foundation"}
+  result="found:Foundation"`, `[debug] pre_hook 'parse_location' invoked from tool 'get_weather'`
+  and `[debug] post_hook 'non_empty' invoked from tool 'get_weather'`, each label before its
+  hook's own trace line; (3) `@tool` above `@debug` raises the `C2-F6-a` text with `got function`;
+  (4) the code block read with `inspect.getdoc` from the installed `AutoMemory.tools` runs in a
+  namespace holding only `model` and `backend`: the password write is a `ToolErrorObservation`,
+  the call to `create` is rejected, the allowed write is the only turn in the backend. Run twice:
+  with `-W error::DeprecationWarning` and with no warning option; both exit 0 with 10 checks
+  passed, empty stderr and no `CantusDeprecationWarning` shown. The same script passed on the
+  earlier code commit `645da71` (wheel sha256 `045cd8ed…`) before the stage-6 fixes. Not covered:
+  a real model (the model is scripted), `cantus serve`, the TUI, notebooks and Colab.
+

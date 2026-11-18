@@ -68,30 +68,26 @@ def test_class_first_validator():
 
 def test_decorator_validator_no_registry_entry():
     """v0.3.0: @validator SHALL NOT mutate the runtime registry."""
-    from cantus.core.registry import get_registry
+    from cantus.core.registry import _get_global_registry
 
     @validator
     def is_positive(n: int) -> Result:
         """Positive check."""
         return Result.success(n) if n > 0 else Result.failure("not positive")
 
-    reg = get_registry()
-    for kind in ("skill", "analyzer", "validator", "workflow"):
-        assert "is_positive" not in reg.names_for(kind)
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_register_validator_no_registry_entry():
     """v0.3.0: register_validator() SHALL NOT mutate the runtime registry."""
-    from cantus.core.registry import get_registry
+    from cantus.core.registry import _get_global_registry
 
     def v(n: int) -> Result:
         """Even."""
         return Result.success() if n % 2 == 0 else Result.failure("odd")
 
     register_validator(v)
-    reg = get_registry()
-    for kind in ("skill", "analyzer", "validator", "workflow"):
-        assert "v" not in reg.names_for(kind)
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_reserved_validator_name_still_guards():

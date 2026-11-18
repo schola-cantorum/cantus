@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from cantus.core.registry import get_registry
-from cantus.protocols.skill import skill
+from cantus import tool
+from cantus.core.registry import _get_global_registry
 from cantus.workflows import (
     EvaluatorOptimizer,
     OrchestratorWorker,
@@ -13,21 +13,21 @@ from cantus.workflows import (
 )
 
 
-def test_spec_for_llm_top_level_only_skill_after_building_blocks_instantiated():
-    """After instantiating every building block, registry.spec_for_llm() top-level
-    keys SHALL contain only "tool" — none of the building block class names leak."""
+def test_spec_for_llm_top_level_only_tool_after_building_blocks_instantiated():
+    """After instantiating every building block, the global registry's
+    spec_for_llm() SHALL be exactly {"tool": []}: no building block registers itself."""
 
-    @skill
+    @tool
     def a(x: str) -> str:
         """A."""
         return x
 
-    @skill
+    @tool
     def b(x: str) -> str:
         """B."""
         return x
 
-    @skill
+    @tool
     def plan(x: str) -> list[str]:
         """Plan."""
         return [x]
@@ -38,18 +38,4 @@ def test_spec_for_llm_top_level_only_skill_after_building_blocks_instantiated():
     OrchestratorWorker(orchestrator=plan, workers=[a])
     EvaluatorOptimizer(generator=a, evaluator=b, max_iters=1)
 
-    spec = get_registry().spec_for_llm()
-    assert set(spec.keys()) == {"tool"}, (
-        f"building blocks polluted spec_for_llm: {set(spec.keys())}"
-    )
-    skill_names = {s["name"] for s in spec["tool"]}
-    for forbidden in (
-        "PromptChain",
-        "Router",
-        "Parallel",
-        "OrchestratorWorker",
-        "EvaluatorOptimizer",
-    ):
-        assert forbidden not in skill_names, (
-            f"building block {forbidden!r} leaked into skill registry"
-        )
+    assert _get_global_registry().spec_for_llm() == {"tool": []}

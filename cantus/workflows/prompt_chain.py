@@ -1,4 +1,4 @@
-"""PromptChain — run a sequence of Skills, threading output to next input."""
+"""PromptChain — run a sequence of Tools, threading output to next input."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable
 
 
 class PromptChain:
-    """Run Skills in order, where each Skill's output becomes the next one's input.
+    """Run Tools in order, where each Tool's output becomes the next one's input.
 
     Pure Python composition — SHALL NOT touch the runtime registry.
 

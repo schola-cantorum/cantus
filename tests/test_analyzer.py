@@ -53,7 +53,7 @@ def test_class_first_analyzer():
 
 def test_decorator_analyzer_no_registry_entry():
     """v0.3.0: @analyzer SHALL NOT mutate the runtime registry."""
-    from cantus.core.registry import get_registry
+    from cantus.core.registry import _get_global_registry
 
     @analyzer
     def parse_book(text: str) -> Book:
@@ -61,17 +61,12 @@ def test_decorator_analyzer_no_registry_entry():
         title, isbn = text.split("/", 1)
         return Book(title=title, isbn=isbn)
 
-    reg = get_registry()
-    # registry SHALL have no entries at all for analyzer/validator/workflow kinds
-    for kind in ("skill", "analyzer", "validator", "workflow"):
-        assert "parse_book" not in reg.names_for(kind), (
-            f"@analyzer leaked into registry under kind {kind!r}"
-        )
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_register_analyzer_no_registry_entry():
     """v0.3.0: register_analyzer() SHALL NOT mutate the runtime registry."""
-    from cantus.core.registry import get_registry
+    from cantus.core.registry import _get_global_registry
 
     def parse(text: str) -> Book:
         """Parse."""
@@ -79,14 +74,12 @@ def test_register_analyzer_no_registry_entry():
         return Book(title=title, isbn=isbn)
 
     register_analyzer(parse)
-    reg = get_registry()
-    for kind in ("skill", "analyzer", "validator", "workflow"):
-        assert "parse" not in reg.names_for(kind)
+    assert _get_global_registry().names_for("tool") == []
 
 
 def test_class_first_analyzer_no_registry_entry():
     """v0.3.0: instantiating an Analyzer subclass SHALL NOT mutate the registry."""
-    from cantus.core.registry import get_registry
+    from cantus.core.registry import _get_global_registry
 
     class ParseSomething(Analyzer):
         """Parse something."""
@@ -97,6 +90,4 @@ def test_class_first_analyzer_no_registry_entry():
             return Book(title=text, isbn="x")
 
     ParseSomething()
-    reg = get_registry()
-    for kind in ("skill", "analyzer", "validator", "workflow"):
-        assert "parse_something" not in reg.names_for(kind)
+    assert _get_global_registry().names_for("tool") == []
