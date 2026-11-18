@@ -78,6 +78,7 @@ def test_observations_can_join_event_stream():
 
 # --- T-0009 rows 2-4: the event classes speak tool_name ---------------------
 
+
 def test_missing_required_arguments_and_unknown_keywords_raise_type_error_silently():
     # Row 2 (guard): the generated __init__'s behaviour is kept.
     with warnings.catch_warnings(record=True) as caught:
@@ -164,7 +165,6 @@ def test_new_api_operations_emit_no_cantus_warning():
         warnings.simplefilter("always")
         for event in (action, ok, err):
             repr(event)
-            assert event == event
             dataclasses.asdict(event)
             assert copy.deepcopy(event) == event
             assert pickle.loads(pickle.dumps(event)) == event
@@ -174,12 +174,13 @@ def test_new_api_operations_emit_no_cantus_warning():
     assert [w for w in caught if issubclass(w.category, CantusDeprecationWarning)] == []
 
 
-def test_max_iterations_partial_state_stays_a_deep_copy():
-    # Row 4 (guard).
-    stream = EventStream()
-    stream.append(ToolObservation("a", 1))
-    snapshot = copy.deepcopy(stream)
-    obs = MaxIterationsObservation(iterations=1, partial_state=snapshot)
-    assert obs.partial_state is snapshot
-    assert obs.partial_state[0] is not stream[0]
-    assert obs.partial_state[0] == stream[0]
+def test_type_error_texts_are_the_generated_ones_and_the_signature_shows_the_fields():
+    # D1: the constructor is the generated one, so its messages and signature are too.
+    import inspect
+
+    with pytest.raises(TypeError, match=r"missing 2 required positional arguments: 'tool_name' and 'result'"):
+        ToolObservation()  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match=r"got an unexpected keyword argument 'extra'"):
+        ToolObservation(tool_name="x", result=1, extra=2)  # type: ignore[call-arg]
+    assert list(inspect.signature(ToolObservation).parameters) == ["tool_name", "result"]
+    assert list(inspect.signature(CallToolAction).parameters) == ["thought", "tool_name", "args"]

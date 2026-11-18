@@ -25,6 +25,10 @@ def _from_replace(cls: type, tool_name: Any, caller: FrameType) -> bool:
     The calling frame belongs to the ``dataclasses`` module and ``tool_name`` is the very
     object the original event holds (the frame's local ``obj`` on Python 3.10-3.12, or
     ``self`` on 3.13+). Then the legacy keyword wins over the carried-along value.
+    Known limits: a caller that passes the original's own ``tool_name`` object explicitly
+    is indistinguishable from the carried-along value and is let through; a subclass whose
+    own ``__init__`` forwards to ``super().__init__`` is not recognised, so ``replace``
+    with the legacy keyword raises there.
     """
     if caller.f_globals.get("__name__") != "dataclasses":
         return False

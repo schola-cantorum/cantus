@@ -379,8 +379,7 @@ def test_a_tool_subclass_instance_in_tools_is_dispatched_and_stays_out_of_the_gl
 
 
 def test_prompt_lists_tools_under_the_tool_key_and_shows_the_new_event_reprs(records):
-    # Row 8: the model output is built here (thought 'add them'); the action key is still
-    # skill_name until T-0010.
+    # Row 8: the model output is built here (thought 'add them'); T-0010 switches its key.
     import json
 
     @tool
@@ -402,8 +401,9 @@ def test_prompt_lists_tools_under_the_tool_key_and_shows_the_new_event_reprs(rec
     )
 
     assert len(model.prompts) == 3
-    for prompt in model.prompts:
+    for index, prompt in enumerate(model.prompts):
         assert list(json.loads(prompt)["tools"]) == ["tool"]
+        assert prompt_tool_names(model, index) == ["add", "boom"]
     events = json.loads(model.prompts[2])["events"]
     assert events == [
         "CallToolAction(thought='add them', tool_name='add', args={'a': 3, 'b': 4})",

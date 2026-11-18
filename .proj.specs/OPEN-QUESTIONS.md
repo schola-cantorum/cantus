@@ -477,6 +477,8 @@ calling.
 **Revisit when.** The async-core epic reaches stage 1 (install hints); the tool-calling epic reaches
 stage 1 (`Args:` descriptions).
 
+---
+
 ## OQ-013 — How does the split loop keep a student's private dispatch override from being skipped silently?
 
 **Deferred on:** 2026-11-18
@@ -491,9 +493,10 @@ this one rename. The async-core epic splits the loop into replaceable stages (AD
 made async there, and the same silent skip can return before the permission seam (OQ-008) exists.
 
 **Evidence.**
-- Verified: the guard is `Agent.__init_subclass__` in `cantus/core/agent.py`; its tests are in
+- Verified: the guard is `Agent.__init_subclass__` (`cantus/core/agent.py:135`); its tests are in
   `tests/legacy/test_dispatch_override_guard.py`. It does not cover a method assigned or
-  monkeypatched after the class exists.
+  monkeypatched after the class exists, an attribute set on the instance, or a subclass below an
+  intermediate class whose own `__init_subclass__` does not call `super()`.
 - Not verified: whether course material or a teacher's package teaches overriding the dispatch
   method (the user could not confirm it on 2026-11-18).
 - The guard's message tells the student to override `_dispatch_tool`; that advice goes stale if

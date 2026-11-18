@@ -1,7 +1,7 @@
 """Shared helpers for tests that drive an Agent with a scripted model.
 
-The transitional name (the ``skill_name`` action key) appears only in this file, marked
-with the ticket that renames it.
+The model output still uses the v0.6 action key until T-0010; `call_json` holds it, on a
+line marked with that ticket.
 """
 
 import json

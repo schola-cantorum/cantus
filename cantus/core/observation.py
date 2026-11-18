@@ -32,10 +32,6 @@ class ToolObservation(Observation):
     result: Any
 
 
-if TYPE_CHECKING:
-    SkillObservation = ToolObservation  # legacy-alias
-
-
 @accepts_legacy_keyword
 @dataclass(frozen=True)
 class ToolErrorObservation(Observation):
@@ -81,6 +77,10 @@ class MaxIterationsObservation(Observation):
     iterations: int
     last_action_summary: str = ""
     partial_state: "EventStream" = field(default_factory=_default_event_stream)
+
+
+if TYPE_CHECKING:
+    SkillObservation = ToolObservation  # legacy-alias
 
 
 def __getattr__(name: str) -> Any:

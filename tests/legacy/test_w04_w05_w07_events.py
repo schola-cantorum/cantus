@@ -41,30 +41,6 @@ def test_serve_modules_have_no_attribute_named_after_the_legacy_event_classes():
         assert "SkillObservation" not in vars(module)
 
 
-def test_trace_summaries_keep_their_text_until_the_serve_ticket():
-    # Row 12 (D5): the step type is the new class name; the summary string is unchanged.
-    pytest.importorskip("fastapi")
-    from fastapi.testclient import TestClient
-
-    from cantus import Registry, register_tool
-    from cantus.serve import serve
-
-    def echo(value: str) -> str:
-        """Echo the value."""
-        return value
-
-    reg = Registry()
-    register_tool(echo, registry=reg)
-    client = TestClient(serve(reg))
-    client.post("/skills/echo", json={"value": "hi"})
-    run_id = client.get("/introspection/sessions").json()[0]["id"]
-    steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
-
-    assert [s["type"] for s in steps] == ["CallToolAction", "ToolObservation"]
-    assert steps[0]["summary"] == "CallSkillAction skill='echo' arg_keys=['value']"
-    assert steps[1]["summary"] == "SkillObservation skill='echo' result_type=str"
-
-
 # --- Row 13 -----------------------------------------------------------------
 
 _ALIAS_CASES = [
@@ -289,7 +265,7 @@ def test_tool_name_together_with_skill_name_raises_type_error_before_any_warning
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         with pytest.raises(TypeError, match="tool_name= or skill_name="):
-            cls(tool_name="a", skill_name="b", **{**rest})
+            cls(tool_name="a", skill_name="b", **rest)
         with pytest.raises(TypeError, match="tool_name= or skill_name="):
             cls(*args, skill_name="b", **rest)
     assert cantus_records(caught) == []
@@ -429,7 +405,10 @@ def test_copy_replace_with_skill_name_behaves_like_dataclasses_replace(label, cl
         silent = copy.replace(event, tool_name="z")  # type: ignore[attr-defined]
     assert replaced == cls(tool_name="x", **rest)
     assert silent.tool_name == "z"
-    assert [str(w.message) for w in cantus_records(caught)] == [EXPECTED["W7"]]
+    records = cantus_records(caught)
+    assert [str(w.message) for w in records] == [EXPECTED["W7"]]
+    # traceability 2.4 as written: the first non-cantus frame is the standard library's
+    assert records[0].filename.endswith("dataclasses.py")
 
 
 # --- Row 19 -----------------------------------------------------------------
@@ -496,8 +475,20 @@ def test_a_legacy_class_subclass_instance_in_tools_is_dispatched_into_a_tool_obs
         ("from cantus import CallSkillAction", "W4"),
         ("from cantus import SkillObservation", "W5"),
         ("from cantus import ToolObservation\nvalue = ToolObservation('a', 1).skill_name", "W7"),
+        ("from cantus.core.action import CallSkillAction", "W4"),
+        ("from cantus.core.observation import SkillObservation", "W5"),
+        ("from cantus.core.agent import CallSkillAction", "W4"),
+        ("from cantus.core.agent import SkillObservation", "W5"),
     ],
-    ids=["CallSkillAction", "SkillObservation", "skill_name-read"],
+    ids=[
+        "CallSkillAction",
+        "SkillObservation",
+        "skill_name-read",
+        "core.action",
+        "core.observation",
+        "core.agent-action",
+        "core.agent-observation",
+    ],
 )
 def test_under_default_filters_each_legacy_use_prints_its_warning_once(tmp_path, statement, w_id):
     from tests.legacy.support import run_python
@@ -508,6 +499,15 @@ def test_under_default_filters_each_legacy_use_prints_its_warning_once(tmp_path,
     assert result.returncode == 0, result.stderr
     assert result.stderr.count("CantusDeprecationWarning") == 1
     assert result.stderr.count(EXPECTED[w_id]) == 1
+
+
+def test_the_legacy_property_says_it_is_deprecated_and_the_signature_hides_the_legacy_keyword():
+    # D1: help() lists the property with a one-line note; the constructor shows new fields only.
+    import inspect
+
+    for cls in (CallToolAction, ToolObservation):
+        assert inspect.getdoc(inspect.getattr_static(cls, "skill_name")) == "Deprecated; use tool_name."
+        assert "skill_name" not in inspect.signature(cls).parameters
 
 
 # --- Row 24 (characterization; known limit, see the ticket) -----------------

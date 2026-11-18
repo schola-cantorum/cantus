@@ -382,6 +382,22 @@ def test_version_is_valid_semver() -> None:
 # --- T-0009: the event classes are CallToolAction / ToolObservation ------------
 
 
+def _run_python(args, *, cwd):
+    """Run ``python *args`` without the warning and path variables of the test process."""
+    import os
+    import subprocess
+    import sys
+
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"PYTHONPATH", "PYTHONWARNINGS", "PYTHONDEVMODE"}
+    }
+    return subprocess.run(
+        [sys.executable, *args], capture_output=True, text=True, cwd=str(cwd), env=env, timeout=120
+    )
+
+
 def test_event_classes_are_in_all_and_are_attributes():
     import cantus
 
@@ -394,24 +410,19 @@ def test_event_classes_are_in_all_and_are_attributes():
 
 
 def test_star_import_binds_the_event_classes_and_is_silent(tmp_path):
-    from tests.legacy.support import run_python
-
     script = (
         "from cantus import *\n"
         "assert CallToolAction.__name__ == 'CallToolAction'\n"
         "assert ToolObservation.__name__ == 'ToolObservation'\n"
         "assert ToolErrorObservation.__name__ == 'ToolErrorObservation'\n"
     )
-    result = run_python(["-c", script], cwd=tmp_path)
+    result = _run_python(["-c", script], cwd=tmp_path)
     assert result.returncode == 0, result.stderr
-    assert "CantusDeprecationWarning" not in result.stderr
     assert "DeprecationWarning" not in result.stderr
 
 
 def test_importing_the_event_modules_is_silent_under_error_filter(tmp_path):
-    from tests.legacy.support import run_python
-
-    result = run_python(
+    result = _run_python(
         [
             "-W",
             "error::DeprecationWarning",

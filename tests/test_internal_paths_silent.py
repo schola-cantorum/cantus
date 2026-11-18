@@ -91,7 +91,7 @@ def test_workflow_trace_route_after_an_invocation_is_silent(records):
 
     client = TestClient(serve(_registry()))
 
-    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}
+    assert client.post("/skills/echo", json={"value": "hi"}).json() == {"result": "hi"}  # T-0012 renames this route
     run_id = client.get("/introspection/sessions").json()[0]["id"]
     trace = client.get(f"/introspection/workflows/{run_id}")
 

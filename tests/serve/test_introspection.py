@@ -778,3 +778,27 @@ def test_introspection_workflows_endpoint_gated_by_auth(monkeypatch: Any) -> Non
     )
     assert ok.status_code in (200, 404)
     assert ok.status_code != 401
+
+
+def test_trace_summaries_keep_their_text_until_the_serve_ticket():
+    # T-0009 row 12 (D5): the step type is the new class name; the summary strings keep their
+    # v0.6 text. T-0012 rewrites these summaries and this test with them.
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry, register_tool
+    from cantus.serve import serve
+
+    def echo(value: str) -> str:
+        """Echo the value."""
+        return value
+
+    reg = Registry()
+    register_tool(echo, registry=reg)
+    client = TestClient(serve(reg))
+    client.post("/skills/echo", json={"value": "hi"})
+    run_id = client.get("/introspection/sessions").json()[0]["id"]
+    steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
+
+    assert [s["type"] for s in steps] == ["CallToolAction", "ToolObservation"]
+    assert steps[0]["summary"] == "CallSkillAction skill='echo' arg_keys=['value']"
+    assert steps[1]["summary"] == "SkillObservation skill='echo' result_type=str"

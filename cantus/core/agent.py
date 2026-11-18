@@ -133,6 +133,14 @@ class Agent:
     soul: "Soul | None" = field(default=None, kw_only=True)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Reject a subclass that still carries the pre-0.7 dispatch override.
+
+        The loop calls ``_dispatch_tool``; an override under the old name would never
+        run, so any check in it would be skipped without a sign.
+
+        Raises:
+            TypeError: If the old method name is found on the subclass or its bases.
+        """
         super().__init_subclass__(**kwargs)
         if hasattr(cls, "_dispatch_skill"):  # legacy-alias
             raise TypeError(

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from cantus._deprecation import warn_legacy
 from cantus.core._legacy_events import accepts_legacy_keyword
 
+
 @dataclass(frozen=True)
 class Action:
     """Base class for everything the agent can decide to do.

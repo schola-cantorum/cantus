@@ -348,18 +348,18 @@ def _summarize_event(event: Any) -> str:
     """
     if isinstance(event, CallToolAction):
         return (
-            f"CallSkillAction skill={event.tool_name!r} "  # legacy-alias
+            f"CallSkillAction skill={event.tool_name!r} "  # T-0012 rewrites this summary
             f"arg_keys={sorted(event.args)}"
         )
     if isinstance(event, ToolObservation):
         return (
-            f"SkillObservation skill={event.tool_name!r} "  # legacy-alias
+            f"SkillObservation skill={event.tool_name!r} "  # T-0012 rewrites this summary
             f"result_type={type(event.result).__name__}"
         )
     if isinstance(event, ToolErrorObservation):
         # The exception (error) type name only — the raw message may embed
         # internal paths or input values, so it is dropped.
-        return f"ToolErrorObservation skill={event.tool_name!r}"
+        return f"ToolErrorObservation skill={event.tool_name!r}"  # T-0012 rewrites this summary
     return type(event).__name__
 
 
