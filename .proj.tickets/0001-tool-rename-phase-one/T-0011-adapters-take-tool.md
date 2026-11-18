@@ -2,7 +2,7 @@
 id: T-0011
 title: Adapters take Tool
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0007]
 ---
 
