@@ -21,7 +21,8 @@ except ImportError as exc:
         "Run: pip install cantus[dspy]"
     ) from exc
 
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._arguments import resolve_tool
+from cantus.adapters._remote_tool import _RemoteToolBase
 from cantus.protocols.tool import Tool
 
 _JSON_TYPE_TO_PY: dict[str, type] = {
@@ -44,7 +45,7 @@ def _py_type_to_json_type(py_type: Any) -> str:
 
 
 class _CantusDspyInputField:
-    """Shape that mirrors a dspy input-field descriptor for exposed Skills."""
+    """Shape that mirrors a dspy input-field descriptor for exposed Tools."""
 
     def __init__(self, py_type: type, *, optional: bool = False) -> None:
         self.py_type = py_type
@@ -58,14 +59,27 @@ class _CantusDspySignature:
         self.input_fields = input_fields
 
 
-def expose_as_dspy_tool(skill: Tool) -> "dspy.Tool":
-    """Wrap a cantus Skill as a dspy.Tool instance."""
-    if not isinstance(skill, Tool):
-        raise TypeError(
-            f"expose_as_dspy_tool expects Skill, got {type(skill).__name__}"
-        )
+def expose_as_dspy_tool(
+    tool: Tool | None = None,
+    *,
+    skill: Tool | None = None,  # legacy-alias
+) -> "dspy.Tool":
+    """Wrap a cantus Tool as a dspy.Tool instance.
 
-    spec = skill.spec_for_llm()
+    Args:
+        tool: The cantus Tool to wrap.
+        skill: Deprecated; use ``tool``.
+
+    Returns:
+        A ``dspy.Tool`` whose implementation calls the Tool.
+
+    Raises:
+        TypeError: If the argument is not a Tool, or both ``tool`` and the
+            deprecated keyword are given.
+    """
+    tool = resolve_tool("expose_as_dspy_tool", tool, skill)  # legacy-alias
+
+    spec = tool.spec_for_llm()
     properties = (spec["args_schema"].get("properties") or {})
     required = set(spec["args_schema"].get("required") or [])
 
@@ -79,7 +93,7 @@ def expose_as_dspy_tool(skill: Tool) -> "dspy.Tool":
     signature = _CantusDspySignature(input_fields)
 
     def _impl(**kwargs: Any) -> Any:
-        return skill(**kwargs)
+        return tool(**kwargs)
 
     return dspy.Tool(
         name=spec["name"],
@@ -89,8 +103,8 @@ def expose_as_dspy_tool(skill: Tool) -> "dspy.Tool":
     )
 
 
-class _DspyRemoteSkill(_RemoteSkillBase):
-    """cantus Skill that proxies a dspy.Tool."""
+class _DspyRemoteTool(_RemoteToolBase):
+    """cantus Tool that proxies a dspy.Tool."""
 
     def __init__(self, *, tool: "dspy.Tool") -> None:
         signature = getattr(tool, "signature", None)
@@ -138,12 +152,12 @@ class _DspyRemoteSkill(_RemoteSkillBase):
 
 
 def import_dspy_tool(tool: "dspy.Tool") -> Tool:
-    """Wrap a dspy.Tool as a cantus Skill instance."""
+    """Wrap a dspy.Tool as a cantus Tool instance."""
     if not isinstance(tool, dspy.Tool):
         raise TypeError(
             f"import_dspy_tool expects dspy.Tool, got {type(tool).__name__}"
         )
-    return _DspyRemoteSkill(tool=tool)
+    return _DspyRemoteTool(tool=tool)
 
 
 __all__ = ["expose_as_dspy_tool", "import_dspy_tool"]

@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from cantus.protocols.skill import skill
+from cantus.protocols.tool import Tool, tool
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ def test_import_without_openhands_sdk_raises_actionable_error(monkeypatch):
 def test_expose_round_trip(fake_openhands):
     from cantus.adapters.openhands import expose_as_openhands_action
 
-    @skill
+    @tool
     def search_book(title: str) -> str:
         """Search the catalog by exact title."""
         return title
@@ -85,14 +85,69 @@ def test_expose_round_trip(fake_openhands):
     assert action.args_schema == spec["args_schema"]
 
 
-def test_expose_rejects_non_skill(fake_openhands):
+def _plain_function(title: str) -> str:
+    return title
+
+
+def _bad_inputs(a_tool: Tool) -> list[tuple[Any, str]]:
+    return [
+        (None, "NoneType"),
+        ("x", "str"),
+        ({}, "dict"),
+        (_plain_function, "function"),
+        (Tool, "type"),
+        ([a_tool], "list"),
+    ]
+
+
+def test_expose_with_tool_keyword_matches_positional(fake_openhands):
+    import warnings
+
+    import cantus.adapters as adapters
     from cantus.adapters.openhands import expose_as_openhands_action
 
-    for bad in ("not a skill", None, {}, 42):
+    @tool
+    def search_book(title: str) -> str:
+        """Search the catalog by exact title."""
+        return title
+
+    expected_schema = {
+        "properties": {"title": {"title": "Title", "type": "string"}},
+        "required": ["title"],
+        "title": "SearchBookArgs",
+        "type": "object",
+    }
+    for fn in (adapters.expose_as_openhands_action, expose_as_openhands_action):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            by_keyword = fn(tool=search_book)
+            positional = fn(search_book)
+        for action in (by_keyword, positional):
+            assert action.tool_name == "search_book"
+            assert action.description == "Search the catalog by exact title."
+            assert action.args_schema == expected_schema
+
+
+def test_expose_rejects_non_tool_positional_and_keyword(fake_openhands):
+    import cantus.adapters as adapters
+    from cantus.adapters.openhands import expose_as_openhands_action
+
+    @tool
+    def search_book(title: str) -> str:
+        """Search the catalog by exact title."""
+        return title
+
+    for fn in (adapters.expose_as_openhands_action, expose_as_openhands_action):
+        for bad, type_name in _bad_inputs(search_book):
+            message = f"expose_as_openhands_action expects Tool, got {type_name}"
+            with pytest.raises(TypeError, match=message):
+                fn(bad)
+            with pytest.raises(TypeError, match=message):
+                fn(tool=bad)
         with pytest.raises(
-            TypeError, match="expose_as_openhands_action expects Skill"
+            TypeError, match="expose_as_openhands_action expects Tool, got NoneType"
         ):
-            expose_as_openhands_action(bad)  # type: ignore[arg-type]
+            fn()
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +160,7 @@ def test_import_openhands_action_not_exported(fake_openhands):
 
     `openhands.events.Action` is a declarative event record dispatched by the
     OpenHands host runtime; it exposes no `__call__` that cantus
-    `Skill.run(**kwargs)` could delegate to. Wrapping an Action as a Skill is
+    `Tool.run(**kwargs)` could delegate to. Wrapping an Action as a Tool is
     a semantic mismatch — adapters are pure conversion utilities, not
     runtime re-implementations.
     """

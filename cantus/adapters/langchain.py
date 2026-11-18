@@ -4,9 +4,9 @@ The module gates on ``langchain_core`` at import time so a missing SDK
 surfaces immediately as a clear ``ImportError`` instead of a confusing
 ``AttributeError`` deep inside :func:`expose_as_langchain_tool` /
 :func:`import_langchain_tool`. Both directions preserve the v0.3.0
-``Skill.spec_for_llm()`` JSON shape — no Pydantic-specific keys are
+``Tool.spec_for_llm()`` JSON shape — no Pydantic-specific keys are
 stripped, and ``is_remote = True`` never leaks into the imported
-Skill's spec.
+Tool's spec.
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ except ImportError as exc:
         "Run: pip install cantus[langchain]"
     ) from exc
 
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._arguments import resolve_tool
+from cantus.adapters._remote_tool import _RemoteToolBase
 from cantus.protocols.tool import Tool
 
 # Module-level reference so test introspection that imports the package
@@ -63,14 +64,28 @@ def _build_args_model_from_json_schema(
     return built
 
 
-def expose_as_langchain_tool(skill: Tool) -> BaseTool:
-    """Wrap a cantus Skill as a langchain_core BaseTool instance."""
-    if not isinstance(skill, Tool):
-        raise TypeError(
-            f"expose_as_langchain_tool expects Skill, got {type(skill).__name__}"
-        )
+def expose_as_langchain_tool(
+    tool: Tool | None = None,
+    *,
+    skill: Tool | None = None,  # legacy-alias
+) -> BaseTool:
+    """Wrap a cantus Tool as a langchain_core BaseTool instance.
 
-    spec = skill.spec_for_llm()
+    Args:
+        tool: The cantus Tool to wrap.
+        skill: Deprecated; use ``tool``.
+
+    Returns:
+        A ``BaseTool`` whose ``_run`` calls the Tool.
+
+    Raises:
+        TypeError: If the argument is not a Tool, or both ``tool`` and the
+            deprecated keyword are given.
+    """
+    tool = resolve_tool("expose_as_langchain_tool", tool, skill)  # legacy-alias
+    backing: Tool = tool  # mypy does not carry the narrowing into the closure below
+
+    spec = tool.spec_for_llm()
     args_model = _build_args_model_from_json_schema(
         spec["args_schema"],
         model_name=f"{spec['name']}Args",
@@ -82,13 +97,13 @@ def expose_as_langchain_tool(skill: Tool) -> BaseTool:
         args_schema: type = args_model
 
         def _run(self, **kwargs: Any) -> Any:
-            return skill(**kwargs)
+            return backing(**kwargs)
 
     return _ExposedLangChainTool()
 
 
-class _LangChainRemoteSkill(_RemoteSkillBase):
-    """cantus Skill that proxies a LangChain BaseTool."""
+class _LangChainRemoteTool(_RemoteToolBase):
+    """cantus Tool that proxies a LangChain BaseTool."""
 
     def __init__(self, *, tool: BaseTool) -> None:
         args_schema_attr = getattr(tool, "args_schema", None)
@@ -132,13 +147,13 @@ class _LangChainRemoteSkill(_RemoteSkillBase):
 
 
 def import_langchain_tool(tool: BaseTool) -> Tool:
-    """Wrap a langchain_core BaseTool as a cantus Skill instance."""
+    """Wrap a langchain_core BaseTool as a cantus Tool instance."""
     if not isinstance(tool, BaseTool):
         raise TypeError(
             f"import_langchain_tool expects langchain_core.tools.BaseTool, "
             f"got {type(tool).__name__}"
         )
-    return _LangChainRemoteSkill(tool=tool)
+    return _LangChainRemoteTool(tool=tool)
 
 
 __all__ = ["expose_as_langchain_tool", "import_langchain_tool"]

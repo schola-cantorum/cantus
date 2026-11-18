@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from cantus.protocols.skill import Skill, skill
+from cantus.protocols.tool import Tool, tool
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ def test_adapter_module_does_not_import_transformers(fake_smolagents, monkeypatc
 def test_expose_round_trip(fake_smolagents):
     from cantus.adapters.huggingface import expose_as_hf_tool
 
-    @skill
+    @tool
     def search_book(title: str) -> str:
         """Search the catalog by exact title."""
         return title
@@ -163,10 +163,10 @@ def test_expose_round_trip(fake_smolagents):
     assert hf_tool.output_type == "any"
 
 
-class _SpecSkill(Skill):
-    """Skill whose spec_for_llm() is handwritten so the JSON Schema is exact."""
+class _SpecTool(Tool):
+    """Tool whose spec_for_llm() is handwritten so the JSON Schema is exact."""
 
-    name = "spec_skill"
+    name = "spec_tool"
     description = "Hand-rolled schema"
 
     def __init__(self, properties: dict[str, Any], impl: Any) -> None:
@@ -204,8 +204,8 @@ def test_expose_inputs_use_type_mapping(fake_smolagents):
         "items": {"type": "array"},
         "meta": {"type": "object"},
     }
-    sk = _SpecSkill(properties, lambda **kw: kw)
-    hf_tool = expose_as_hf_tool(sk)
+    spec_tool = _SpecTool(properties, lambda **kw: kw)
+    hf_tool = expose_as_hf_tool(spec_tool)
     assert hf_tool.inputs == {
         "title": {"type": "string", "description": "book title"},
         "n": {"type": "integer", "description": ""},
@@ -222,7 +222,7 @@ def test_expose_inputs_use_type_mapping(fake_smolagents):
 def test_expose_dispatches_positional_and_keyword(fake_smolagents):
     from cantus.adapters.huggingface import expose_as_hf_tool
 
-    @skill
+    @tool
     def add(a: int, b: int) -> int:
         """Add two integers."""
         return a + b
@@ -232,14 +232,14 @@ def test_expose_dispatches_positional_and_keyword(fake_smolagents):
     assert hf_tool(a=3, b=4) == 7
 
 
-def test_expose_dispatches_through_skill_call(fake_smolagents):
-    """Dispatch goes through Skill.__call__ (not a cached run()), so a Skill
+def test_expose_dispatches_through_tool_call(fake_smolagents):
+    """Dispatch goes through Tool.__call__ (not a cached run()), so a Tool
     that customises __call__ sees the call; hooks remain an Agent concern."""
     from cantus.adapters.huggingface import expose_as_hf_tool
 
     calls: list[dict[str, Any]] = []
 
-    class Shout(Skill):
+    class Shout(Tool):
         """Upper-case the text."""
 
         name = "shout"
@@ -256,28 +256,87 @@ def test_expose_dispatches_through_skill_call(fake_smolagents):
     assert calls == [{"text": "hi"}]
 
 
-def test_expose_rejects_non_skill(fake_smolagents):
+def _plain_function(title: str) -> str:
+    return title
+
+
+def _bad_inputs(a_tool: Tool) -> list[tuple[Any, str]]:
+    return [
+        (None, "NoneType"),
+        ("x", "str"),
+        ({}, "dict"),
+        (_plain_function, "function"),
+        (Tool, "type"),
+        ([a_tool], "list"),
+    ]
+
+
+def test_expose_with_tool_keyword_matches_positional(fake_smolagents):
+    import warnings
+
+    import cantus.adapters as adapters
     from cantus.adapters.huggingface import expose_as_hf_tool
 
-    for bad in ("not a skill", None, {}, 42):
-        with pytest.raises(TypeError, match="expose_as_hf_tool expects Skill"):
-            expose_as_hf_tool(bad)  # type: ignore[arg-type]
+    @tool
+    def add(a: int, b: int) -> int:
+        """Add two integers."""
+        return a + b
+
+    for fn in (adapters.expose_as_hf_tool, expose_as_hf_tool):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            by_keyword = fn(tool=add)
+            positional = fn(add)
+        assert by_keyword.name == "add"
+        assert by_keyword.description == "Add two integers."
+        assert by_keyword(1, 2) == 3
+        assert by_keyword(a=3, b=4) == 7
+        assert positional(a=5, b=6) == 11
+
+
+def test_expose_rejects_non_tool_positional_and_keyword(fake_smolagents):
+    import cantus.adapters as adapters
+    from cantus.adapters.huggingface import expose_as_hf_tool
+
+    @tool
+    def add(a: int, b: int) -> int:
+        """Add two integers."""
+        return a + b
+
+    for fn in (adapters.expose_as_hf_tool, expose_as_hf_tool):
+        for bad, type_name in _bad_inputs(add):
+            message = f"expose_as_hf_tool expects Tool, got {type_name}"
+            with pytest.raises(TypeError, match=message):
+                fn(bad)
+            with pytest.raises(TypeError, match=message):
+                fn(tool=bad)
+        with pytest.raises(TypeError, match="expose_as_hf_tool expects Tool, got NoneType"):
+            fn()
+
+
+def test_expose_accepts_imported_remote_tool(fake_smolagents):
+    from cantus.adapters.huggingface import expose_as_hf_tool, import_hf_tool
+
+    remote = import_hf_tool(_search_tool(lambda q: f"hit:{q}"))
+    exposed = expose_as_hf_tool(remote)
+    assert exposed.name == "search"
+    assert exposed(q="dune") == "hit:dune"
 
 
 def test_expose_rejects_non_identifier_property(fake_smolagents):
     from cantus.adapters.huggingface import expose_as_hf_tool
 
     for bad_name in ("not-an-identifier", "class", "1st"):
-        sk = _SpecSkill({bad_name: {"type": "string"}}, lambda **kw: kw)
+        spec_tool = _SpecTool({bad_name: {"type": "string"}}, lambda **kw: kw)
         with pytest.raises(RuntimeError, match="huggingface_handshake_failed"):
-            expose_as_hf_tool(sk)
+            expose_as_hf_tool(spec_tool)
 
 
 def test_expose_forward_never_uses_kwargs(fake_smolagents):
     """The generated forward names each input explicitly (smolagents rule)."""
     from cantus.adapters.huggingface import expose_as_hf_tool
 
-    @skill
+    @tool
     def greet(name: str, times: int) -> str:
         """Greet someone."""
         return name * times
@@ -292,13 +351,14 @@ def test_expose_forward_never_uses_kwargs(fake_smolagents):
 # ---------------------------------------------------------------------------
 
 
-def test_import_returns_v030_shaped_skill(fake_smolagents):
+def test_import_returns_v030_shaped_tool(fake_smolagents):
     from cantus.adapters.huggingface import import_hf_tool
 
     hf_tool = _search_tool(lambda q: f"hit:{q}")
-    sk = import_hf_tool(hf_tool)
-    assert isinstance(sk, Skill)
-    spec = sk.spec_for_llm()
+    imported = import_hf_tool(hf_tool)
+    assert isinstance(imported, Tool)
+    assert imported.is_remote is True
+    spec = imported.spec_for_llm()
     assert set(spec.keys()) == {"name", "description", "args_schema"}
     assert spec["name"] == "search"
     assert spec["description"] == "Search the catalog"
@@ -323,38 +383,38 @@ def test_import_mirrors_smolagents_specific_types(fake_smolagents):
         def forward(self, img: Any, clip: Any, blob: Any) -> Any:
             return (img, clip, blob)
 
-    sk = import_hf_tool(MediaTool())
-    props = sk.spec_for_llm()["args_schema"]["properties"]
+    imported = import_hf_tool(MediaTool())
+    props = imported.spec_for_llm()["args_schema"]["properties"]
     assert props["img"]["type"] == "image"
     assert props["clip"]["type"] == "audio"
     assert props["blob"]["type"] == "any"
-    assert sk.spec_for_llm()["args_schema"]["required"] == ["img", "clip", "blob"]
+    assert imported.spec_for_llm()["args_schema"]["required"] == ["img", "clip", "blob"]
 
 
-def test_imported_skill_is_remote_marker(fake_smolagents):
+def test_imported_tool_is_remote_marker(fake_smolagents):
     from cantus.adapters.huggingface import import_hf_tool
 
-    sk = import_hf_tool(_search_tool(lambda q: q))
-    assert sk.is_remote is True
-    assert "is_remote" not in sk.spec_for_llm()
+    imported = import_hf_tool(_search_tool(lambda q: q))
+    assert imported.is_remote is True
+    assert "is_remote" not in imported.spec_for_llm()
 
 
-def test_imported_skill_dispatches_to_underlying_tool(fake_smolagents):
+def test_imported_tool_dispatches_to_underlying_tool(fake_smolagents):
     from cantus.adapters.huggingface import import_hf_tool
 
-    sk = import_hf_tool(_search_tool(lambda q: f"hit:{q}"))
-    assert sk(q="cantus") == "hit:cantus"
+    imported = import_hf_tool(_search_tool(lambda q: f"hit:{q}"))
+    assert imported(q="cantus") == "hit:cantus"
 
 
-def test_imported_skill_remote_error_wrapping(fake_smolagents):
+def test_imported_tool_remote_error_wrapping(fake_smolagents):
     from cantus.adapters.huggingface import import_hf_tool
 
     def boom(q: str) -> Any:
         raise ValueError("kapow")
 
-    sk = import_hf_tool(_search_tool(boom))
+    imported = import_hf_tool(_search_tool(boom))
     with pytest.raises(RuntimeError, match="huggingface_remote_error"):
-        sk(q="x")
+        imported(q="x")
 
 
 def test_import_handshake_failure(fake_smolagents):
@@ -400,7 +460,7 @@ def test_expose_accepts_property_named_type(fake_smolagents):
     from cantus.adapters.huggingface import expose_as_hf_tool
 
     hf_tool = expose_as_hf_tool(
-        _SpecSkill(
+        _SpecTool(
             {"type": {"type": "string"}, "print": {"type": "integer"}},
             lambda **kw: kw,
         )

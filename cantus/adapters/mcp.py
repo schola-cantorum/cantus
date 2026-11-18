@@ -31,7 +31,7 @@ def _start_server(
     name: str,
     version: str,
     tools: list[dict[str, Any]],
-    skills: list[Any],
+    backing_tools: list[Any],
     transport: str,
     host: str,
     port: int,
@@ -56,20 +56,20 @@ def _start_server(
 
     server = Server(name=name, version=version)
 
-    def _make_wrapper(sk: Any) -> Any:
+    def _make_wrapper(backing: Any) -> Any:
         def _wrapped(**kwargs: Any) -> Any:
-            return sk(**kwargs)
+            return backing(**kwargs)
         return _wrapped
 
-    for tool, sk in zip(tools, skills, strict=True):
+    for tool, backing in zip(tools, backing_tools, strict=True):
         # SDK 1.x style: `Server.tool()` decorator binds a callable. The
-        # cantus Skill is captured in a fresh closure per tool so each
-        # tool dispatches to its own backing Skill.
+        # cantus Tool is captured in a fresh closure per tool so each
+        # tool dispatches to its own backing Tool.
         server.tool(
             name=tool["name"],
             description=tool["description"],
             inputSchema=tool["inputSchema"],
-        )(_make_wrapper(sk))
+        )(_make_wrapper(backing))
 
     if transport == "stdio":
         stdio_module = getattr(server_module, "stdio", None)

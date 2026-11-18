@@ -1,14 +1,14 @@
-"""MCP client adapter — connect to a remote MCP server, return cantus Skills.
+"""MCP client adapter — connect to a remote MCP server, return cantus Tools.
 
 `import_mcp_server(*, transport, command_or_url)` validates the
 ``command_or_url`` against a strict policy (shell-metacharacter rejection
 for stdio, HTTP(S)-only for http), then lazy-imports the ``mcp`` SDK
-gate to enumerate remote tools and build a cantus :class:`Skill` per
+gate to enumerate remote tools and build a cantus :class:`Tool` per
 remote tool.
 
-Each returned Skill bypasses the standard signature-introspection path
+Each returned Tool bypasses the standard signature-introspection path
 so its ``spec_for_llm()`` returns the remote tool's MCP ``inputSchema``
-verbatim (no Pydantic schema rewrite). The Skill carries a read-only
+verbatim (no Pydantic schema rewrite). The Tool carries a read-only
 ``is_remote = True`` attribute for log / Inspector display, but the
 attribute does NOT leak into ``spec_for_llm()`` (the v0.3.0 shape
 contract holds: top-level keys remain ``{"name", "description",
@@ -25,7 +25,7 @@ from __future__ import annotations
 import urllib.parse
 from typing import Any, Literal
 
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._remote_tool import _RemoteToolBase
 from cantus.protocols.tool import Tool
 
 _SHELL_METACHARS: tuple[str, ...] = ("|", ">", "<", "&", ";", "$", "`", "\n", "\r")
@@ -89,8 +89,8 @@ def _call_remote_tool(
     )
 
 
-class _RemoteSkill(_RemoteSkillBase):
-    """cantus Skill wrapper for an MCP tool exposed by a remote server."""
+class _RemoteTool(_RemoteToolBase):
+    """cantus Tool wrapper for an MCP tool exposed by a remote server."""
 
     def __init__(
         self,
@@ -129,7 +129,7 @@ def import_mcp_server(
     transport: Literal["stdio", "http"],
     command_or_url: str,
 ) -> list[Tool]:
-    """Connect to a remote MCP server and return its tools as cantus Skills."""
+    """Connect to a remote MCP server and return its tools as cantus Tools."""
     if transport == "stdio":
         _validate_stdio_command(command_or_url)
     elif transport == "http":
@@ -150,7 +150,7 @@ def import_mcp_server(
     out: list[Tool] = []
     for t in tools:
         out.append(
-            _RemoteSkill(
+            _RemoteTool(
                 tool_name=t["name"],
                 description=t.get("description", ""),
                 input_schema=t.get("inputSchema", {}),

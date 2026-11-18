@@ -18,7 +18,7 @@ import pytest
 
 smolagents = pytest.importorskip("smolagents")
 
-from cantus.protocols.skill import Skill, skill  # noqa: E402
+from cantus.protocols.tool import Tool, tool  # noqa: E402
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def adapter():
 
 
 def test_exported_tool_is_a_real_smolagents_tool(adapter):
-    @skill
+    @tool
     def add(a: int, b: int) -> int:
         """Add two integers."""
         return a + b
@@ -61,7 +61,7 @@ def test_exported_tool_is_a_real_smolagents_tool(adapter):
 
 
 def test_exported_tool_dispatches_positional_and_keyword(adapter):
-    @skill
+    @tool
     def add(a: int, b: int) -> int:
         """Add two integers."""
         return a + b
@@ -71,10 +71,10 @@ def test_exported_tool_dispatches_positional_and_keyword(adapter):
     assert hf_tool(a=3, b=4) == 7
 
 
-class _SpecSkill(Skill):
-    """Skill with a handwritten JSON Schema so the type mapping is exact."""
+class _SpecTool(Tool):
+    """Tool with a handwritten JSON Schema so the type mapping is exact."""
 
-    name = "spec_skill"
+    name = "spec_tool"
     description = "Hand-rolled schema"
 
     def __init__(self, properties: dict[str, Any]) -> None:
@@ -99,7 +99,7 @@ class _SpecSkill(Skill):
 def test_exported_tool_type_mapping_passes_real_validation(adapter):
     """Unknown JSON Schema types become ``any`` — which smolagents accepts."""
     hf_tool = adapter.expose_as_hf_tool(
-        _SpecSkill(
+        _SpecTool(
             {
                 "title": {"type": "string", "description": "book title"},
                 "extra": {"type": "float"},
@@ -118,7 +118,7 @@ def test_exported_tool_type_mapping_passes_real_validation(adapter):
 
 
 def test_exported_tool_with_empty_description_is_accepted(adapter):
-    hf_tool = adapter.expose_as_hf_tool(_SpecSkill({"q": {"type": "string"}}))
+    hf_tool = adapter.expose_as_hf_tool(_SpecTool({"q": {"type": "string"}}))
     assert hf_tool.inputs["q"]["description"] == ""
     assert hf_tool(q="x") == {"q": "x"}
 
@@ -126,7 +126,7 @@ def test_exported_tool_with_empty_description_is_accepted(adapter):
 def test_exported_tool_to_dict_is_unsupported(adapter):
     """Documented limitation: the dynamic subclass has no source code."""
 
-    @skill
+    @tool
     def echo(text: str) -> str:
         """Echo the text."""
         return text
@@ -153,16 +153,16 @@ def _real_add(a: int, b: int) -> int:
 
 
 def test_import_decorated_tool_and_dispatch(adapter):
-    sk = adapter.import_hf_tool(_real_add)
-    spec = sk.spec_for_llm()
+    imported = adapter.import_hf_tool(_real_add)
+    spec = imported.spec_for_llm()
     assert set(spec) == {"name", "description", "args_schema"}
     assert spec["name"] == "_real_add"
     assert spec["args_schema"]["properties"]["a"]["type"] == "integer"
     assert spec["args_schema"]["properties"]["a"]["description"] == "first operand"
     assert spec["args_schema"]["required"] == ["a", "b"]
-    assert sk.is_remote is True
+    assert imported.is_remote is True
     assert "is_remote" not in spec
-    assert sk(a=1, b=2) == 3
+    assert imported(a=1, b=2) == 3
 
 
 def test_import_subclassed_tool_and_error_wrapping(adapter):
@@ -175,13 +175,13 @@ def test_import_subclassed_tool_and_error_wrapping(adapter):
         def forward(self, q: str) -> str:
             raise ValueError("kapow")
 
-    sk = adapter.import_hf_tool(Boom())
+    imported = adapter.import_hf_tool(Boom())
     with pytest.raises(RuntimeError, match="huggingface_remote_error"):
-        sk(q="x")
+        imported(q="x")
 
 
-def test_round_trip_skill_to_tool_to_skill(adapter):
-    @skill
+def test_round_trip_tool_to_hf_tool_to_tool(adapter):
+    @tool
     def shout(text: str) -> str:
         """Upper-case the text."""
         return text.upper()
@@ -196,7 +196,7 @@ def test_exported_tool_with_property_named_type_passes_real_validation(adapter):
     """Gate D audit M2: ``type`` as an input name must survive smolagents'
     signature check and dispatch correctly."""
     hf_tool = adapter.expose_as_hf_tool(
-        _SpecSkill({"type": {"type": "string"}, "a": {"type": "integer"}})
+        _SpecTool({"type": {"type": "string"}, "a": {"type": "integer"}})
     )
     assert isinstance(hf_tool, smolagents.Tool)
     assert hf_tool(type="node", a=1) == {"type": "node", "a": 1}

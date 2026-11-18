@@ -58,15 +58,16 @@ def test_v033_all_includes_nine_callables():
     assert expected.issubset(set(adapters.__all__))
 
 
-def test_remote_skill_base_is_not_public():
-    """`_RemoteSkillBase` is private — must not appear in cantus.adapters."""
+def test_remote_tool_base_is_not_public():
+    """`_RemoteToolBase` is private: absent from cantus.adapters and its __all__."""
     import cantus.adapters as adapters
+    from cantus.adapters._remote_tool import _RemoteToolBase
+    from cantus.protocols.tool import Tool
 
-    assert not hasattr(adapters, "_RemoteSkillBase")
-    # But it remains importable via the underscore-prefixed private module:
-    from cantus.adapters._remote_skill import _RemoteSkillBase
-
-    assert _RemoteSkillBase.__name__ == "_RemoteSkillBase"
+    assert "_RemoteToolBase" not in adapters.__all__
+    assert "_RemoteToolBase" not in vars(adapters)
+    assert issubclass(_RemoteToolBase, Tool)
+    assert _RemoteToolBase.__name__ == "_RemoteToolBase"
 
 
 def test_registry_kinds_unchanged_after_import():
