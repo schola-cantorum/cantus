@@ -31,9 +31,9 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.params import Depends as DependsType
 
 from cantus.config import AuthMode, Settings
-from cantus.core.action import CallSkillAction
+from cantus.core.action import CallToolAction
 from cantus.core.event_stream import EventStream
-from cantus.core.observation import SkillObservation, ToolErrorObservation
+from cantus.core.observation import ToolErrorObservation, ToolObservation
 from cantus.core.registry import Registry
 from cantus.serve.channel import Channel, RealtimeChannel, WebhookChannel
 from cantus.serve.dashboard import (
@@ -245,21 +245,21 @@ def _register_skill_endpoint(
         try:
             result: Any = skill_instance.run(**body)
         except Exception as exc:
-            # Record the invocation as a CallSkillAction followed by a
+            # Record the invocation as a CallToolAction followed by a
             # ToolErrorObservation so GET /introspection/workflows/{run_id}
             # returns an ordered trace for the failed run instead of 404.
             if tracker is not None and run_id is not None:
                 stream = EventStream()
-                stream.append(CallSkillAction(skill_name=name, args=body))
-                stream.append(ToolErrorObservation(skill_name=name, message=str(exc)))
+                stream.append(CallToolAction(tool_name=name, args=body))
+                stream.append(ToolErrorObservation(tool_name=name, message=str(exc)))
                 tracker.finish(run_id, status="error", stream=stream)
             raise
-        # Record the invocation as a CallSkillAction followed by a
-        # SkillObservation; event_count then reflects the recorded events.
+        # Record the invocation as a CallToolAction followed by a
+        # ToolObservation; event_count then reflects the recorded events.
         if tracker is not None and run_id is not None:
             stream = EventStream()
-            stream.append(CallSkillAction(skill_name=name, args=body))
-            stream.append(SkillObservation(skill_name=name, result=result))
+            stream.append(CallToolAction(tool_name=name, args=body))
+            stream.append(ToolObservation(tool_name=name, result=result))
             tracker.finish(run_id, status="completed", stream=stream)
         return {"result": result}
 

@@ -210,12 +210,12 @@ You should see, across the six steps:
 
 ```text
 25
-CallSkillAction
-SkillObservation
-CallSkillAction
-SkillObservation
-CallSkillAction
-SkillObservation
+CallToolAction
+ToolObservation
+CallToolAction
+ToolObservation
+CallToolAction
+ToolObservation
 FinalAnswerAction
 Noodles and tea cost 85 dollars.
 ## Name & Role

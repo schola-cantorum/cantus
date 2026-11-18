@@ -11,6 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from cantus._deprecation import warn_legacy
+from cantus.core._legacy_events import accepts_legacy_keyword
+
 if TYPE_CHECKING:
     from cantus.core.event_stream import EventStream
 
@@ -20,24 +23,26 @@ class Observation:
     """Base class for everything that comes back from an Action."""
 
 
+@accepts_legacy_keyword
 @dataclass(frozen=True)
-class SkillObservation(Observation):
-    """Successful return from a skill call."""
+class ToolObservation(Observation):
+    """Successful return from a Tool call."""
 
-    skill_name: str
+    tool_name: str
     result: Any
 
 
+@accepts_legacy_keyword
 @dataclass(frozen=True)
 class ToolErrorObservation(Observation):
-    """A skill call failed — either raised, or named a non-registered skill.
+    """A Tool call failed — either raised, or named a non-registered Tool.
 
     The `message` is the string the LLM will see in the next prompt; it
-    should be actionable (e.g., list available skill names when the model
+    should be actionable (e.g., list available Tool names when the model
     typo'd one).
     """
 
-    skill_name: str
+    tool_name: str
     message: str
 
 
@@ -72,3 +77,15 @@ class MaxIterationsObservation(Observation):
     iterations: int
     last_action_summary: str = ""
     partial_state: "EventStream" = field(default_factory=_default_event_stream)
+
+
+if TYPE_CHECKING:
+    SkillObservation = ToolObservation  # legacy-alias
+
+
+def __getattr__(name: str) -> Any:
+    """Serve the legacy class name as `ToolObservation`, with a deprecation warning."""
+    if name == "SkillObservation":  # legacy-alias
+        warn_legacy("W5")
+        return ToolObservation
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

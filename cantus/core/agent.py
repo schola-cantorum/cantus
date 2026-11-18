@@ -21,21 +21,24 @@ from typing import TYPE_CHECKING, Any, Protocol, Union
 from cantus._deprecation import warn_legacy
 from cantus.core.action import (
     Action,
-    CallSkillAction,
+    CallToolAction,
     FinalAnswerAction,
 )
 from cantus.core.event_stream import EventStream
 from cantus.core.observation import (
     MaxIterationsObservation,
     Observation,
-    SkillObservation,
     ToolErrorObservation,
+    ToolObservation,
     ValidationErrorObservation,
 )
 from cantus.core.registry import Registry, _get_global_registry
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from cantus.core.action import CallToolAction as CallSkillAction  # noqa: F401  # legacy-alias
+    from cantus.core.observation import ToolObservation as SkillObservation  # noqa: F401  # legacy-alias
 
     from cantus.identity import Soul
     from cantus.protocols.tool import Tool
@@ -44,7 +47,7 @@ if TYPE_CHECKING:
 def _emit_hook_debug_label(role: str, hook: Any, skill_name: str) -> None:
     """Print a `[debug] <role> '<hook_name>' …` line for @debug-wrapped hooks.
 
-    Called from `_dispatch_skill` when a `pre_hook` / `post_hook` has been
+    Called from `_dispatch_tool` when a `pre_hook` / `post_hook` has been
     wrapped with `@debug`. The hook's own `@debug` traced wrapper still fires
     afterwards and prints its own args/result line; this label is the
     role-tagged announcement that the spec scenario requires.
@@ -129,6 +132,27 @@ class Agent:
     tools: Any = _ToolsField()
     soul: "Soul | None" = field(default=None, kw_only=True)
 
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Reject a subclass that still carries the pre-0.7 dispatch override.
+
+        The loop calls ``_dispatch_tool``; an override under the old name would never
+        run, so any check in it would be skipped without a sign.
+
+        Raises:
+            TypeError: If the old method name is found on the subclass or its bases.
+        """
+        super().__init_subclass__(**kwargs)
+        if hasattr(cls, "_dispatch_skill"):  # legacy-alias
+            raise TypeError(
+                f"{cls.__name__} defines _dispatch_skill, which cantus 0.7.0 no longer calls: "  # legacy-alias
+                "Agent._dispatch_skill was renamed to _dispatch_tool, so the checks in your "  # legacy-alias
+                "override would be skipped silently. Rename the method to _dispatch_tool, call "
+                "super()._dispatch_tool(action) inside it, and read action.tool_name instead of "
+                "action.skill_name. See "  # legacy-alias
+                "https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/"
+                "MIGRATION_v0.6.0_to_v0.7.0.md"
+            )
+
     def __init__(
         self,
         model: ModelHandle,
@@ -187,7 +211,7 @@ class Agent:
     def step(self, state: AgentState) -> Union[Action, Observation]:
         """One decision step: ask the model for the next action.
 
-        Returns either an `Action` subclass (CallSkillAction or
+        Returns either an `Action` subclass (CallToolAction or
         FinalAnswerAction) when the model output parses cleanly, or a
         `ValidationErrorObservation` when the output fails the
         `non_empty_final_answer` or `action_parse` validators (see the
@@ -214,7 +238,7 @@ class Agent:
         substantive answer; this is a caller-supplied override, NOT a
         framework default.
 
-        Skill calls go through the registry; validator failures trigger
+        Tool calls go through the registry; validator failures trigger
         retry of the *previous* action. The workflow argument is accepted
         for symmetry with future API expansions but is not currently
         consulted by the loop directly — workflows execute via the
@@ -253,8 +277,8 @@ class Agent:
             if isinstance(action, FinalAnswerAction):
                 return state
 
-            if isinstance(action, CallSkillAction):
-                obs = self._dispatch_skill(action)
+            if isinstance(action, CallToolAction):
+                obs = self._dispatch_tool(action)
                 state.stream.append(obs)
 
                 if isinstance(obs, ValidationErrorObservation):
@@ -388,7 +412,7 @@ class Agent:
                 )
             return FinalAnswerAction(thought=thought, answer=str(answer))
 
-        # CallSkillAction path: skill_name is present (no final_answer).
+        # CallToolAction path: skill_name is present (no final_answer).
         skill_name = action.get("skill_name", "")
         if not isinstance(skill_name, str):
             return ValidationErrorObservation(
@@ -417,9 +441,9 @@ class Agent:
         args = action.get("args", {})
         if not isinstance(args, dict):
             args = {}
-        return CallSkillAction(
+        return CallToolAction(
             thought=thought,
-            skill_name=skill_name,
+            tool_name=skill_name,
             args=dict(args),
         )
 
@@ -444,20 +468,20 @@ class Agent:
             f"raw_output_preview: {preview_with_literal_newlines}{truncated_suffix}"
         )
 
-    def _dispatch_skill(self, action: CallSkillAction) -> Observation:
-        """Run a CallSkillAction; wrap any failure as the right Observation.
+    def _dispatch_tool(self, action: CallToolAction) -> Observation:
+        """Run a CallToolAction; wrap any failure as the right Observation.
 
-        v0.3.0 dispatch: single registry lookup under "skill", followed by a
+        Dispatch: a single registry lookup under "tool", followed by a
         linear `pre_hook → body → post_hook` chain. No per-kind branching.
         """
         from cantus.core.result import Result
 
-        instance = self.registry.lookup("tool", action.skill_name)
+        instance = self.registry.lookup("tool", action.tool_name)
         if instance is None:
             available = self.registry.names_for("tool")
             return ToolErrorObservation(
-                skill_name=action.skill_name,
-                message=f"skill '{action.skill_name}' not registered. Available: {available}",
+                tool_name=action.tool_name,
+                message=f"tool '{action.tool_name}' not registered. Available: {available}",
             )
 
         try:
@@ -468,19 +492,19 @@ class Agent:
             )
         except Exception as exc:
             return ToolErrorObservation(
-                skill_name=action.skill_name,
+                tool_name=action.tool_name,
                 message=f"args validation failed: {type(exc).__name__}: {exc}",
             )
 
         pre_hook = getattr(instance, "_pre_hook", None)
         if pre_hook is not None:
             if getattr(pre_hook, "_debug_enabled", False):
-                _emit_hook_debug_label("pre_hook", pre_hook, action.skill_name)
+                _emit_hook_debug_label("pre_hook", pre_hook, action.tool_name)
             try:
                 pre_out = pre_hook(**args) if isinstance(args, dict) else pre_hook(args)
             except Exception as exc:
                 return ToolErrorObservation(
-                    skill_name=action.skill_name,
+                    tool_name=action.tool_name,
                     message=f"pre_hook {type(exc).__name__}: {exc}",
                 )
             args = pre_out if isinstance(pre_out, dict) else {"_pre_hook_value": pre_out}
@@ -492,19 +516,19 @@ class Agent:
                 result = instance(**args)
         except Exception as exc:
             return ToolErrorObservation(
-                skill_name=action.skill_name,
+                tool_name=action.tool_name,
                 message=f"{type(exc).__name__}: {exc}",
             )
 
         post_hook = getattr(instance, "_post_hook", None)
         if post_hook is not None:
             if getattr(post_hook, "_debug_enabled", False):
-                _emit_hook_debug_label("post_hook", post_hook, action.skill_name)
+                _emit_hook_debug_label("post_hook", post_hook, action.tool_name)
             try:
                 result = post_hook(result)
             except Exception as exc:
                 return ToolErrorObservation(
-                    skill_name=action.skill_name,
+                    tool_name=action.tool_name,
                     message=f"post_hook {type(exc).__name__}: {exc}",
                 )
 
@@ -513,12 +537,23 @@ class Agent:
                 hook_name = (
                     getattr(post_hook, "name", None)
                     or getattr(post_hook, "__name__", None)
-                    or action.skill_name
+                    or action.tool_name
                 )
                 return ValidationErrorObservation(
                     validator_name=hook_name,
                     feedback=result.feedback or "validation failed",
                 )
-            return SkillObservation(skill_name=action.skill_name, result=result.value)
+            return ToolObservation(tool_name=action.tool_name, result=result.value)
 
-        return SkillObservation(skill_name=action.skill_name, result=result)
+        return ToolObservation(tool_name=action.tool_name, result=result)
+
+
+def __getattr__(name: str) -> Any:
+    """Serve the legacy event class names as `CallToolAction` and `ToolObservation`."""
+    if name == "CallSkillAction":  # legacy-alias
+        warn_legacy("W4")
+        return CallToolAction
+    if name == "SkillObservation":  # legacy-alias
+        warn_legacy("W5")
+        return ToolObservation
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -248,7 +248,7 @@ def test_skill_invoke_records_two_step_event_stream() -> None:
     run = sessions[0]
     assert run["source"] == "skill:echo"
     assert run["status"] == "completed"
-    # The skill invocation records a CallSkillAction + SkillObservation.
+    # The skill invocation records a CallToolAction + ToolObservation.
     assert run["event_count"] == 2
 
     trace = client.get(f"/introspection/workflows/{run['id']}")
@@ -256,9 +256,9 @@ def test_skill_invoke_records_two_step_event_stream() -> None:
     steps = trace.json()["steps"]
     assert [s["index"] for s in steps] == [0, 1]
     assert steps[0]["kind"] == "action"
-    assert steps[0]["type"] == "CallSkillAction"
+    assert steps[0]["type"] == "CallToolAction"
     assert steps[1]["kind"] == "observation"
-    assert steps[1]["type"] == "SkillObservation"
+    assert steps[1]["type"] == "ToolObservation"
 
 
 def test_skill_invoke_error_records_tool_error_observation() -> None:
@@ -280,7 +280,7 @@ def test_skill_invoke_error_records_tool_error_observation() -> None:
     trace = client.get(f"/introspection/workflows/{run['id']}")
     assert trace.status_code == 200
     steps = trace.json()["steps"]
-    assert steps[0]["type"] == "CallSkillAction"
+    assert steps[0]["type"] == "CallToolAction"
     assert steps[1]["kind"] == "observation"
     assert steps[1]["type"] == "ToolErrorObservation"
 
@@ -397,14 +397,14 @@ def test_collect_dataflow_includes_channel_and_skill_nodes() -> None:
 
 
 def test_collect_workflow_projects_ordered_steps() -> None:
-    from cantus.core.action import CallSkillAction
+    from cantus.core.action import CallToolAction
     from cantus.core.event_stream import EventStream
-    from cantus.core.observation import SkillObservation
+    from cantus.core.observation import ToolObservation
     from cantus.serve.introspection import SessionTracker, collect_workflow
 
     stream = EventStream()
-    stream.append(CallSkillAction(skill_name="echo", args={"value": "hi"}))
-    stream.append(SkillObservation(skill_name="echo", result="hi"))
+    stream.append(CallToolAction(tool_name="echo", args={"value": "hi"}))
+    stream.append(ToolObservation(tool_name="echo", result="hi"))
 
     tracker = SessionTracker()
     run_id = tracker.start("skill:echo")
@@ -669,7 +669,7 @@ def test_workflow_action_summary_has_keys_not_values() -> None:
     client, run_id = _run_secret_skill()
     steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
     first = steps[0]
-    assert first["type"] == "CallSkillAction"
+    assert first["type"] == "CallToolAction"
     # The structural summary projects the skill name and the argument key
     # names — but never the argument values.
     assert "issue" in first["summary"]
@@ -778,3 +778,27 @@ def test_introspection_workflows_endpoint_gated_by_auth(monkeypatch: Any) -> Non
     )
     assert ok.status_code in (200, 404)
     assert ok.status_code != 401
+
+
+def test_trace_summaries_keep_their_text_until_the_serve_ticket():
+    # T-0009 row 12 (D5): the step type is the new class name; the summary strings keep their
+    # v0.6 text. T-0012 rewrites these summaries and this test with them.
+    from fastapi.testclient import TestClient
+
+    from cantus import Registry, register_tool
+    from cantus.serve import serve
+
+    def echo(value: str) -> str:
+        """Echo the value."""
+        return value
+
+    reg = Registry()
+    register_tool(echo, registry=reg)
+    client = TestClient(serve(reg))
+    client.post("/skills/echo", json={"value": "hi"})
+    run_id = client.get("/introspection/sessions").json()[0]["id"]
+    steps = client.get(f"/introspection/workflows/{run_id}").json()["steps"]
+
+    assert [s["type"] for s in steps] == ["CallToolAction", "ToolObservation"]
+    assert steps[0]["summary"] == "CallSkillAction skill='echo' arg_keys=['value']"
+    assert steps[1]["summary"] == "SkillObservation skill='echo' result_type=str"

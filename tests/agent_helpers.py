@@ -1,15 +1,15 @@
 """Shared helpers for tests that drive an Agent with a scripted model.
 
-The transitional names (the ``skill_name`` action key and attribute, the observation
-class) appear only in this file, each marked with the ticket that renames it.
+The model output still uses the v0.6 action key until T-0010; `call_json` holds it, on a
+line marked with that ticket.
 """
 
 import json
 
 from cantus import Agent
 from cantus.core.observation import (
-    SkillObservation,  # T-0009 renames this class
     ToolErrorObservation,
+    ToolObservation,
     ValidationErrorObservation,
 )
 
@@ -46,16 +46,16 @@ def observations(stream):
     return [
         e
         for e in stream
-        if isinstance(e, (SkillObservation, ValidationErrorObservation))  # T-0009 renames this class
+        if isinstance(e, (ToolObservation, ValidationErrorObservation))
     ]
 
 
 def tool_results(stream):
     """(name, result) for every successful tool observation."""
     return [
-        (e.skill_name, e.result)  # T-0009 switches this attribute
+        (e.tool_name, e.result)
         for e in stream
-        if isinstance(e, SkillObservation)  # T-0009 renames this class
+        if isinstance(e, ToolObservation)
     ]
 
 

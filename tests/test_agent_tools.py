@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import pytest
 
 from cantus import Agent, CantusDeprecationWarning, Registry, tool
+from cantus.core.action import CallToolAction, FinalAnswerAction
+from cantus.core.observation import ToolErrorObservation, ToolObservation
 from tests.agent_helpers import (
     ScriptedModel,
     call_json,
@@ -308,3 +310,139 @@ def test_dataclass_subclass_resolves_tools_and_falls_back(records):
 def test_a_bare_agent_without_tools_slot_reports_no_tools_attribute():
     bare = Agent.__new__(Agent)
     assert hasattr(bare, "tools") is False
+
+
+# --- T-0009: the event classes in the run stream ----------------------------
+
+
+def test_run_stream_holds_the_tool_event_classes_with_tool_name(records):
+    # Row 6.
+    add = _make_tool("add", 7)
+    stream, _ = run_agent([add], [call_json("add", x=1), final_json()])
+
+    action, observation, final = list(stream)
+    assert type(action) is CallToolAction
+    assert (action.tool_name, action.args) == ("add", {"x": 1})
+    assert type(observation) is ToolObservation
+    assert (observation.tool_name, observation.result) == ("add", 7)
+    assert isinstance(final, FinalAnswerAction)
+    _assert_no_cantus_warning(records)
+
+
+def test_a_tool_that_raises_becomes_a_tool_error_observation_with_tool_name(records):
+    # Row 6.
+    @tool
+    def boom(x: int = 0) -> int:
+        """Always fails."""
+        raise ValueError("no")
+
+    stream, _ = run_agent([boom], [call_json("boom"), final_json()])
+
+    (error,) = tool_errors(stream)
+    assert type(error) is ToolErrorObservation
+    assert error.tool_name == "boom"
+    assert error.message == "ValueError: no"
+    _assert_no_cantus_warning(records)
+
+
+def test_unknown_name_with_no_tools_is_reported_as_a_tool_that_is_not_registered(records):
+    # Row 6: an empty registry reaches dispatch (a non-empty one rejects at parse time).
+    stream, _ = run_agent([], [call_json("x"), final_json()])
+
+    (error,) = tool_errors(stream)
+    assert error.tool_name == "x"
+    assert error.message == "tool 'x' not registered. Available: []"
+    _assert_no_cantus_warning(records)
+
+
+def test_a_tool_subclass_instance_in_tools_is_dispatched_and_stays_out_of_the_global_registry(
+    records,
+):
+    # Row 7 (guard).
+    from cantus import Tool
+    from cantus.core.registry import _get_global_registry
+
+    class Adder(Tool):
+        """Add one."""
+
+        name = "adder"
+
+        def run(self, a: int) -> int:
+            return a + 1
+
+    stream, _ = run_agent([Adder()], [call_json("adder", a=1), final_json()])
+
+    assert tool_results(stream) == [("adder", 2)]
+    assert type(list(stream)[1]) is ToolObservation
+    assert _get_global_registry().names_for("tool") == []
+    _assert_no_cantus_warning(records)
+
+
+def test_prompt_lists_tools_under_the_tool_key_and_shows_the_new_event_reprs(records):
+    # Row 8: the model output is built here (thought 'add them'); T-0010 switches its key.
+    import json
+
+    @tool
+    def add(a: int, b: int) -> int:
+        """Add."""
+        return a + b
+
+    @tool
+    def boom() -> int:
+        """Fail."""
+        raise ValueError("no")
+
+    def call(name, **args):
+        action = {"skill_name": name, "args": args}  # T-0010 switches this key
+        return json.dumps({"thought": "add them", "action": action})
+
+    stream, model = run_agent(
+        [add, boom], [call("add", a=3, b=4), call("boom"), final_json()]
+    )
+
+    assert len(model.prompts) == 3
+    for index, prompt in enumerate(model.prompts):
+        assert list(json.loads(prompt)["tools"]) == ["tool"]
+        assert prompt_tool_names(model, index) == ["add", "boom"]
+    events = json.loads(model.prompts[2])["events"]
+    assert events == [
+        "CallToolAction(thought='add them', tool_name='add', args={'a': 3, 'b': 4})",
+        "ToolObservation(tool_name='add', result=7)",
+        "CallToolAction(thought='add them', tool_name='boom', args={})",
+        "ToolErrorObservation(tool_name='boom', message='ValueError: no')",
+    ]
+    _assert_no_cantus_warning(records)
+
+
+def test_a_subclass_overriding_dispatch_tool_sees_the_dispatch_during_run(records):
+    # Row 11: the override point is the subject of this test.
+    seen = []
+
+    class Gatekeeper(Agent):
+        def _dispatch_tool(self, action):
+            seen.append(action)
+            return ToolErrorObservation(tool_name=action.tool_name, message="blocked")
+
+    add = _make_tool("add", 7)
+    model = ScriptedModel([call_json("add", x=1), final_json()])
+    stream = Gatekeeper(model, tools=[add]).run("q").stream
+
+    assert [(a.tool_name, a.args) for a in seen] == [("add", {"x": 1})]
+    assert type(seen[0]) is CallToolAction
+    (error,) = tool_errors(stream)
+    assert error.message == "blocked"
+    assert tool_results(stream) == []
+    _assert_no_cantus_warning(records)
+
+
+def test_dispatch_tool_names_the_registered_tools_when_the_name_is_unknown(records):
+    # Row 6 (non-empty form): a non-empty registry rejects an unknown name at parse time,
+    # so only a direct call reaches this text. The override point is the subject.
+    agent = Agent(ScriptedModel([]), tools=[_make_tool("add", 7)])
+
+    error = agent._dispatch_tool(CallToolAction(tool_name="x"))
+
+    assert type(error) is ToolErrorObservation
+    assert error.tool_name == "x"
+    assert error.message == "tool 'x' not registered. Available: ['add']"
+    _assert_no_cantus_warning(records)
