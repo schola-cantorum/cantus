@@ -2,7 +2,7 @@
 id: T-0015
 title: Legacy surface closes — every legacy name, text and export checked together
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0011, T-0013, T-0014]
 ---
 
@@ -53,7 +53,8 @@ It is the behaviour-final ticket: later tickets change only docs, tests and comm
     stderr are audited against the T-0007 and T-0008 readings, with the result in the Comments. An
     escalation or ignore column per W is not added.
   - `V2-13-a` the no-warning check adds only what no existing test asserts: every `cantus.*`
-    module's import, eight star imports, the TR-69 list, the dashboard route, a live `cantus serve`
+    module's import, eight star imports, the TR-69 list, the dashboard's `/health` and `/events`
+    routes, a live `cantus serve`
     and the `cantus tui` command path (rows 12–15). The other items of the list are mapped to the
     existing tests in the Comments.
   - `C2-F14-a` the incidental list is module-level and comes from a scan against v0.6.0; changes a
@@ -110,10 +111,10 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
   3 the legacy keyword and attribute on the four classes (W7); 4 the legacy registry kind, six
   forms (W9); 5 `Agent` and the grammar: `registry=`, the three fallback sites, both grammar
   functions with `registry` omitted and `None`, the legacy action key through `run`, `step` and
-  `parse_tool_call` (W10–W13); 6 `update_skills` on a mounted pane (W17); 7 the adapter keywords
-  on six entry points through both import paths (W18); 8 statements that use two legacy names;
-  9 four statements in a subprocess under default filters; 10 the completeness guard: a literal
-  list of {W, module or function, form} from section 2.4, each with a case; 11 final `__all__` of
+  `parse_tool_call` (W10–W13); 6 `update_skills` on a mounted pane (W17); 7 the adapter keywords:
+  five functions through both import paths and `McpServer` through its module (W18); 8 statements that use two legacy names;
+  9 four statements in a subprocess under default filters; 10 the completeness guard: a
+  hand-written set of {W, module or function, form} from section 2.4, each with a case; 11 final `__all__` of
   four modules and of `cantus.protocols.skill`; 12 importing every module and eight star imports
   is silent; 13 the TR-69 list and the dashboard route are silent; 14 a live `cantus serve` is
   silent; 15 the `cantus tui` command path is silent.
@@ -122,8 +123,8 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
   mutation check below. The executor wrote the matrix (Part A) and the export and silent-path
   tests (Part B) in two runs; the main session read both, confirmed that each reported test
   exists, and ran the checks again.
-- **Mutation check** (`.scratch/T-0015/mutate.py`; 94 mutations, each applied alone and run
-  against this ticket's three test modules; all 94 turned a test red; the full table with the
+- **Mutation check** (`.scratch/T-0015/mutate.py`; 101 mutations after the stage-6 fixes, each applied alone and
+  run against this ticket's three test modules; all 101 turn a test red; the full table with the
   first failing test per mutation is `.scratch/T-0015/mutation-results.md`, not committed):
 
   | Group | Mutations | Killed by |
@@ -132,9 +133,10 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
   | an alias returns another object (six aliases) or is cached in the module globals (two) | 8 | the matrix row for that alias |
   | attribution and count: cantus frames not skipped, importlib frames not skipped, a fresh warning registry per call, line number off by one, category changed, template or hint text changed | 7 | `test_matrix_row[W1 from cantus import Skill]` and neighbours |
   | the default filter is not installed at import | 1 | `test_matrix_default_filters_in_a_subprocess[from cantus import Skill]` |
-  | exports: a legacy name back in each of five `__all__`, a new name removed, `Skill` bound eagerly | 7 | `tests/legacy/test_final_exports.py` |
-  | cantus's own code reaches a legacy name: at import of `cantus.tui.app` and of `cantus.workflows`; the serve app, dashboard, introspection, agent and grammar using the legacy kind; the `cantus tui` and `cantus serve` command paths; `Registry.names_for` | 11 | the subprocess test of rows 12–13, `test_serve_routes_are_silent` (an older test of the same module), the live-server test, the `cantus tui` test, and matrix rows |
+  | exports: a legacy name back in each of five `__all__`, a new name removed, `Skill` bound eagerly | 7 | `tests/legacy/test_final_exports.py` for five; a legacy name back in `cantus.__all__` or bound eagerly fails a matrix row first (the star-import and `from cantus import Skill` cases) |
+  | cantus's own code reaches a legacy name: at import of `cantus.tui.app` and of `cantus.workflows`; the serve app, dashboard, introspection, agent and grammar using the legacy kind; the `cantus tui` and `cantus serve` command paths; `Registry.names_for` calling `lookup` with the legacy kind | 11 | the subprocess test of rows 12–13, `test_serve_routes_are_silent` (an older test of the same module), the live-server test, the `cantus tui` test, and matrix rows |
   | the matrix loses a case or an entry point | 2 | `test_matrix_covers_every_required_trigger_and_nothing_else` |
+  | added at stage 6, the "works" half of a row: `get_registry()` returns a new `Registry`, the legacy entries stop registering globally, the grammar fallback uses an empty registry, a dashboard route is renamed, a core module fails to import, the W17 table or a compound statement loses its tag | 7 | matrix rows, the subprocess test of rows 12–13, the completeness guard |
 
 - **Self-check** (ticket-rules section 3; traceability 4.2 patterns over the touched files outside
   `tests/legacy/`): `tests/test_internal_paths_silent.py` is clean; two lines there must spell the
@@ -148,15 +150,15 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
   | `import cantus`; every `cantus.*` module | rows 12–13 (`test_the_whole_new_api_surface_runs_with_cantus_warnings_as_errors`); earlier: `tests/test_tool.py` (subprocess, `-W error::DeprecationWarning`) |
   | `from cantus import *` and the other seven star imports | rows 12–13; earlier: `tests/test_public_api.py`, `tests/legacy/test_w01_w02_w03_construction.py`, `tests/legacy/test_w06_w16_serve.py` |
   | `import cantus.protocols.skill` | rows 12–13; earlier: `tests/legacy/test_w01_w02_w03_construction.py` |
-  | `tool`, `register_tool`, `Registry(tools=)`, `Agent(tools=)`, `Agent.run` with `tool_name` output | rows 12–13; earlier: `tests/test_agent_tools.py` (23 tests), `tests/test_agent_run.py`, `tests/test_internal_paths_silent.py` |
+  | `tool`, `register_tool`, `Registry(tools=)`, `Agent(tools=)`, `Agent.run` with `tool_name` output | rows 12–13; earlier: `tests/test_agent_tools.py` (19 of its 25 tests assert it), `tests/test_agent_run.py`, `tests/test_internal_paths_silent.py` |
   | `ToolEntry`, `collect_tools`, `ToolsPane` | rows 12–13; earlier: `tests/serve/test_init_exports.py`, `tests/tui/test_app.py` (whole module under the error filter) |
   | `serve()` and its primary routes, the dashboard routes | rows 12–13; earlier: three tests in `tests/test_internal_paths_silent.py` |
-  | the `cantus serve` CLI | row 14 (`test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation`): the real process, default filters, stderr |
+  | the `cantus serve` CLI | row 14 (`test_a_live_cantus_serve_with_a_new_api_registry_prints_no_deprecation`): the real process with no warning option, so cantus's own filter is what would show a warning; stderr |
   | the `cantus tui` CLI | row 15 (`test_the_cantus_tui_command_path_is_silent`): `main(["tui", ...])` in-process with the app's `run` replaced; the app itself: `tests/tui/test_app.py`. In a real terminal a warning would not be visible while the TUI runs (T-0013, measured) |
   | adapters with `tool=` / `tools=`, six entry points | `tests/adapters/test_langchain.py`, `test_dspy.py`, `test_huggingface.py`, `test_openhands.py`, `test_mcp_server.py` (three tests), all under `simplefilter("error")`; no new test |
   | the grammar with an explicit `registry=` | `tests/test_internal_paths_silent.py`, `tests/test_tool_call_grammar.py`; no new test |
   | `@debug` on a Tool; `AutoMemory` | `tests/test_debug.py`, `tests/test_memory_auto.py` (T-0014); no new test |
-  | no internal call reaches a warning path | the mutation group "cantus's own code reaches a legacy name" above, and the whole-tree scan |
+  | no internal call reaches a warning path | the tests of the rows above, run on every path cantus's own code takes; that they catch an internal legacy use was shown by the mutation group "cantus's own code reaches a legacy name" and by a scan of `cantus/` (both are records of this ticket, not committed checks) |
 
 - **AC-16 and AC-20 rows that older tests carry.** TR-60 (both `tool_name=` and `skill_name=`
   raise `TypeError`): `tests/legacy/test_w04_w05_w07_events.py` and
@@ -169,9 +171,15 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
   `test_dspy.py`, `test_huggingface.py`, `test_openhands.py`, `test_mcp_server.py`,
   `tests/legacy/test_w12_w13_wire.py`, `test_w07_parsed_tool_call.py`,
   `test_w01_w02_w03_construction.py`, the script in `tests/test_integration_smoke.py`). They are
-  stricter than the readings, not looser, so none was changed; a warning from a third-party
-  package would fail them for a reason unrelated to cantus. No test was found that reads "nothing
-  is printed" as an empty stderr.
+  Subprocess tests that escalate every `DeprecationWarning` or search stderr for the bare word:
+  `tests/test_tool.py` and `tests/test_public_api.py` (`-W error::DeprecationWarning`, and
+  `"DeprecationWarning" not in result.stderr`), `tests/legacy/test_w01_w02_w03_construction.py`
+  and `tests/legacy/test_w18_adapters.py` (`-W error::DeprecationWarning`). This ticket's own
+  matrix also asserts that no warning of another category is recorded while a trigger runs
+  (the cantus modules a case needs are imported before the recording starts, so a third-party
+  warning at first import is not counted). All of these are stricter than the readings, not
+  looser, so none was changed; a warning from a third-party package would fail them for a reason
+  unrelated to cantus. No test was found that reads "nothing is printed" as an empty stderr.
 - **Incidental attributes of v0.6.0** (C2-F14 / K2-F3; for T-0019's approval table). Method: the
   attributes of every `cantus.*` module were listed in two fresh Python 3.12 environments,
   `cantus-agent[serve,tui,providers]==0.6.0` from PyPI and a wheel of this branch with the same
@@ -208,8 +216,10 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
     and every class built from a function.
   - *Star imports that no longer bind a legacy name:* `from cantus.core.action import *`
     (`CallSkillAction`), `from cantus.core.observation import *` (`SkillObservation`),
-    `from cantus.core.agent import *` (both classes and `get_registry`): these modules have no
-    `__all__` and the names now live behind `__getattr__`. `cantus.protocols.skill` gained
+    `from cantus.core.agent import *` (both classes and `get_registry`),
+    `from cantus.grammar.tool_call import *` (`get_registry`) and
+    `from cantus.protocols.debug import *` (`Skill`): these modules have no `__all__`; the class
+    names now live behind `__getattr__` and the other names are no longer imported there. `cantus.protocols.skill` gained
     `__all__ = ["skill", "register_skill"]`, so its star import no longer binds `Skill` or
     `get_registry`. X9 names only `from cantus import *`.
   - *`__all__` changes:* `cantus` lost `Skill`, `CallSkillAction`, `SkillObservation` and gained
@@ -224,25 +234,91 @@ AC-18 只補既有測試沒涵蓋的項目，其餘以對照表記錄；incident
     `expose_as_hf_tool` builds → `_cantus_tool`, the `skills` parameter of `mcp._start_server` →
     `backing_tools` (T-0011); the nested serve handlers `list_skills` and `introspection_skills`
     → `list_tools`, `introspection_tools` (T-0012); `CantusTUI._skills` → `_tools` (T-0013); the
-    third parameter of `_emit_hook_debug_label` (T-0014). New names on the branch
-    (`warn_legacy`, `ToolSpecMapping`, `cantus._deprecation`, `cantus.adapters._arguments`,
-    `cantus.serve._aliases`, `cantus.core._legacy_events`) are listed in `attr-scan.txt`.
+    third parameter of `_emit_hook_debug_label` (T-0014). New module-level names on the branch that a
+    student could meet: `cantus.core.registry.ToolSpecMapping` (public) and `warn_legacy` on
+    `cantus.core.registry` and `cantus.protocols.skill`, `resolve_tool` / `resolve_tools` on the
+    adapter modules, `SmolagentsTool` on `cantus.adapters.huggingface` (all imported for the
+    module's own use); new private modules `cantus._deprecation`, `cantus.adapters._arguments`,
+    `cantus.adapters._remote_tool`, `cantus.core._legacy_events`, `cantus.serve._aliases`, and
+    the public module `cantus.protocols.tool`.
 - **Known and unchanged** (already recorded for T-0019 by earlier tickets, restated because this
   ticket closes the surface): a warning that goes through `dataclasses.replace` or
   `copy.replace` is reported at the standard library's file and line (T-0008, T-0009);
   `inspect.getmembers` or `hasattr` on an event or a `ParsedToolCall` reads the legacy property
   and emits W7 (T-0010); under an `always` filter a `from <package> import <legacy name>`
   records its warning twice.
-- **Coverage report** (percentages from the full suite in the local `.venv`, Python 3.13,
-  `1848 passed, 3 skipped`; the skips need `mlx_lm`, `rank_bm25` and `sentence_transformers`; the
-  three new test modules also pass on Python 3.10–3.14, `115 passed` each):
+- **Coverage report** (percentages are the whole suite's, not these tests' alone, in the local `.venv`, Python
+  3.13, `1848 passed, 3 skipped`; the skips need `mlx_lm`, `rank_bm25` and
+  `sentence_transformers`; the two new modules and the extended one also pass on Python
+  3.10–3.14, `115 passed` together on each):
 
   | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
   | every legacy trigger, in a student module | `tests/legacy/test_matrix_w01_w18.py` rows 1–5, 8 (79 cases), row 6 (1), row 7 (11) | `cantus/core/_legacy_events.py`, `core/registry.py`, `protocols/skill.py`, `adapters/_arguments.py`, `serve/__init__.py` 100%; `tui/widgets.py` 99%; `cantus/__init__.py` 91% | AC-16 (TR-57–59, 61, 62), AC-20 (TR-77, 78), TR-71, V2-14, K2-F4 | `cantus/__init__.py` 140–144: the lazy `serve` / `config` loader's rarely hit branch (unchanged); `tui/widgets.py` two partial branches in formatting helpers (unchanged) |
   | Python's default filters in a subprocess | same module, row 9 (4 cases) | `cantus/_deprecation.py` 47% in-process: the filter-installation code runs at import in the subprocesses, which the coverage run does not trace | AC-20 (TR-79), V2-14 | lines 128–222 of `_deprecation.py` are exercised by T-0007's subprocess tests and by row 9, not measured |
-  | completeness of the table | same module, row 10 (1 test) | not a line measurement: a literal list of 79 {W, target, form} entries, each matched to a case | Deliverable 1 | the tags on each case are written by hand; a wrong tag is caught only by review |
+  | completeness of the table | same module, row 10 (1 test) | not a line measurement: a hand-written set of 82 {W, target, form} entries (79 triggers and the three statements V2-14 names), each matched to a case | Deliverable 1 | the tags on each case are written by hand; a wrong tag is caught only by review (stage 6 checked all 90 cases against their tags). Two entries rest on earlier tickets' readings, not on the frozen text: `agent.tools = None` as a W11 trigger (T-0008) and `"skill" in spec` as a W9 read (T-0007) |
   | export surface | `tests/legacy/test_final_exports.py` row 11 (11 tests) | the five `__all__` lists, read directly | AC-18 (TR-68), V2-13, C2-F14, K2-F3 | — |
   | the new API and every module's import, in a subprocess | `tests/test_internal_paths_silent.py` rows 12–13 (1 test) | not measured (subprocess) | AC-18 (TR-67, TR-69), V2-13, C2-F15 | optional SDK modules that are not installed are skipped (five adapter modules and the mlx provider locally; CI installs `huggingface`) |
   | the two CLIs | same module, rows 14 and 15 (2 tests) | `cantus/cli.py` 92% | V2-13, C2-F15 | 215, 225–226, 231–232, 284–288: argument and import error branches (unchanged) |
+- **Stage 6** (code review on `72250f1..4101ec2`; Standards 25 findings, Spec 14, none high, two
+  medium; the Spec reviewer named a test or case for each of the 15 rows, and the Standards
+  reviewer checked every case's tags against its trigger and found none wrong). Fixed in the
+  next commit, tests only: the import check names the modules that may be skipped instead of
+  counting to 80 (S-01, P-07); the live server runs with no warning option, as the record said
+  (S-02, P-04); two checks that were the literal `True`, and the weak "works" checks of W2, W3,
+  W8, W12, W18 and the compound statements, now assert the result (S-03, S-06, S-07, S-08, P-08,
+  P-09); W17 and the three statements V2-14 names are entries of the completeness set (S-04,
+  S-05); the subprocess rows assert the reported line (S-11); cantus modules a case needs are
+  imported before recording starts (S-12, P-02); `update_skills` left the legacy export list,
+  where it could never match (S-19); the export test skips without the serve extra (P-12); the
+  loopback requests bypass any proxy from the environment (SEC-T0015-3); this ticket's records
+  (S-22, S-23, P-01, P-03, P-05, P-06, P-10, P-13, P-14). The mutation check then caught one of
+  those fixes: the first W12 check matched the word `additionalProperties`; it now reads the
+  schema's name list. Shown to the user and left as they are: `@skill()` shares the `decorator`
+  tag with `@skill`, and `cantus.protocols.skill` has no `@skill()` case (S-10); the subprocess
+  test recognises cantus's warnings by their text, so a reworded template would blind it, and a
+  warning raised inside one of cantus's broad `except` blocks would be swallowed (S-14); the
+  fake-SDK fixture repeats T-0011's and leaves the adapter modules bound on the `cantus.adapters`
+  package (S-15, SEC-T0015-7); repeated environment and setup strings, short helper names, and a
+  cover tuple whose middle field means a module, a class or a function (S-16, S-17, S-18);
+  `tests/test_internal_paths_silent.py` names the legacy module on two marked lines (S-20, D3);
+  `tests/legacy/test_final_exports.py` is not named after a W id and holds checks of the new
+  names, which a later removal of `tests/legacy/` would take with it (S-21, P-11); `ToolEntry`
+  and `ToolsPane` are only imported in the subprocess test (S-25); `McpServer` is reached through
+  one import path (P-10); the port is chosen before the server binds it (S-24).
+- **Stage 7**: `.proj.specs/0001-tool-rename-phase-one/review/security-T-0015.md`. Seven
+  candidates, all about test code, none confirmed as a security defect; no finding at the report
+  threshold. The change touches nothing under `cantus/`, so it adds nothing to the close-out
+  chain analysis.
+- **Stage 8** (ADR-0018; surfaces: the Python API in a script run as a subprocess, and a notebook
+  in a Jupyter kernel through nbclient; driven by the agent). Ticket build: this branch changes
+  nothing under `cantus/` (the last commit that does is `72250f1` on `main`, T-0014), so the
+  wheel was built from the branch commit `4101ec241ecf6be328e8b0e26164296bc11effd4` with
+  `git archive` and `uv build --wheel` (sha256
+  `334a386ce0ebf974e682bca3d3bf33cdffb37e2c9603810f520a7afe62d83e2c`) and installed with the
+  `serve` and `tui` extras into a new virtual environment that also got `ipykernel` 7.4.0,
+  `nbclient` 0.11.0 and `nbformat` (IPython 9.18.1; not added to any project extra). Working
+  directory and scripts outside the checkout, `PYTHONPATH` and `PYTHONWARNINGS` unset; both modes
+  assert that `cantus.__file__` is under that environment's `site-packages`; Python 3.12.12,
+  macOS 26.6.2 arm64. The notebook (`.scratch/T-0015/stage8_notebook.py`, not committed) is
+  v0.6-style code in ten cells: `from cantus import *`; `@skill` and `register_skill`; the three
+  legacy class names in one import; `get_registry()` and the kind `"skill"`; an `Agent` without
+  `tools=` whose scripted model writes the legacy action key; `.skill_name` read through
+  `SkillObservation`, twice in two cells; `registry=` and `build_schema()`; the four legacy names
+  of `cantus.serve` and `cantus.tui.widgets`; and a last cell on the new API.
+  - Script mode (the cells joined into one file, run with the build's interpreter): exit 0; the
+    code works (the agent calls `add` and answers; `add 7` printed); stderr holds exactly 17
+    warnings, each with the section 2.4 text, category `CantusDeprecationWarning`, the script's
+    file name and the line of the statement that used the legacy name: W2 (line 8, the decorator
+    line), W3, then W1, W4, W5 on one line, W8, W9, W11, W13, W7 twice, W10, W12, W6, W16, and
+    W14, W15 on one line.
+  - Kernel mode: every cell's stderr holds exactly the expected warnings at the expected line
+    of that cell (11 checks passed); the file a warning names is the kernel's per-cell file; the
+    same `.skill_name` read at the same line of two different cells is shown in both; the
+    new-API cell prints nothing on stderr.
+  - Not covered: Colab, a real model (scripted), `cantus serve` as a process and the TUI (W17;
+    T-0012 and T-0013 ran those surfaces), the adapters (W18; T-0011), and a legacy name used
+    inside a helper module that the notebook imports (decision D8: every legacy use here is in
+    `__main__`, where Python shows deprecation warnings by itself, so this run does not exercise
+    the filter cantus installs; T-0007's stage 8 covered that case for W2).
 
