@@ -2,7 +2,7 @@
 id: T-0012
 title: cantus serve offers Tools under /tools, with deprecated /skills aliases
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0009]
 ---
 
