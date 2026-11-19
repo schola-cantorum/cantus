@@ -8,7 +8,7 @@ This sits alongside the other two teaching abstractions in the framework:
 
 | Abstraction | Role |
 | --- | --- |
-| `Skill` | Capability — what this agent can do |
+| `Tool` | Capability — what this agent can do |
 | `Memory` | Memory — what this agent has remembered |
 | `Soul` | Identity — who this agent is |
 
@@ -79,10 +79,10 @@ except SoulParseError as exc:
 `Agent.__init__` takes a keyword-only parameter `soul: Soul | None = None`. The injection order is:
 
 ```
-<soul.to_system_prompt()>\n\n<v0.3.0 baseline system prompt>
+<soul.to_system_prompt()>\n\n<the system prompt cantus builds>
 ```
 
-In other words, the `soul.to_system_prompt()` string comes first, followed by two newlines, followed by the existing v0.3.0 system prompt. When `soul=None` (the default), the system prompt is **byte-identical** to v0.3.0, so existing agent behavior is untouched.
+In other words, the `soul.to_system_prompt()` string comes first, followed by two newlines, followed by the system prompt cantus builds anyway. When `soul=None` (the default), nothing is prepended.
 
 ```python
 from cantus import Agent
@@ -94,7 +94,7 @@ agent = Agent(model=m, soul=soul)
 # the soul content as a system-prompt prefix.
 ```
 
-The `soul` is **not** registered as a `Skill` and does **not** appear in `registry.spec_for_llm()`, so the tool list the model sees stays free of `SOUL.md` content.
+The `soul` is **not** a `Tool` and does **not** appear in `registry.spec_for_llm()`, so the tool list the model sees stays free of `SOUL.md` content.
 
 ## Override pattern: build the system prompt yourself
 

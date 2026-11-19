@@ -2,14 +2,14 @@
 
 ## 它是什麼、什麼時候用
 
-Memory 負責 agent 的「狀態化回憶」：把過去的對話 turn 存起來，之後在某個 query 下把它們檢索回來，再折進新一輪 prompt。它跟 skill、hook helper（analyzer/validator）以及 workflow 的關鍵差別在於——memory **永遠帶著狀態**：一個 buffer、一份 index、一個 embedding 矩陣。這些東西，沒有一個能用「一次純函式呼叫」乾淨地表達出來。
+Memory 負責 agent 的「狀態化回憶」：把過去的對話 turn 存起來，之後在某個 query 下把它們檢索回來，再折進新一輪 prompt。它跟 tool、hook helper（analyzer/validator）以及 workflow 的關鍵差別在於——memory **永遠帶著狀態**：一個 buffer、一份 index、一個 embedding 矩陣。這些東西，沒有一個能用「一次純函式呼叫」乾淨地表達出來。
 
 ## 為什麼沒有 `@memory` decorator 與 `register_memory`？
 
 這是設計上刻意留下的不對稱，也是這個 framework 的教學重點之一：
 
 - 其他協定都可以從一個 stateless function 起步，所以 decorator 入口跟「傳一個 function 進去」的入口，對學生來說是最友善的起點。
-- 但 memory 最小可行的實作（`ShortTermMemory`），你一建構它就需要一個 `deque(maxlen=n)`；BM25 與 embedding 版本更要建索引、cache 一堆 embeddings。**狀態沒辦法寫成單一個 function**，硬要包成 decorator，只會誤導學生以為「memory 跟 skill 是同一種東西」。
+- 但 memory 最小可行的實作（`ShortTermMemory`），你一建構它就需要一個 `deque(maxlen=n)`；BM25 與 embedding 版本更要建索引、cache 一堆 embeddings。**狀態沒辦法寫成單一個 function**，硬要包成 decorator，只會誤導學生以為「memory 跟 tool 是同一種東西」。
 - 正因如此，`from cantus import memory` 與 `from cantus import register_memory` 在 package surface 是**故意拋 ImportError 的**，而且有 test 守住這個約定。
 
 當學生注意到這個缺口，他們就學到了：「這個東西能不能寫成 decorator？」其實是一個實實在在的設計判斷，而且它跟「有沒有牽涉到狀態」高度相關。
@@ -60,7 +60,7 @@ print(len(mem.recall("Tainan snacks")))
 cantus 把 Memory 拆成兩層：底層是四個 explicit 的 `Memory` 實作，上層則是暴露四個 LLM-facing tool 的 `AutoMemory`。
 
 - **底層**：由 host code 自己去呼叫 `mem.recall(query)` 跟 `mem.remember(turn)`。每一次檢索、每一次寫入發生的時機，都由學生精準掌控，很適合教學跟需要 deterministic 的流程。
-- **上層**：`AutoMemory(backend=mem)` 把任何一個底層 memory 包成四個 cantus `Skill`（`view`、`create`、`str_replace`、`delete`），對齊 Anthropic Memory tool spec。把 `auto.tools` 註冊進 agent 的 registry，LLM 就會自己決定什麼時候讀、什麼時候寫。
+- **上層**：`AutoMemory(backend=mem)` 把任何一個底層 memory 包成四個 cantus tool（`view`、`create`、`str_replace`、`delete`），對齊 Anthropic Memory tool spec。用 `Agent(model, tools=auto.tools)` 傳進去，LLM 就會自己決定什麼時候讀、什麼時候寫。
 
 ```python
 from cantus.protocols.memory import MarkdownMemory, AutoMemory, Turn
@@ -69,13 +69,13 @@ backend = MarkdownMemory("memo.md")            # 底層 explicit API
 backend.remember(Turn(user="q", assistant="a"))
 print(backend.recall("q"))                      # [Turn(user='q', assistant='a', ...)]
 
-auto = AutoMemory(backend=backend)              # 上層：4 個 Skill 給 LLM 用
+auto = AutoMemory(backend=backend)              # 上層：4 個 tool 給 LLM 用
 print([t.name for t in auto.tools])             # ['view', 'create', 'str_replace', 'delete']
 ```
 
 **設計細節**：
 
-- `AutoMemory` 採用 **composition**：它持有任何一個 `Memory` 當 backend，而不是去繼承 `Memory`，所以它不會干擾底層的 ABI。`AutoMemory` 自己並不是 `Memory` 的子類。
+- `AutoMemory` 採用 **composition**：它持有任何一個 `Memory` 當 backend，而不是去繼承 `Memory`，所以它不會干擾底層的 ABI。`AutoMemory` 自己並不是 `Memory` 的子類別。
 - `auto.tools` 是一個 **instance-level 的 cache**：每次存取都回傳**同一個 list 物件**，所以 LLM 看到的 spec 不會在多輪 turn 之間 drift。
 - `tools` property 的 docstring 永遠包含字面字串 `"LLM has full CRUD access"`，這樣靜態 introspection 跟 IDE hover 都能把這個警告浮出來。
 
@@ -90,29 +90,28 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 每一個 rejection 都在開檔**之前**就完成。被拒絕的路徑，除了分類所需的那一次 `stat()` 之外，不會被任何 IO 建立、開啟、或碰到。
 
-## `AutoMemory`：LLM 自主 CRUD 與正式應用警告
+## `AutoMemory`：LLM 自主 CRUD 與正式應用警告 {#automemory-production-warning}
 
-`AutoMemory.tools` 回傳的四個 `Skill`，**預設就讓 LLM 讀寫 memory**，而且沒有內建任何內容過濾。在教學情境下這是刻意的：學生需要親眼看到「讓 LLM 自己寫入」會帶來什麼樣的權衡。基礎的 `Memory` protocol 沒有硬刪除，所以 `delete` 只回報有幾筆符合，`str_replace` 則是在原本那筆旁邊再記一筆修正後的版本。但是在**任何正式應用之前**，請用 cantus 既有的 hook 機制把它們包一層過濾起來：
+`AutoMemory.tools` 回傳的四個 tool，**預設就讓 LLM 讀寫 memory**，而且沒有內建任何內容過濾。在教學情境下這是刻意的：學生需要親眼看到「讓 LLM 自己寫入」會帶來什麼樣的權衡。基礎的 `Memory` protocol 沒有硬刪除，所以 `delete` 只回報有幾筆符合，`str_replace` 則是在原本那筆旁邊再記一筆修正後的版本。但是在**任何正式應用之前**，請在 memory tool 前面放一個你自己寫的 tool，並且只把 agent 需要的 tool 交給它：
 
 ```python
-from cantus import skill
-from cantus.protocols.memory import AutoMemory, MarkdownMemory
+from cantus import Agent, AutoMemory, ChatModelAsHandle, load_chat_model, tool
+from cantus.protocols.memory import MarkdownMemory
 
-def block_secrets(result):
-    # post_hook 範例：在寫入發生之後，檢查這個工具回傳了什麼
-    return result  # ... 你的過濾邏輯
-
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
 backend = MarkdownMemory("memo.md")
-auto = AutoMemory(backend=backend)
 
-# 把 create tool 換成包過的版本（保留另外 3 個 tool）
-create_skill = auto.tools[1]
-create_skill._post_hook = block_secrets
+memory = AutoMemory(backend=backend)
+view, create, str_replace, delete = memory.tools
 
-from cantus.core.registry import get_registry
+@tool
+def remember(user: str, assistant: str) -> str:
+    """Save one turn, refusing anything that looks like a password."""
+    if "password" in f"{user} {assistant}".lower():
+        raise ValueError("refusing to store a password")
+    return create(user=user, assistant=assistant)
 
-for tool in auto.tools:
-    get_registry().register("skill", tool)  # the agent now offers all four
+agent = Agent(model, tools=[view, remember])
 ```
 
 ## EventStream 的 JSON-Lines 持久化
@@ -149,5 +148,5 @@ print(restored)  # [{'action': 'search', ...}, {'observation': ...}]
 
 - **忘了在 `__init__` 裡初始化內部容器**，於是第一次呼叫 `recall` 就直接拋 `AttributeError`。
 - **以為可以用 `@memory` 來註冊**：package surface 會直接拋 ImportError，請改用 class。
-- **把 LLM 呼叫塞進 `recall` 裡**：memory 應該是純粹的檢索。要做 summarization，請把它拆成一個 skill 或一個 workflow，再讓 memory 去存它的結果。
+- **把 LLM 呼叫塞進 `recall` 裡**：memory 應該是純粹的檢索。要做 summarization，請把它拆成一個 tool 或一個 workflow，再讓 memory 去存它的結果。
 - **用了 `BM25Memory` 或 `EmbeddingMemory` 卻沒裝 extras**：runtime 會提示你去跑 `pip install 'cantus[memory]'`。

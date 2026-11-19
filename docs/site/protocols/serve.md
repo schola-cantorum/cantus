@@ -1,6 +1,6 @@
 # `cantus.serve` core
 
-`cantus.serve` is the HTTP entry point for cantus. It takes the Skill registry you have already built and exposes it over plain HTTP/JSON. Call `serve(registry)` and you get back a configured FastAPI app, ready to run under uvicorn (or any ASGI server).
+`cantus.serve` is the HTTP entry point for cantus. It takes the tool registry you have already built and exposes it over plain HTTP/JSON. Call `serve(registry)` and you get back a configured FastAPI app, ready to run under uvicorn (or any ASGI server).
 
 This page covers four public surfaces: Quick start, the `cantus.config.Settings` 12-factor configuration, the read-only dashboard endpoints, and the Channel Protocol abstraction together with `LocalMockReceiver`.
 
@@ -14,15 +14,14 @@ Install the serve extras. FastAPI, uvicorn, and pydantic-settings sit behind a l
 pip install "cantus-agent[serve]"
 ```
 
-Here is a minimal example. Register a Skill, call `serve(registry)`, and start the server with uvicorn:
+Here is a minimal example. Put a tool in a `Registry`, call `serve(registry)`, and start the server with uvicorn:
 
 ```python
 import uvicorn
 from cantus.core.registry import Registry
 from cantus.serve import serve
 
-registry = Registry()
-registry.register("skill", my_skill)             # my_skill is any Skill instance
+registry = Registry(tools=[my_tool])  # my_tool is any Tool
 app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
@@ -39,7 +38,9 @@ Expected response:
 {"status":"ok","cantus_version":"0.6.0"}
 ```
 
-Every Skill registered in the registry is automatically mounted at `POST /skills/{spec_for_llm.name}`. Arguments go in the JSON body, and the response shape is `{"result": <jsonable>}`. The Swagger UI is mounted at `/docs` by default, the OpenAPI JSON at `/openapi.json`, and ReDoc at `/redoc`. Each Skill's `args_schema` is projected straight into the `requestBody.application/json.schema` of its endpoint, so a student can open the Swagger UI and see exactly how to call any Skill.
+Every tool in the registry is automatically mounted at `POST /tools/{spec_for_llm.name}`. Arguments go in the JSON body, and the response shape is `{"result": <jsonable>}`. The Swagger UI is mounted at `/docs` by default, the OpenAPI JSON at `/openapi.json`, and ReDoc at `/redoc`. Each tool's `args_schema` is projected straight into the `requestBody.application/json.schema` of its endpoint, so a student can open the Swagger UI and see exactly how to call any tool.
+
+During the alias period the v0.6 route paths still answer, with deprecation headers; see the [Tool page's migration section](./tool.md#migrating-from-skill).
 
 ## Configuration
 
@@ -49,7 +50,7 @@ Every Skill registered in the registry is automatically mounted at `POST /skills
 | --- | --- | --- | --- |
 | `host` | `str` | `"127.0.0.1"` | Host that uvicorn binds to; the default opens localhost only |
 | `port` | `int` | `8765` | Port that uvicorn binds to |
-| `dashboard` | `bool` | `True` | Whether to enable the `/skills`, `/health`, and `/events` dashboard endpoints |
+| `dashboard` | `bool` | `True` | Whether to enable the `/tools`, `/health`, and `/events` dashboard endpoints |
 | `introspection` | `bool` | `True` | Whether to mount the read-only `/introspection/*` endpoints |
 | `introspection_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether `/introspection/*` also requires auth |
 | `docs_url` | `str \| None` | `"/docs"` | Mount path for the Swagger UI; set to `None` to disable |
@@ -58,7 +59,7 @@ Every Skill registered in the registry is automatically mounted at `POST /skills
 | `auth_mode` | `AuthMode` | `AuthMode.NONE` | Authentication mode. Three enum values: `"none"` / `"bearer"` / `"api-key"`. The default `NONE` keeps the original no-auth behavior |
 | `api_key` | `SecretStr \| None` | `None` | Token for api-key mode (loaded from env and wrapped in `SecretStr`, so `repr`, JSON dumps, and the OpenAPI schema never leak it) |
 | `bearer_token` | `SecretStr \| None` | `None` | Token for bearer mode; same `SecretStr` behavior as above |
-| `dashboard_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether the `/skills`, `/health`, and `/events` dashboard endpoints also require auth. Set `False` to let a monitoring system poll them anonymously |
+| `dashboard_requires_auth` | `bool` | `True` | When `auth_mode != NONE`, whether the `/tools`, `/health`, and `/events` dashboard endpoints also require auth. Set `False` to let a monitoring system poll them anonymously |
 
 `Settings` also carries one `channel_*` field per platform credential (LINE, Telegram, Discord, Google Chat); each channel page lists the ones it reads.
 
@@ -121,8 +122,7 @@ import uvicorn
 from cantus.core.registry import Registry
 from cantus.serve import serve
 
-registry = Registry()
-registry.register("skill", my_skill)
+registry = Registry(tools=[my_tool])
 app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
@@ -131,11 +131,11 @@ Calling it:
 
 ```bash
 # No token: 401
-curl http://localhost:8765/skills/my_skill -d '{"value":"hi"}'
+curl http://localhost:8765/tools/my_tool -d '{"value":"hi"}'
 # {"detail":"Authentication required"}
 
 # Correct token: 200
-curl http://localhost:8765/skills/my_skill \
+curl http://localhost:8765/tools/my_tool \
   -H "Authorization: Bearer $CANTUS_SERVE_BEARER_TOKEN" \
   -d '{"value":"hi"}'
 # {"result":"hi"}
@@ -151,14 +151,14 @@ export CANTUS_SERVE_API_KEY=$(openssl rand -hex 32)
 Pass the `X-API-Key` header when you call:
 
 ```bash
-curl http://localhost:8765/skills/my_skill \
+curl http://localhost:8765/tools/my_tool \
   -H "X-API-Key: $CANTUS_SERVE_API_KEY" \
   -d '{"value":"hi"}'
 ```
 
 ### Whether the dashboard requires auth
 
-The default is `dashboard_requires_auth = True`: when `auth_mode != NONE`, the three dashboard endpoints `/skills`, `/health`, and `/events` also require authentication. The reasoning is that the Skill list and health status the dashboard exposes are reconnaissance information in their own right.
+The default is `dashboard_requires_auth = True`: when `auth_mode != NONE`, the three dashboard endpoints `/tools`, `/health`, and `/events` also require authentication. The reasoning is that the tool list and health status the dashboard exposes are reconnaissance information in their own right.
 
 If you want to let a monitoring system such as Prometheus or Grafana poll `/health` anonymously, turn it off explicitly:
 
@@ -166,7 +166,7 @@ If you want to let a monitoring system such as Prometheus or Grafana poll `/heal
 export CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH=false
 ```
 
-With it off, `/skills`, `/health`, and `/events` return 200 to anonymous requests, while `POST /skills/<name>` still requires a token.
+With it off, `/tools`, `/health`, and `/events` return 200 to anonymous requests, while `POST /tools/<name>` still requires a token.
 
 ### Fail-fast on a missing token
 
@@ -185,12 +185,12 @@ If you set `CANTUS_SERVE_AUTH_MODE=bearer` but forget to set `CANTUS_SERVE_BEARE
 
 When `Settings.dashboard is True` (the default), `serve()` mounts three extra read-only endpoints:
 
-### `GET /skills`
+### `GET /tools`
 
-Returns the `spec_for_llm()` output for every Skill in the registry, typed as `list[dict]`. Each entry has the three-key shape `{"name", "description", "args_schema"}`:
+Returns the `spec_for_llm()` output for every tool in the registry, typed as `list[dict]`. Each entry has the three-key shape `{"name", "description", "args_schema"}`:
 
 ```bash
-curl http://localhost:8765/skills
+curl http://localhost:8765/tools
 ```
 
 ```json
@@ -237,26 +237,25 @@ app.state.event_persistence = JsonLinesPersistence("events.jsonl")
 
 ### Turning the dashboard off
 
-Pass `Settings(dashboard=False)` and all three endpoints become `404`, while every Skill invoke endpoint (`POST /skills/<name>`) is **unaffected**:
+Pass `Settings(dashboard=False)` and all three endpoints become `404`, while every tool invoke endpoint (`POST /tools/<name>`) is **unaffected**:
 
 ```python
 from cantus.config import Settings
 
 app = serve(registry, settings=Settings(dashboard=False))
-# GET /skills  -> 404
+# GET /tools  -> 404
 # GET /health  -> 404
 # GET /events  -> 404
-# POST /skills/search_book -> 200 (as usual)
+# POST /tools/search_book -> 200 (as usual)
 ```
 
-### Reserved paths: Skill names cannot collide
+### Reserved paths: tool names cannot collide
 
-The names `skills`, `health`, and `events` are reserved for the dashboard. If any Skill in the registry has a `spec_for_llm()["name"]` equal to one of these three, `serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`. Two more names are reserved the same way: `channels` (`"reserved channel path"`) and `introspection` (`"reserved introspection path"`).
+The names `tools`, `health`, and `events` are reserved for the dashboard (the alias period reserves one more name, listed in the [Tool page's migration section](./tool.md#migrating-from-skill)). If any tool in the registry has a `spec_for_llm()["name"]` equal to one of these reserved names, `serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`. Two more names are reserved the same way: `channels` (`"reserved channel path"`) and `introspection` (`"reserved introspection path"`).
 
 ```python
-# Suppose bad_skill.spec_for_llm()["name"] == "health"
-registry = Registry()
-registry.register("skill", bad_skill)
+# Suppose bad_tool.spec_for_llm()["name"] == "health"
+registry = Registry(tools=[bad_tool])
 
 serve(registry)
 # ValueError: ... reserved dashboard path ...
@@ -266,11 +265,11 @@ This guard **fires in both** the `dashboard=True` and `dashboard=False` cases �
 
 ## Introspection endpoints
 
-When `Settings.introspection is True` (the default), `serve()` mounts an extra group of read-only `/introspection/*` endpoints that project cantus's existing runtime state (the Skill registry, auth configuration, attached channels, and EventStream) into a stable JSON read-model. It **observes only** and never changes any registry, settings, session, channel, or event-stream state. It runs in parallel with the dashboard and each toggles **independently**.
+When `Settings.introspection is True` (the default), `serve()` mounts an extra group of read-only `/introspection/*` endpoints that project cantus's existing runtime state (the tool registry, auth configuration, attached channels, and EventStream) into a stable JSON read-model. It **observes only** and never changes any registry, settings, session, channel, or event-stream state. It runs in parallel with the dashboard and each toggles **independently**.
 
 | Endpoint | Contents |
 | --- | --- |
-| `GET /introspection/skills` | The `spec_for_llm()` projection of every registered Skill |
+| `GET /introspection/tools` | The `spec_for_llm()` projection of every tool in the registry |
 | `GET /introspection/sessions` | The most recently dispatched runs (a bounded, read-only `SessionTracker`) |
 | `GET /introspection/permissions` | The effective auth configuration (`auth_mode` plus the two `*_requires_auth` flags plus the list of gated paths; **never** the token values) |
 | `GET /introspection/queues` | The queue depth of each channel (a channel without this capability is listed with `depth=null`) |
@@ -282,7 +281,7 @@ When `Settings.introspection is True` (the default), `serve()` mounts an extra g
 
 `/introspection` is controlled by two flags, each independent of the dashboard:
 
-- `introspection` (default `True`): whether to mount the whole group of endpoints. With `Settings(introspection=False)`, they all return `404`, while the dashboard and Skill invoke endpoints are unaffected.
+- `introspection` (default `True`): whether to mount the whole group of endpoints. With `Settings(introspection=False)`, they all return `404`, while the dashboard and tool invoke endpoints are unaffected.
 - `introspection_requires_auth` (default `True`): when `auth_mode != NONE`, whether the whole `/introspection/*` group (**including** `/introspection/workflows/{run_id}`) is wrapped with `require_auth`. Set `False` to allow anonymous reads, matching the behavior of `dashboard_requires_auth`.
 
 > ⚠️ **The `auth_mode=none` config cliff**: when `auth_mode` is `none` (the default), there is no authentication to apply, so `introspection_requires_auth` (and `dashboard_requires_auth`) **are ignored** and `/introspection` is readable by anyone who can reach the server. In this situation (`auth_mode=none` and `introspection` enabled), `serve()` emits a `UserWarning` during app build stating that `/introspection` is currently accessible without authentication (the message **contains no** token). Once you expose the server beyond loopback (binding `0.0.0.0`, attaching a tunnel), switch `auth_mode` to `bearer` or `api-key` and introspection is protected along with everything else.
@@ -291,9 +290,9 @@ When `Settings.introspection is True` (the default), `serve()` mounts an extra g
 
 `GET /introspection/workflows/{run_id}` projects that run's EventStream into ordered steps, each with four fields: `index`, `kind`, `type`, and `summary`. The `summary` is a **structural projection that carries no values**:
 
-- `CallSkillAction` → the skill name plus a sorted list of argument **key names** (no argument values)
-- `SkillObservation` → the skill name plus the result **type name** (no result value)
-- `ToolErrorObservation` → the skill name only (no exception type, no exception message)
+- `CallToolAction` → the tool name plus a sorted list of argument **key names** (no argument values)
+- `ToolObservation` → the tool name plus the result **type name** (no result value)
+- `ToolErrorObservation` → the tool name only (no exception type, no exception message)
 - other types → the event type name (no field values)
 
 Argument values, result values, and raw exception messages can carry secrets or PII, so none of them are projected; the step's `kind`, `type`, and ordering stay intact. An unknown `run_id` returns `404`. The TUI Inspector (`cantus tui`, see [`docs/tui.md`](../tui.md)) is a pure render of this server data, so it likewise shows only the redacted summary.

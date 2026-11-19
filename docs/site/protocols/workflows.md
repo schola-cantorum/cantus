@@ -1,6 +1,6 @@
 # `cantus.workflows` Building Blocks
 
-v0.3.0 replaced the `@workflow` decorator from v0.2.x with five explicit Python classes. The constructor takes registered Skill instances (or any callable), and `.run(input)` expresses the orchestration as host code rather than a framework-managed registry entry. These classes do **not** register themselves, and they do **not** appear in `registry.spec_for_llm()` — an LLM agent never sees them. You compose them yourself in Python. The patterns are drawn from Anthropic's *Building Effective Agents* playbook.
+v0.3.0 replaced the `@workflow` decorator from v0.2.x with five explicit Python classes. The constructor takes Tool instances (or any callable), and `.run(input)` expresses the orchestration as host code rather than a framework-managed registry entry. These classes do **not** register themselves, and they do **not** appear in `registry.spec_for_llm()` — an LLM agent never sees them. You compose them yourself in Python. The patterns are drawn from Anthropic's *Building Effective Agents* playbook.
 
 ```python
 from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
@@ -8,7 +8,7 @@ from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, 
 
 ## PromptChain
 
-This maps to the **Prompt Chaining** pattern in the Anthropic playbook. It runs several Skills in order, feeding each step's return value straight into the next step as input; the final step's return value is the return value of the whole chain. It fits tasks that break down into a stable linear sequence, such as outline → draft → polish.
+This maps to the **Prompt Chaining** pattern in the Anthropic playbook. It runs several tools in order, feeding each step's return value straight into the next step as input; the final step's return value is the return value of the whole chain. It fits tasks that break down into a stable linear sequence, such as outline → draft → polish.
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -17,7 +17,7 @@ class PromptChain:
     def run(self, input: Any) -> Any: ...
 ```
 
-The examples on this page use plain functions as stand-ins for registered skills; the building blocks accept any callable.
+The examples on this page use plain functions as stand-ins for tools; the building blocks accept any callable.
 
 ```python
 from cantus.workflows import PromptChain
@@ -44,7 +44,7 @@ Things to keep in mind:
 
 ## Router
 
-This is the **Routing** pattern. A classifier first sorts the input into a single string key, then dispatches to the matching Skill; a given input only ever reaches one route. It fits intent classification followed by a dedicated handler.
+This is the **Routing** pattern. A classifier first sorts the input into a single string key, then dispatches to the matching tool; a given input only ever reaches one route. It fits intent classification followed by a dedicated handler.
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -84,7 +84,7 @@ Things to keep in mind:
 
 ## Parallel
 
-This is the **Parallelization** pattern. It fans the same input out to several branch Skills and collects each one's return value into a `list`, in the same order the branches were declared. It fits cases where you want several perspectives on the same input and aggregate them afterward.
+This is the **Parallelization** pattern. It fans the same input out to several branch tools and collects each one's return value into a `list`, in the same order the branches were declared. It fits cases where you want several perspectives on the same input and aggregate them afterward.
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -115,7 +115,7 @@ Things to keep in mind:
 
 ## OrchestratorWorker
 
-This is the **Orchestrator-Workers** pattern. The orchestrator Skill takes the input and returns a series of subtasks; `OrchestratorWorker` dispatches the subtasks one at a time to the workers and returns a list of results in the same order the orchestrator produced the subtasks. It fits cases where you don't know the number of subtasks ahead of time and need to plan dynamically.
+This is the **Orchestrator-Workers** pattern. The orchestrator tool takes the input and returns a series of subtasks; `OrchestratorWorker` dispatches the subtasks one at a time to the workers and returns a list of results in the same order the orchestrator produced the subtasks. It fits cases where you don't know the number of subtasks ahead of time and need to plan dynamically.
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -209,7 +209,7 @@ Things to keep in mind:
 
 ## Shared contract
 
-- The five building blocks do **not** register themselves: `get_registry().names_for("skill")` is unchanged before and after instantiation, and the top-level keys of `registry.spec_for_llm()` are always just `"skill"`.
-- An LLM agent never sees a building block — they are an orchestration layer you write in host code. If you want the agent to see an entry point, wrap the whole orchestration in a single `@skill` function; what the agent sees is that skill.
-- A building block leaves no trace in the `EventStream`: it calls its steps directly, not through the agent's dispatcher, even when those steps are registered Skills. To watch the steps run, add `@debug` to the component Skills; to get one event on the stream, wrap the whole orchestration in a single `@skill`.
+- The five building blocks do **not** register anything: building one adds nothing to any `Registry`, and a building block never appears in `spec_for_llm()`.
+- An LLM agent never sees a building block — they are an orchestration layer you write in host code. If you want the agent to see an entry point, wrap the whole orchestration in a single `@tool` function and pass it with `Agent(model, tools=[...])`; what the agent sees is that tool.
+- A building block leaves no trace in the `EventStream`: it calls its steps directly, not through the agent's dispatcher, even when those steps are Tools. To watch the steps run, add `@debug` to the component tools; to get one event on the stream, wrap the whole orchestration in a single `@tool` and pass it to the agent.
 - All five classes are plain Python classes with no async interface; `.run` is a synchronous method, and concurrency is always the host code's responsibility.

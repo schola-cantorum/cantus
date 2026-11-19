@@ -1,6 +1,6 @@
 # `cantus.workflows` Building Blocks
 
-v0.3.0 用五個明確的 Python 類別取代了 v0.2.x 的 `@workflow` decorator。建構子收 registered Skill 實例（或任何 callable），`.run(input)` 把編排寫成 host code 而不是 framework-managed registry entry。它們**不**會註冊到 registry、**不**會出現在 `registry.spec_for_llm()` — LLM agent 看不到它們；組合是程式設計師自己用 Python 寫的。靈感來源：Anthropic 的 *Building Effective Agents* playbook。
+v0.3.0 用五個明確的 Python 類別取代了 v0.2.x 的 `@workflow` decorator。建構子收 Tool 實例（或任何 callable），`.run(input)` 把編排寫成 host code 而不是 framework-managed registry entry。它們**不**會註冊到 registry、**不**會出現在 `registry.spec_for_llm()` — LLM agent 看不到它們；組合是程式設計師自己用 Python 寫的。靈感來源：Anthropic 的 *Building Effective Agents* playbook。
 
 ```python
 from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
@@ -8,7 +8,7 @@ from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, 
 
 ## PromptChain
 
-對應 Anthropic playbook 的 **Prompt Chaining** pattern。把多個 Skill 依序串起來，前一步的 return 直接餵給下一步當 input；最後一步的 return 就是整條 chain 的 return。適合可拆成穩定線性步驟的任務（例如 outline → draft → polish）。
+對應 Anthropic playbook 的 **Prompt Chaining** pattern。把多個 tool 依序串起來，前一步的 return 直接餵給下一步當 input；最後一步的 return 就是整條 chain 的 return。適合可拆成穩定線性步驟的任務（例如 outline → draft → polish）。
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -17,7 +17,7 @@ class PromptChain:
     def run(self, input: Any) -> Any: ...
 ```
 
-本頁的範例用純函式代替已註冊的 skill；building block 接受任何 callable。
+本頁的範例用純函式代替 tool；building block 接受任何 callable。
 
 ```python
 from cantus.workflows import PromptChain
@@ -44,7 +44,7 @@ print(final)
 
 ## Router
 
-對應 Anthropic playbook 的 **Routing** pattern。先用 classifier 把 input 分類成一個 string key，再分派給對應的 Skill；同一個 input 最終只會打到一條 route。適合做 intent classification 後接專責 handler。
+對應 Anthropic playbook 的 **Routing** pattern。先用 classifier 把 input 分類成一個 string key，再分派給對應的 tool；同一個 input 最終只會打到一條 route。適合做 intent classification 後接專責 handler。
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -84,7 +84,7 @@ print(router.run("typhoon update"))
 
 ## Parallel
 
-對應 Anthropic playbook 的 **Parallelization** pattern。把同一個 input fan-out 給多條 branch Skill，收集每條的 return 成一個 `list`，順序與 `branches` 的宣告順序一致。適合需要多視角輸出再 aggregate 的情境。
+對應 Anthropic playbook 的 **Parallelization** pattern。把同一個 input fan-out 給多條 branch tool，收集每條的 return 成一個 `list`，順序與 `branches` 的宣告順序一致。適合需要多視角輸出再 aggregate 的情境。
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -115,7 +115,7 @@ print(en_summary, "|", zh_summary)
 
 ## OrchestratorWorker
 
-對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator Skill 拿到 input 後回一串 subtask；`OrchestratorWorker` 把這些 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
+對應 Anthropic playbook 的 **Orchestrator-Workers** pattern。orchestrator tool 拿到 input 後回一串 subtask；`OrchestratorWorker` 把這些 subtask 一個一個派給 worker 跑、回一個 list 結果，順序對應 orchestrator 給的 subtask 順序。適合事前不知道子任務數量、需要動態 plan 的情境。
 
 <!-- vv:skip: signature sketch, the real class is imported at the top of the page -->
 ```python
@@ -209,7 +209,7 @@ attempt 2: Argue for solar over wind
 
 ## 共通契約
 
-- 五個 building block **不**註冊到 registry：實例化前後 `get_registry().names_for("skill")` 內容不變，`registry.spec_for_llm()` 的 top-level keys 永遠只有 `"skill"`。
-- LLM agent 看不到 building block — 它們是 host code 自己寫的編排層；如果你要 agent 看到入口，把整段編排再包成一個 `@skill` 函式（agent 看到的就是那個 skill）。
-- building block 不會留 trace 進 `EventStream`：它直接呼叫各個步驟，不經過 agent 的 dispatcher，就算步驟是 registered Skill 也一樣。想看各步驟怎麼跑，請在組成的 Skill 上加 `@debug`；想在 stream 上留一筆事件，就把整段編排包成一個 `@skill`。
+- 五個 building block **不**註冊任何東西：建立一個 building block 不會在任何 `Registry` 裡新增內容，building block 也永遠不會出現在 `spec_for_llm()` 裡。
+- LLM agent 看不到 building block — 它們是 host code 自己寫的編排層；如果你要 agent 看到入口，把整段編排再包成一個 `@tool` 函式，並用 `Agent(model, tools=[...])` 傳進去；agent 看到的就是那個 tool。
+- building block 不會在 `EventStream` 留下 trace：它直接呼叫各個步驟，不經過 agent 的 dispatcher，就算那些步驟是 Tool 也一樣。想看各步驟怎麼跑，請在組成的 tool 上加 `@debug`；想在 stream 上留一筆事件，就把整段編排包成一個 `@tool` 再傳給 agent。
 - 五個類別都是 plain Python class、沒有非同步介面；`.run` 是同步方法，concurrency 一律由 host code 負責。

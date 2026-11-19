@@ -36,6 +36,7 @@ const MAX_FILES = 50
 const MAP = [
   ['overview.md', 'overview.md'],
   ['quickstart.md', 'quickstart.md'],
+  ['protocols/tool.md', 'protocols/tool.md'],
   ['protocols/skill.md', 'protocols/skill.md'],
   ['protocols/analyzer.md', 'protocols/analyzer.md'],
   ['protocols/validator.md', 'protocols/validator.md'],

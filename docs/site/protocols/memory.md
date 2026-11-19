@@ -2,14 +2,14 @@
 
 ## What it is, and when to use it
 
-Memory handles an agent's stateful recall: it stores past conversation turns and retrieves them later under some query, so they can be folded into a new prompt. The key difference from skills, the hook helpers (analyzer/validator), and workflows is that memory **always carries state**: a buffer, an index, an embedding matrix. None of that can be expressed cleanly as a single pure function call.
+Memory handles an agent's stateful recall: it stores past conversation turns and retrieves them later under some query, so they can be folded into a new prompt. The key difference from tools, the hook helpers (analyzer/validator), and workflows is that memory **always carries state**: a buffer, an index, an embedding matrix. None of that can be expressed cleanly as a single pure function call.
 
 ## Why there is no `@memory` decorator and no `register_memory`
 
 This is a deliberate asymmetry, and one of the framework's teaching points:
 
 - The other protocols can start from a stateless function, so a decorator entry and a function-pass entry are the friendliest starting points for students.
-- The smallest viable memory implementation (`ShortTermMemory`) needs a `deque(maxlen=n)` the moment you construct it; the BM25 and embedding variants need to build an index and cache embeddings. **State cannot be written as a single function**, and forcing it into a decorator would mislead students into thinking "memory is the same kind of thing as a skill."
+- The smallest viable memory implementation (`ShortTermMemory`) needs a `deque(maxlen=n)` the moment you construct it; the BM25 and embedding variants need to build an index and cache embeddings. **State cannot be written as a single function**, and forcing it into a decorator would mislead students into thinking "memory is the same kind of thing as a tool."
 - For that reason, `from cantus import memory` and `from cantus import register_memory` **raise ImportError on purpose** at the package surface, and tests guard that contract.
 
 When students notice the gap, they learn that "can this be written as a decorator?" is a real design judgement, and that it correlates strongly with whether there is state involved.
@@ -60,7 +60,7 @@ The teaching progression maps neatly onto four levels: data structure (deque) â†
 cantus splits Memory into two tiers: the lower tier of four explicit `Memory` implementations, and the upper-tier `AutoMemory` that exposes four LLM-facing tools.
 
 - **Lower tier**: host code calls `mem.recall(query)` and `mem.remember(turn)` itself. The student controls exactly when each retrieval and each write happens, which suits teaching and deterministic flows.
-- **Upper tier**: `AutoMemory(backend=mem)` wraps any lower-tier memory into four cantus `Skill`s (`view`, `create`, `str_replace`, `delete`), aligned with the Anthropic Memory tool spec. Register `auto.tools` in the agent's registry and the LLM decides for itself when to read and write.
+- **Upper tier**: `AutoMemory(backend=mem)` wraps any lower-tier memory into four cantus tools (`view`, `create`, `str_replace`, `delete`), aligned with the Anthropic Memory tool spec. Pass them with `Agent(model, tools=auto.tools)` and the LLM decides for itself when to read and write.
 
 ```python
 from cantus.protocols.memory import MarkdownMemory, AutoMemory, Turn
@@ -69,7 +69,7 @@ backend = MarkdownMemory("memo.md")            # lower-tier explicit API
 backend.remember(Turn(user="q", assistant="a"))
 print(backend.recall("q"))                      # [Turn(user='q', assistant='a', ...)]
 
-auto = AutoMemory(backend=backend)              # upper tier: 4 Skills for the LLM
+auto = AutoMemory(backend=backend)              # upper tier: 4 tools for the LLM
 print([t.name for t in auto.tools])             # ['view', 'create', 'str_replace', 'delete']
 ```
 
@@ -90,29 +90,28 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 Every rejection completes **before** the file is opened. A rejected path is never created, opened, or touched by any IO beyond the `stat()` needed to classify it.
 
-## `AutoMemory`: autonomous LLM CRUD, and a production warning
+## `AutoMemory`: autonomous LLM CRUD, and a production warning {#automemory-production-warning}
 
-The four `Skill`s returned by `AutoMemory.tools` **let the LLM read and write memory by default**, with no built-in content filter. In a teaching setting that is intentional: students need to see the trade-offs of letting an LLM write on its own. The base `Memory` protocol has no hard delete, so `delete` only reports how many turns matched, and `str_replace` remembers a corrected copy next to the original. **Before any production use**, wrap them with a filter using cantus's existing hook mechanism:
+The four tools returned by `AutoMemory.tools` **let the LLM read and write memory by default**, with no built-in content filter. In a teaching setting that is intentional: students need to see the trade-offs of letting an LLM write on its own. The base `Memory` protocol has no hard delete, so `delete` only reports how many turns matched, and `str_replace` remembers a corrected copy next to the original. **Before any production use**, put a tool of your own in front of a memory tool and give the agent only the tools it needs:
 
 ```python
-from cantus import skill
-from cantus.protocols.memory import AutoMemory, MarkdownMemory
+from cantus import Agent, AutoMemory, ChatModelAsHandle, load_chat_model, tool
+from cantus.protocols.memory import MarkdownMemory
 
-def block_secrets(result):
-    # post_hook example: inspect what the tool returned, after the write happened
-    return result  # ... your filtering logic
-
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
 backend = MarkdownMemory("memo.md")
-auto = AutoMemory(backend=backend)
 
-# Replace the create tool with a wrapped version (keeping the other 3 tools)
-create_skill = auto.tools[1]
-create_skill._post_hook = block_secrets
+memory = AutoMemory(backend=backend)
+view, create, str_replace, delete = memory.tools
 
-from cantus.core.registry import get_registry
+@tool
+def remember(user: str, assistant: str) -> str:
+    """Save one turn, refusing anything that looks like a password."""
+    if "password" in f"{user} {assistant}".lower():
+        raise ValueError("refusing to store a password")
+    return create(user=user, assistant=assistant)
 
-for tool in auto.tools:
-    get_registry().register("skill", tool)  # the agent now offers all four
+agent = Agent(model, tools=[view, remember])
 ```
 
 ## EventStream JSON-Lines persistence
@@ -149,5 +148,5 @@ You should see, across the four blocks above:
 
 - **Forgetting to initialize the internal container in `__init__`**, so the first call to `recall` raises `AttributeError`.
 - **Assuming you can register with `@memory`**: the package surface raises ImportError directly. Use a class instead.
-- **Putting an LLM call inside `recall`**: memory should be pure retrieval. For summarization, split it into a skill or a workflow, then let memory store the result.
+- **Putting an LLM call inside `recall`**: memory should be pure retrieval. For summarization, split it into a tool or a workflow, then let memory store the result.
 - **Using `BM25Memory` or `EmbeddingMemory` without installing the extras**: at runtime you will be told to run `pip install 'cantus[memory]'`.

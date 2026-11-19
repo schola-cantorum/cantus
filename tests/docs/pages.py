@@ -32,7 +32,7 @@ IN_SCOPE_PAGES: tuple[str, ...] = (
     "core/agent.md",
     "core/event-stream.md",
     "core/inspector.md",
-    "protocols/skill.md",
+    "protocols/tool.md",
     "protocols/memory.md",
     "protocols/analyzer.md",
     "protocols/validator.md",
