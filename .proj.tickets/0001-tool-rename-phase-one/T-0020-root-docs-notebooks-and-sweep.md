@@ -2,7 +2,7 @@
 id: T-0020
 title: Root documents, notebooks and the rename sweep — the epic's last ticket
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0016, T-0018, T-0019]
 ---
 
