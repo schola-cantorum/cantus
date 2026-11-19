@@ -232,4 +232,13 @@ TUI 分頁叫 Tools、路由寫 `/tools`（R15）；channel 頁版本下限改 `
   `.scratch/T-0018/stage8/browser.md`. Not covered: a real `cantus serve` for the channel pages
   (R13), the platforms and worker loops (OQ-001, OQ-011), Python 3.10–3.12 page execution (the PR's
   CI), other browsers, keyboard and screen-reader behaviour.
+- **Open items at push (2026-11-19).** The user approved the push without answering these; they stay
+  as they are, for the retrospective or a later ticket: FB-01 (quickstart-desktop:127, :150 mix
+  provider function calling with the agent's tools; medium, pre-existing), FA-09 and FB-06 ("tool" /
+  工具 used for the Inspector, the CLI and a helper; the zh-tw quickstart-agent heading 「2. 工具」),
+  FA-05 (`@debug` prints `[debug] registered ...`; package behaviour), FB-12 (the interactive
+  manual's data under `docs/site/public/` still teaches `@skill`), SEC-T0018-5 (the channel pages'
+  `cantus serve` commands have no `--auth-mode`, so the registry's tools share the public tunnel;
+  pre-existing), S-05 (the approved test plan table lives only in `.scratch/`). Python 3.10–3.12
+  page execution is evidenced by the PR's CI run.
 
