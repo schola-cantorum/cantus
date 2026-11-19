@@ -2,7 +2,7 @@
 id: T-0017
 title: Documentation site — the Tool page and the protocol pages
 epic: 0001-tool-rename-phase-one
-status: processing
+status: review
 blocked_by: [T-0015]
 ---
 
@@ -133,3 +133,32 @@ identity 頁只修正「byte-identical」一句（D12）。Test plan 共 16 列�
   (relative to the page). T-0020: `tests/docs/test_parity.py:42,70` use `@skill` in synthetic
   samples (D7). The `[debug] registered <Class>` line printed for a Tool no registry holds is
   T-0014's "Left as they are" item (D6), unchanged.
+- **Stage 5 result (2026-11-19, code at `fd69cb3`).** Red runs were captured before the pages
+  existed: `red-part0.txt` (rows 1–3: the moved page had 56 non-blank lines, `protocols/tool.md`
+  missing), `scan-baseline-3edfb93.txt` (row 5: 21 files), `pagewarn-baseline-90e0ed3.txt` (row 6:
+  4 pages printed 13 cantus warnings), `debugcheck-red-naive-rename.txt` (row 7: a plain `@skill` →
+  `@tool` rename still fails on the stale `TypeError` line). The zh-tw href test
+  (`test_zh_tw_moved_page_links_where_the_english_one_does`) was green on arrival (both pages had
+  no link); the mutation check kills it. The main session wrote the English Tool page, the moved
+  page and `test_moved_page.py`; `harness-executor` wrote the rest in two runs (briefs
+  `executor-brief-A.md`, `executor-brief-B.md`); the main session reviewed both diffs and fixed one
+  wording slip in `analyzer.md` (`tool(**dict)`).
+- **Coverage report.** No package code changed, so line coverage does not apply; the measure is
+  which rows have evidence. Evidence files in `.scratch/T-0017/`.
+
+  | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
+  |---|---|---|---|---|
+  | moved page (en, zh-tw) | `tests/docs/test_moved_page.py` (3 tests), rows 1–2 | 3 passed; 14 mutations killed (`mutations.txt`) | AC-37/TR-135, TR-132 (moved page), V2-15 | — |
+  | Tool page (en, zh-tw) | `IN_SCOPE_PAGES` parametrised tests (well-formed, runs, parity, install pin), row 3; H2 | runner passes, 0 cantus warnings (`h2h3-stage5.txt`) | TR-131/132/134, R2-14, R2-15 | prose rows judged at stage 6 |
+  | self-check over touched files | H1 `scan2.py`, row 5 | `FILES FAILING: 0` over 33 files (`scan2-final.txt`); 12 H1 mutations killed | self-check, AC-37 | `supp` lines left on purpose: the anchor `#migrating-from-skill`, the moved page's path in `pages.py`, `test_moved_page.py`, `gen_docs_api.mjs` |
+  | executed protocol pages | H2 `pagewarn2.py`, row 6 | 5 pages, 0 warnings, `cantus.__file__` recorded | Deliverable | page execution on Python 3.10–3.12 could not run locally (below) |
+  | `@debug` output (en, zh-tw) | H3 `debugcheck.py`, row 7; parse mode, row 8 | 5/5 lines match on both pages; 8 pages parse; 5 H3 mutations killed | Deliverable | the four non-executed pages (adapters, debug, identity, serve) only parse |
+  | `docs/api` | `npm run docs:api`, row 9 | `docs/api/protocols/tool.md` tracked; no drift | TR-136 | — |
+  | navigation, build, anchors | `build-dist-checks.txt`, rows 10–11 | build exit 0; nav and sidebar point to `/protocols/tool` in both locales; `id="migrating-from-skill"` on both Tool pages; markers absent from the HTML | TR-134, AC-37 | the GitHub guide URL is 404 until T-0019 lands |
+  | TR-137 | row 12 | analyzer en, zh-tw, `docs/api`: `_dispatch_tool` 1, `_dispatch_skill` 0 | TR-137 | workflows per reading D1 |
+  | repository | row 14 (`pytest-full.txt`, `repo-checks.txt`) | 1851 passed, 3 skipped; ruff, mypy, `check_no_dev_paths.sh`, `verify-project.py` pass | ticket-rules §3 | — |
+  | Python 3.10–3.14 | row 15 (`matrix-tests-docs.txt`, `matrix-base-3edfb93.txt`) | 3.13, 3.14: 181 passed; 3.10–3.12: the ticket's tests pass, but every page-execution test fails locally, at `3edfb93` too (same 15 tests, the runner's socket patch breaks the `ssl` import on this macOS setup) | — | page execution on 3.10–3.12 is left to CI (green on `main` at `3edfb93`) |
+
+  One harness bug was found and fixed during the run: `debugcheck.py` resolved a relative
+  interpreter path from its temporary directory, which made every H3 run fail; after the fix the
+  controls pass and the H3 mutations are killed for the right reason.
