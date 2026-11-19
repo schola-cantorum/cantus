@@ -2,7 +2,7 @@
 id: T-0018
 title: Documentation site — core, cookbook, channels, quickstart and TUI pages
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0017]
 ---
 
