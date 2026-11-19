@@ -6,10 +6,10 @@
 
 ```
 +-----------------------------------------------------+
-|  User Code        @skill + Memory subclass + hook   |  <- decorator-first
+|  User Code        @tool + Memory subclass + hook    |  <- decorator-first
 |                   helpers (analyzer / validator)    |
 +-----------------------------------------------------+
-|  Protocols        skill | memory (two protocol      |  <- two kinds + hook
+|  Protocols        tool | memory (two protocol       |  <- two kinds + hook
 |                   kinds) + analyzer / validator     |     helpers + workflows
 |                   hook helpers + cantus.workflows   |     building blocks
 +-----------------------------------------------------+
@@ -20,19 +20,19 @@
 +-----------------------------------------------------+
 ```
 
-You write the top layer: plain Python functions registered as protocols through decorators. The framework supplies the two middle layers, the actual runtime. Underneath sits the environment, a model handle, a Drive mount, and stdout.
+You write the top layer: plain Python functions that decorators turn into protocol objects. The framework supplies the two middle layers, the actual runtime. Underneath sits the environment, a model handle, a Drive mount, and stdout.
 
 ## Two Protocol Kinds, Hook Helpers, and Workflow Building Blocks
 
 | Category                  | Role                                                                              | Return type        |
 | ------------------------- | --------------------------------------------------------------------------------- | ------------------ |
-| `skill` (protocol kind)   | A single atomic capability, such as a table lookup or an API call                 | Any value          |
+| `tool` (protocol kind)    | A single atomic capability, such as a table lookup or an API call                 | Any value          |
 | `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, plus the AutoMemory wrapper) | The relevant memory interface |
-| `analyzer` (hook helper)  | A skill's `pre_hook`: turns the skill's arguments into a structured value before its body runs | dataclass / dict   |
-| `validator` (hook helper) | A skill's `post_hook`: judges the skill's return value and can send feedback to the model | `Result(ok, ...)`  |
-| `cantus.workflows`        | A namespace of building blocks for composing skills and hooks into a flow         | Any value          |
+| `analyzer` (hook helper)  | A tool's `pre_hook`: turns the tool's arguments into a structured value before its body runs | dataclass / dict   |
+| `validator` (hook helper) | A tool's `post_hook`: judges the tool's return value and can send feedback to the model | `Result(ok, ...)`  |
+| `cantus.workflows`        | A namespace of building blocks for composing tools and hooks into a flow          | Any value          |
 
-cantus has exactly two protocol kinds: `skill` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they are attached to one skill and run around that skill's body, rather than being dispatched on their own. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Skill's `spec_for_llm()`; there is no separate `tool` category.
+cantus has exactly two protocol kinds: `tool` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they are attached to one tool and run around that tool's body when an agent calls it, rather than being dispatched on their own. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Tool's `spec_for_llm()`, so the callable protocol kind and the tools the model can call are the same thing.
 
 ## Model Providers
 
@@ -60,7 +60,7 @@ cantus can serve an agent over four messaging channels:
 ## Command-Line Tools
 
 - **`cantus serve`** exposes an agent as a FastAPI app. The app factory supports three auth modes (`none`, `bearer`, `api-key`) and ships read-only introspection endpoints so you can inspect a running session.
-- **`cantus tui`** is a Textual dashboard for watching sessions, skills, permissions, and the event stream from the terminal.
+- **`cantus tui`** is a Textual dashboard for watching sessions, tools, permissions, and the event stream from the terminal.
 
 ## Relationship to OpenHands, smolagents, and LangGraph
 
@@ -77,7 +77,7 @@ The core runtime is under 800 lines of Python and its only runtime dependency is
 - `quickstart-desktop.md`: the same on Windows, macOS or Linux, plus serving and tunnelling.
 - `quickstart-providers.md`: the same agent against each of the eight model APIs.
 - `quickstart-agent.md`: build an agent piece by piece — tools, identity, guardrail, memory.
-- `protocols/{skill,analyzer,validator,memory,debug}.md`: three entry-point examples and common pitfalls for the two protocol kinds (`skill` / `memory`) and the hook helpers (`analyzer` / `validator`); composition templates live in the `cantus.workflows` building blocks.
+- `protocols/{tool,analyzer,validator,memory,debug}.md`: three entry-point examples and common pitfalls for the two protocol kinds (`tool` / `memory`) and the hook helpers (`analyzer` / `validator`); composition templates live in the `cantus.workflows` building blocks.
 - `core/{agent,event-stream,inspector}.md`: the internal data structures of the runtime.
 - `cookbook/{patterns,errors,tips}.md`: common combinations and troubleshooting.
 - `llms.txt` (repository root): a priming document for external LLMs, explained in `docs/llms-txt.md` in the repository (not part of this site).

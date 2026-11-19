@@ -23,10 +23,10 @@ class Inspector:
 為了讓下面的 trace 在任何機器上都能重現，這個範例用一個「腳本模型」來驅動 agent：一個 `generate` 依序回傳固定回覆的物件。任何有 `generate(prompt) -> str` method 的物件都能當模型，所以最後把它換成真的模型即可。
 
 ```python
-from cantus import Agent, Inspector, skill
+from cantus import Agent, Inspector, tool
 
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """把兩個整數相加。"""
     return a + b
@@ -45,12 +45,12 @@ class ScriptedModel:
 
 
 model = ScriptedModel([
-    '{"thought": "add the first two", "action": {"skill_name": "add", "args": {"a": 3, "b": 4}}}',
-    '{"thought": "now add 5", "action": {"skill_name": "add", "args": {"a": 7, "b": 5}}}',
+    '{"thought": "add the first two", "action": {"tool_name": "add", "args": {"a": 3, "b": 4}}}',
+    '{"thought": "now add 5", "action": {"tool_name": "add", "args": {"a": 7, "b": 5}}}',
     '{"thought": "done", "action": {"final_answer": "3+4+5 = 12"}}',
 ])
 
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[add])
 state = agent.run("Please compute 3 + 4 + 5")
 
 # 印出整段 trace：每一步發生了哪個 Action / Observation
@@ -82,4 +82,4 @@ trace_str = buf.getvalue()           # 之後可以倒進檔案、上傳 wandb�
 
 ## 什麼時候才會自動冒出輸出
 
-只有在你「另外」用 `@debug` decorator 包了某個 protocol 時，trace 行才會在 run 進行的途中冒出來。要分清楚：這些行是 `@debug` 印的，不是 Inspector 印的。`@debug` 疊在一個 Skill（或一個 hook helper，像 analyzer、validator）上面，那個 protocol 每被呼叫一次，就吐一段結構化的 trace。Inspector 不一樣——它從頭到尾都不在 loop 裡，run 結束後你才把它拿出來讀。
+只有在你「另外」用 `@debug` decorator 包了某個 protocol 時，trace 行才會在 run 進行的途中冒出來。要分清楚：這些行是 `@debug` 印的，不是 Inspector 印的。`@debug` 疊在一個 Tool（或一個 hook helper，像 analyzer、validator）上面，那個 protocol 每被呼叫一次，就吐一段結構化的 trace。Inspector 不一樣——它從頭到尾都不在 loop 裡，run 結束後你才把它拿出來讀。

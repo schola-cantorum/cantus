@@ -9,21 +9,23 @@
 @dataclass
 class Agent:
     model: ModelHandle                    # any object with .generate(prompt) -> str
-    registry: Registry = field(default_factory=get_registry)   # defaults to the process-wide registry
+    tools: Registry                       # the tools it may call: Agent(model, tools=[...])
     soul: "Soul | None" = field(default=None, kw_only=True)    # optional system-prompt identity
 ```
+
+The constructor is `Agent(model, tools=None, *, soul=None)`. `tools=` takes a list of tools, which the agent copies into a new `Registry`, or a `Registry`, which it uses as it is; `agent.registry` returns that `Registry`. An agent created without `tools=` falls back to the global registry, which only legacy code fills (see [Migrating from the old names](../protocols/tool.md#migrating-from-skill)).
 
 `ModelHandle` is a `Protocol`. Its minimal interface only requires `generate(prompt: str, **kwargs) -> str`. The object returned by the Gemma 4 loader satisfies it out of the box, and tests can pass in a `MockModel` that matches the same protocol.
 
 ## `step(state) -> Action | Observation`
 
-`step` is the canonical single-step decision function. It takes an `AgentState`, builds a prompt, hands it to the model, and parses the model's reply into a `CallSkillAction` or a `FinalAnswerAction`.
+`step` is the canonical single-step decision function. It takes an `AgentState`, builds a prompt, hands it to the model, and parses the model's reply into a `CallToolAction` or a `FinalAnswerAction`.
 
 When the reply is not valid JSON — or when it parses but fails a check — `step` does **not** silently fall back to `FinalAnswerAction(answer=raw)`. Instead it returns a `ValidationErrorObservation`, so the loop never invents an answer out of unparseable text. The parse path enforces these cases:
 
 - malformed JSON → `validator_name="action_parse"`, `error_type: json_syntax`
-- the `action` object is missing both `skill_name` and `final_answer` → `validator_name="action_parse"`, `error_type: missing_field`
-- a `skill_name` is present but not in the current (non-empty) registry → `validator_name="action_parse"`, `error_type: unknown_skill`
+- the `action` object is missing both `tool_name` and `final_answer` → `validator_name="action_parse"`, `error_type: missing_field`
+- a `tool_name` is present but not in the current (non-empty) registry → `validator_name="action_parse"`, `error_type: unknown_tool`
 - a `final_answer` is present but empty after `str.strip()` → `validator_name="non_empty_final_answer"`
 
 Because `step` can return either branch, callers must handle both an `Action` and an `Observation`. The run loop appends whichever one it gets straight onto the EventStream.
@@ -39,7 +41,7 @@ state = agent.run("What's the weather in Taipei on 8/15?")
 print(type(state.stream[-1]).__name__)
 ```
 
-With no skill registered, the model has nothing to call and answers directly, so the last event on the stream is the final answer. You should see:
+With no tools given, the model has nothing to call and answers directly, so the last event on the stream is the final answer. You should see:
 
 ```text
 FinalAnswerAction
@@ -51,7 +53,7 @@ The first positional parameter is named `workflow_or_query` for forward compatib
 
 1. Call `step()` to get an `Action` (or `Observation`) and append it to the stream.
 2. If it is a `FinalAnswerAction` → return immediately.
-3. If it is a `CallSkillAction` → dispatch it through the registry, wrap the return value as an `Observation`, and append that to the stream.
+3. If it is a `CallToolAction` → dispatch it through the registry, wrap the return value as an `Observation`, and append that to the stream.
 4. If the result is a `ValidationErrorObservation` → nothing is re-run automatically; the observation stays on the stream, and the next round shows the LLM the feedback so it can correct itself.
 5. If `max_iterations` is reached without a `FinalAnswerAction` → append a `MaxIterationsObservation` and return.
 
@@ -61,8 +63,8 @@ The default budgets are `max_iterations=8` and `max_retries=3`. Only `max_iterat
 
 | Observation                    | Triggered when                          | Message the LLM sees                                  |
 | ------------------------------ | --------------------------------------- | ----------------------------------------------------- |
-| `ToolErrorObservation`         | a skill or one of its hooks raises, or the arguments fail validation | the exception type and message |
-| `ValidationErrorObservation`   | a validator returns `Result(ok=False)`, or the model's reply fails to parse (including an unknown skill name) | the `feedback` string; the model decides what to do next round |
+| `ToolErrorObservation`         | a tool or one of its hooks raises, or the arguments fail validation | the exception type and message |
+| `ValidationErrorObservation`   | a validator returns `Result(ok=False)`, or the model's reply fails to parse (including an unknown tool name) | the `feedback` string; the model decides what to do next round |
 | `MaxIterationsObservation`     | `max_iterations` is reached             | `iterations`, `last_action_summary`, and a deep-copied `partial_state`; the loop ends |
 
 Every error goes onto the stream; none of them escapes as an exception. This is a hard guarantee of the framework: `agent.run` either returns an `AgentState`, or it raises only because of a caller bug (such as `model=None`).

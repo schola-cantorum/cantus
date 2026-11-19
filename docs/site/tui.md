@@ -28,9 +28,9 @@ On startup the screen is a `TabbedContent` with five tabs. Press number keys `1`
 | Key | Tab | What it shows |
 | --- | --- | --- |
 | `1` | **Dashboard** | The main overview. On the left, a Sessions list (the most recently dispatched runs). On the right, Queue (the queue depth per channel) and Health (whether the server is reachable, plus `cantus_version`) stacked top to bottom |
-| `2` | **Skills** | The name, description, and argument names of every registered Skill. A skill that an in-flight run is currently using is marked |
+| `2` | **Tools** | The name, description, and argument names of every tool the server holds. A tool that an in-flight run is currently using is marked |
 | `3` | **Permissions** | The effective authentication settings: `auth_mode`, the `dashboard_requires_auth` / `introspection_requires_auth` flags, and the list of paths behind the auth gate. Token values are **never** shown |
-| `4` | **Dataflow** | The static component topology derived from the registry and channels (nodes and edges: serve, the event stream, each skill, each channel) |
+| `4` | **Dataflow** | The static component topology derived from the registry and channels (nodes and edges: serve, the event stream, each tool, each channel) |
 | `5` | **Inspector** | The Action/Observation step trace for a single run (drilled in from a Sessions row; see below) |
 
 ## Key bindings
@@ -43,7 +43,7 @@ On startup the screen is a `TabbedContent` with five tabs. Press number keys `1`
 | `p` | Pause / resume auto-refresh (when paused, the subtitle shows `PAUSED`) |
 | `q` | Quit |
 
-The workflow step `summary` shown in the Inspector is a **structural projection** that the server has already sanitized. It contains only the skill name, the argument **key names**, and the result **type name**. It **never** contains argument values, result values, or raw exception messages. So even when you connect to a publicly exposed server, the Inspector will not surface secrets or PII.
+The workflow step `summary` shown in the Inspector is a **structural projection** that the server has already sanitized. It contains only the tool name, the argument **key names**, and the result **type name**. It **never** contains argument values, result values, or raw exception messages. So even when you connect to a publicly exposed server, the Inspector will not surface secrets or PII.
 
 ## The three authentication modes
 

@@ -21,11 +21,11 @@ class EventStream:
 You can build a stream by hand to see the contract without running an agent:
 
 ```python
-from cantus import EventStream, CallSkillAction, SkillObservation
+from cantus import EventStream, CallToolAction, ToolObservation
 
 stream = EventStream()
-stream.append(CallSkillAction(thought="add them", skill_name="add", args={"a": 1, "b": 2}))
-stream.append(SkillObservation(skill_name="add", result=3))
+stream.append(CallToolAction(thought="add them", tool_name="add", args={"a": 1, "b": 2}))
+stream.append(ToolObservation(tool_name="add", result=3))
 print(len(stream))
 print(stream.replay())
 
@@ -48,24 +48,24 @@ Every `Action` is a `frozen` dataclass. Once it has run, it cannot be changed, s
 
 ```
 Action (base, thought: str)
-├── CallSkillAction(skill_name: str, args: dict)
+├── CallToolAction(tool_name: str, args: dict)
 └── FinalAnswerAction(answer: str)
 ```
 
-- `CallSkillAction` is the LLM deciding to "call a particular protocol".
+- `CallToolAction` is the LLM deciding to "call a particular tool".
 - `FinalAnswerAction` is the LLM deciding "that's enough, answer the user" and terminating the loop.
 
 ## The Observation hierarchy
 
 ```
 Observation (base, frozen)
-├── SkillObservation(skill_name, result)              # Success
-├── ToolErrorObservation(skill_name, message)         # Skill, hook or argument validation failed
+├── ToolObservation(tool_name, result)                # Success
+├── ToolErrorObservation(tool_name, message)          # Tool, hook or argument validation failed
 ├── ValidationErrorObservation(validator_name, feedback)  # Feedback for the model's next turn
 └── MaxIterationsObservation(iterations, last_action_summary, partial_state)  # Loop ran to its bound
 ```
 
-Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, when the model names a skill that is not registered, the `ValidationErrorObservation.feedback` lists the available skill names so the model can correct its own typo.
+Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, when the model names a tool the agent does not have, the `ValidationErrorObservation.feedback` lists the available tool names so the model can correct its own typo.
 
 ## Why frozen
 

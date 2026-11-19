@@ -7,13 +7,13 @@ The cell below goes from `import` to a printed answer. It loads Gemma 4 by defau
 ## Full Example
 
 ```python
-from cantus import skill, Agent, mount_drive_and_load
+from cantus import tool, Agent, mount_drive_and_load
 
 # 1. Load Gemma 4 (mounts Google Drive automatically to reach the cache)
 model = mount_drive_and_load(variant="E2B")  # or "E4B"
 
-# 2. Write a skill: every skill is a plain Python function
-@skill
+# 2. Write a tool: a plain Python function turned into a tool with @tool
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers.
 
@@ -23,11 +23,11 @@ def add(a: int, b: int) -> int:
     """
     return a + b
 
-# 3. To chain skills into a flow, use a cantus.workflows building block.
-#    This example shows a single skill; see the cookbook for composition.
+# 3. To chain tools into a flow, use a cantus.workflows building block.
+#    This example shows a single tool; see the cookbook for composition.
 
-# 4. Hand the model handle to Agent, then start the loop with a natural-language query
-agent = Agent(model=model)
+# 4. Hand the model handle and the tools to Agent, then start the loop with a natural-language query
+agent = Agent(model=model, tools=[add])
 state = agent.run("Please compute 3 + 4 + 5 and report the result back to me")
 
 # 5. Print the result (state.stream is the complete EventStream)
@@ -49,6 +49,6 @@ Inspector(state.stream).summary()     # print action / observation statistics
 
 - `max_iterations=8`: the loop runs at most 8 steps, so a confused model stops instead of looping indefinitely.
 - `max_retries=3`: accepted, but it does not bound the loop today. When a validator returns `Result(ok=False)`, the feedback goes back to the model, which decides what to try next; each attempt uses one of the `max_iterations`.
-- An exception raised by a skill (including a workflow you call from inside a skill) becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
+- An exception raised by a tool (including a workflow you call from inside a tool) becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
 
-That single cell is the whole loop in miniature. Read it, then the channels, serving, and memory chapters are variations on the same three pieces: a model handle, a skill, and an EventStream you can replay.
+That single cell is the whole loop in miniature. Read it, then the channels, serving, and memory chapters are variations on the same three pieces: a model handle, a tool, and an EventStream you can replay.

@@ -34,8 +34,8 @@ class ScriptedModel:
 
 
 def call(name, **args):
-    """The reply a model gives when it wants to call a skill."""
-    return {"thought": "use a tool", "action": {"skill_name": name, "args": args}}
+    """The reply a model gives when it wants to call a tool."""
+    return {"thought": "use a tool", "action": {"tool_name": name, "args": args}}
 
 
 def answer(text):
@@ -43,19 +43,19 @@ def answer(text):
     return {"thought": "done", "action": {"final_answer": text}}
 ```
 
-Those two JSON shapes are the whole contract between a model and the agent loop: either call a skill by name with arguments, or give a final answer. A real model produces the same JSON; here you write it by hand, so you see exactly what the loop reacts to.
+Those two JSON shapes are the whole contract between a model and the agent loop: either call a tool by name with arguments, or give a final answer. A real model produces the same JSON; here you write it by hand, so you see exactly what the loop reacts to.
 
 ## 2. Tools
 
-A skill is a typed Python function with a docstring. `@skill` registers it, and the agent shows its name, description and argument schema to the model.
+A tool is a typed Python function with a docstring, turned into a tool with `@tool`. `@tool` builds the tool and adds it nowhere: you hand the tools to the agent in the next step, and the agent shows each one's name, description and argument schema to the model.
 
 ```python
-from cantus import skill
+from cantus import tool
 
 MENU = {"noodles": 60, "tea": 25}
 
 
-@skill
+@tool
 def menu_price(item: str) -> int:
     """Look up the price of one canteen item.
 
@@ -65,7 +65,7 @@ def menu_price(item: str) -> int:
     return MENU.get(item, 0)
 
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers.
 
@@ -76,12 +76,12 @@ def add(a: int, b: int) -> int:
     return a + b
 
 
-print(menu_price("tea"))  # a skill is still a plain function
+print(menu_price("tea"))  # a tool is still callable by hand
 ```
 
 ## 3. The loop
 
-Hand the model to `Agent` and call `run`. The agent builds a prompt, asks the model, runs the skill the model named, feeds the result back, and repeats until the model gives a final answer.
+Hand the model and the tools to `Agent` and call `run`. The agent builds a prompt, asks the model, runs the tool the model named, feeds the result back, and repeats until the model gives a final answer.
 
 ```python
 from cantus import Agent
@@ -92,7 +92,7 @@ model = ScriptedModel([
     call("add", a=60, b=25),
     answer("Noodles and tea cost 85 dollars."),
 ])
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[menu_price, add])
 state = agent.run("How much are noodles and tea together?")
 
 for event in state.stream:
@@ -100,7 +100,7 @@ for event in state.stream:
 print(state.stream[-1].answer)
 ```
 
-`state.stream` is the `EventStream`: every decision the model made (an `Action`) and everything that came back (an `Observation`), in order. Three skill calls and one final answer make seven events.
+`state.stream` is the `EventStream`: every decision the model made (an `Action`) and everything that came back (an `Observation`), in order. Three tool calls and one final answer make seven events.
 
 ## 4. An identity
 
@@ -131,14 +131,14 @@ Send refund questions to the canteen office.
 """)
 
 model = ScriptedModel([answer("Hello! Ask me about the menu.")])
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 agent.run("Who are you?")
 print(model.prompts[0].splitlines()[0])  # the prompt now opens with the soul
 ```
 
 ## 5. A guardrail
 
-A validator is a hook that checks a skill's result before the model sees it. When it fails, the agent records a `ValidationErrorObservation` carrying your feedback instead of the result, and the model gets another turn to correct itself.
+A validator is a hook that checks a tool's result before the model sees it. When it fails, the agent records a `ValidationErrorObservation` carrying your feedback instead of the result, and the model gets another turn to correct itself.
 
 ```python
 from cantus.hooks import Result, validator
@@ -152,7 +152,7 @@ def known_item(price: int) -> Result:
     return Result.failure("That item is not on the menu. Ask for noodles or tea.")
 
 
-@skill(post_hook=known_item)
+@tool(post_hook=known_item)
 def menu_price(item: str) -> int:
     """Look up the price of one canteen item.
 
@@ -167,12 +167,12 @@ model = ScriptedModel([
     call("menu_price", item="tea"),
     answer("Pizza is not on the menu; tea is 25 dollars."),
 ])
-state = Agent(model=model).run("How much is pizza?")
+state = Agent(model=model, tools=[menu_price, add]).run("How much is pizza?")
 print([type(event).__name__ for event in state.stream][1])
 print(state.stream[1].feedback)
 ```
 
-Registering `menu_price` again replaces the earlier skill of the same name, so the agent now uses the guarded one.
+The second `def menu_price` rebinds the name `menu_price` in your script to the guarded tool, so this agent and every agent built after it get the guarded one.
 
 ## 6. Memory
 
@@ -200,7 +200,7 @@ model = ScriptedModel([
     answer("Nice to meet you, Mei."),
     answer("Your name is Mei."),
 ])
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 chat(agent, "My name is Mei.")
 print(chat(agent, "What is my name?"))
 print("My name is Mei." in model.prompts[-1])  # the second prompt carries the first turn
@@ -233,13 +233,13 @@ Everything above stays the same when the model is real. Only the model handle ch
 from cantus import ChatModelAsHandle, load_chat_model
 
 model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 print(chat(agent, "How much is tea?"))
 ```
 
 `load_chat_model` needs the provider's extra and an API key; [Quickstart (Model APIs)](./quickstart-providers.md) lists the install command, key and model spec for each of the eight providers, including the local ones that need no key. On Colab, `mount_drive_and_load()` from the [Colab quickstart](./quickstart.md) returns a model handle you can pass to `Agent` directly.
 
-A real model writes its own replies, so it can do what the script never did: call the wrong skill, pass a bad argument, or answer with nothing. The loop turns each of those into an observation the model reads on its next turn. To see what happened in a run, replay it:
+A real model writes its own replies, so it can do what the script never did: call the wrong tool, pass a bad argument, or answer with nothing. The loop turns each of those into an observation the model reads on its next turn. To see what happened in a run, replay it:
 
 ```python
 from cantus import Inspector
@@ -251,6 +251,6 @@ Inspector(state.stream).replay()   # every event, one per line
 ## Where to go next
 
 - [Agent loop](./core/agent.md) — the loop's budgets (`max_iterations`, `max_retries`) and its three error paths.
-- [Skill](./protocols/skill.md), [Validator](./protocols/validator.md), [Memory](./protocols/memory.md), [Identity (Soul)](./protocols/identity.md) — each piece on this page in full.
-- [Workflows](./protocols/workflows.md) — chain, route and parallelise skills without a model in the loop.
-- [Serve (HTTP)](./protocols/serve.md) and the [channel cookbooks](./channels/line.md) — put skills behind an HTTP server, then wire a chat platform's messages to your agent.
+- [Tool](./protocols/tool.md), [Validator](./protocols/validator.md), [Memory](./protocols/memory.md), [Identity (Soul)](./protocols/identity.md) — each piece on this page in full.
+- [Workflows](./protocols/workflows.md) — chain, route and parallelise tools without a model in the loop.
+- [Serve (HTTP)](./protocols/serve.md) and the [channel cookbooks](./channels/line.md) — put tools behind an HTTP server, then wire a chat platform's messages to your agent.

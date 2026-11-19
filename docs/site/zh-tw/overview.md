@@ -6,10 +6,10 @@
 
 ```
 +-----------------------------------------------------+
-|  User Code        @skill + Memory subclass + hook   |  <- decorator-first
+|  User Code        @tool + Memory subclass + hook    |  <- decorator-first
 |                   helpers (analyzer / validator)    |
 +-----------------------------------------------------+
-|  Protocols        skill | memory (two protocol      |  <- two kinds + hook
+|  Protocols        tool | memory (two protocol       |  <- two kinds + hook
 |                   kinds) + analyzer / validator     |     helpers + workflows
 |                   hook helpers + cantus.workflows   |     building blocks
 +-----------------------------------------------------+
@@ -20,19 +20,19 @@
 +-----------------------------------------------------+
 ```
 
-你負責寫的是最上層：用 decorator 把一般的 Python function 註冊成 protocol。框架替你補上中間兩層，也就是真正的 runtime。再往下是環境本身：一個 model handle、一個掛載好的 Drive，還有 stdout。
+你負責寫的是最上層：用 decorator 把一般的 Python function 變成 protocol 物件。框架替你補上中間兩層，也就是真正的 runtime。再往下是環境本身：一個 model handle、一個掛載好的 Drive，還有 stdout。
 
 ## 兩個 Protocol Kind、Hook Helper 與 Workflow Building Block
 
 | 類別                       | 角色                                                                              | 回傳型別          |
 | -------------------------- | --------------------------------------------------------------------------------- | ----------------- |
-| `skill`（protocol kind）   | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
+| `tool`（protocol kind）   | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
 | `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory、MarkdownMemory，加上 AutoMemory 包裝）            | 對應的 memory 介面 |
-| `analyzer`（hook helper）  | 掛在某個 skill 上的 `pre_hook`：在 skill 本體執行前，把引數轉成結構化的值 | dataclass / dict  |
-| `validator`（hook helper） | 掛在某個 skill 上的 `post_hook`：判斷 skill 的回傳值，並可把 feedback 送回給模型 | `Result(ok, ...)` |
-| `cantus.workflows`         | 一個命名空間，裡面放的是把 skill 與 hook 組合成流程的 building block               | 任意值            |
+| `analyzer`（hook helper）  | 掛在某個 tool 上的 `pre_hook`：在 tool 本體執行前，把引數轉成結構化的值 | dataclass / dict  |
+| `validator`（hook helper） | 掛在某個 tool 上的 `post_hook`：判斷 tool 的回傳值，並可把 feedback 送回給模型 | `Result(ok, ...)` |
+| `cantus.workflows`         | 一個命名空間，裡面放的是把 tool 與 hook 組合成流程的 building block               | 任意值            |
 
-cantus 剛好只有兩個 protocol kind：`skill`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們掛在某一個 skill 上，在那個 skill 本體的前後執行，而不是自己被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Skill 的 `spec_for_llm()`；沒有另外的 `tool` 類別。
+cantus 剛好只有兩個 protocol kind：`tool`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們掛在某一個 tool 上，在 agent 呼叫那個 tool 時於其本體的前後執行，而不是自己被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Tool 的 `spec_for_llm()`，所以「可呼叫的 protocol kind」與「模型能呼叫的 tool」是同一件事。
 
 ## Model Provider
 
@@ -60,7 +60,7 @@ cantus 可以把一個 agent 透過四種訊息通道對外服務：
 ## 命令列工具
 
 - **`cantus serve`** 把一個 agent 變成 FastAPI app。這個 app factory 支援三種 auth 模式（`none`、`bearer`、`api-key`），並內建唯讀的 introspection 端點，讓你能檢視正在跑的 session。
-- **`cantus tui`** 是一個 Textual 儀表板，讓你直接在終端機裡盯著 session、skill、權限與 event stream 的動態。
+- **`cantus tui`** 是一個 Textual 儀表板，讓你直接在終端機裡盯著 session、tool、權限與 event stream 的動態。
 
 ## 與 OpenHands、smolagents、LangGraph 的關係
 
@@ -77,7 +77,7 @@ cantus 可以把一個 agent 透過四種訊息通道對外服務：
 - `quickstart-desktop.md`：在 Windows、macOS 或 Linux 上做同一件事，外加 serve 與 tunnel。
 - `quickstart-providers.md`：同一個 agent，換上八種模型 API 各跑一次。
 - `quickstart-agent.md`：一塊一塊把 agent 組起來——工具、身分、防護、記憶。
-- `protocols/{skill,analyzer,validator,memory,debug}.md`：兩個 protocol kind（`skill` / `memory`）與兩個 hook helper（`analyzer` / `validator`）的三個入口範例與常見陷阱；組合用的範本則住在 `cantus.workflows` 的 building block 裡。
+- `protocols/{tool,analyzer,validator,memory,debug}.md`：兩個 protocol kind（`tool` / `memory`）與兩個 hook helper（`analyzer` / `validator`）的三個入口範例與常見陷阱；組合用的範本則住在 `cantus.workflows` 的 building block 裡。
 - `core/{agent,event-stream,inspector}.md`：runtime 內部的資料結構。
 - `cookbook/{patterns,errors,tips}.md`：常見的組合方式與排錯。
 - `llms.txt`（repository 根目錄）：給外部 LLM 讀的引導文件，說明在 repository 的 `docs/llms-txt.md`（不屬於這個網站）。

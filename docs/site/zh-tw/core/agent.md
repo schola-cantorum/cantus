@@ -9,21 +9,23 @@
 @dataclass
 class Agent:
     model: ModelHandle                    # 任何具備 .generate(prompt) -> str 的物件
-    registry: Registry = field(default_factory=get_registry)   # 預設取整個 process 共用的 registry
+    tools: Registry                       # 它可以呼叫的 tool：Agent(model, tools=[...])
     soul: "Soul | None" = field(default=None, kw_only=True)    # 選用：用 system prompt 表達身分
 ```
+
+建構式是 `Agent(model, tools=None, *, soul=None)`。`tools=` 可以給一個 tool 的 list，agent 會把它們複製進一個新的 `Registry`；也可以給一個 `Registry`，agent 就直接使用它；`agent.registry` 回傳的就是這個 `Registry`。沒有給 `tools=` 所建立的 agent 會退回使用全域 registry，而那個 registry 只有舊版程式碼才會往裡面放東西（見[從舊名稱遷移](../protocols/tool.md#migrating-from-skill)）。
 
 `ModelHandle` 是一個 `Protocol`，最小介面只要求 `generate(prompt: str, **kwargs) -> str`。Gemma 4 loader 回傳的物件天生就符合這個介面；測試時則可以塞一個同樣符合這份 protocol 的 `MockModel` 進來。
 
 ## `step(state) -> Action | Observation`
 
-`step` 是那個正規的「單步決策函式」。它收下一個 `AgentState`，組出 prompt，丟給 model，再把 model 的回覆解析成 `CallSkillAction` 或 `FinalAnswerAction`。
+`step` 是那個正規的「單步決策函式」。它收下一個 `AgentState`，組出 prompt，丟給 model，再把 model 的回覆解析成 `CallToolAction` 或 `FinalAnswerAction`。
 
 當回覆不是合法 JSON——或是雖然解析得出來，卻沒通過檢查——`step` **不會**默默退回成 `FinalAnswerAction(answer=raw)`。它改為回傳一筆 `ValidationErrorObservation`，這樣迴圈就絕不會從一段無法解析的文字裡硬掰出一個答案。解析這條路徑會嚴格區分以下幾種情況：
 
 - JSON 格式錯誤 → `validator_name="action_parse"`、`error_type: json_syntax`
-- `action` 物件裡 `skill_name` 與 `final_answer` 兩者都缺 → `validator_name="action_parse"`、`error_type: missing_field`
-- 有給 `skill_name`，但它不在目前（非空）的 registry 裡 → `validator_name="action_parse"`、`error_type: unknown_skill`
+- `action` 物件裡 `tool_name` 與 `final_answer` 兩者都缺 → `validator_name="action_parse"`、`error_type: missing_field`
+- 有給 `tool_name`，但它不在目前（非空）的 registry 裡 → `validator_name="action_parse"`、`error_type: unknown_tool`
 - 有給 `final_answer`，但經過 `str.strip()` 後是空字串 → `validator_name="non_empty_final_answer"`
 
 正因為 `step` 可能回傳兩種分支，呼叫端必須同時處理 `Action` 與 `Observation`。run 迴圈不管拿到哪一種，都會直接把它 append 到 EventStream 上。
@@ -39,7 +41,7 @@ state = agent.run("What's the weather in Taipei on 8/15?")
 print(type(state.stream[-1]).__name__)
 ```
 
-沒有註冊任何 skill 時，模型無事可叫，只能直接作答，所以 stream 的最後一個事件就是 final answer。你應該看到：
+沒有給任何 tool 時，模型無事可叫，只能直接作答，所以 stream 的最後一個事件就是 final answer。你應該看到：
 
 ```text
 FinalAnswerAction
@@ -51,7 +53,7 @@ FinalAnswerAction
 
 1. 呼叫 `step()` 取得一筆 `Action`（或 `Observation`），append 進 stream。
 2. 如果它是 `FinalAnswerAction` → 立刻 return。
-3. 如果它是 `CallSkillAction` → 透過 registry 把它 dispatch 出去，把回傳值包成一筆 `Observation`，再 append 進 stream。
+3. 如果它是 `CallToolAction` → 透過 registry 把它 dispatch 出去，把回傳值包成一筆 `Observation`，再 append 進 stream。
 4. 如果結果是 `ValidationErrorObservation` → 不會自動重跑任何東西；這個 observation 留在 stream 上，下一輪會把 feedback 攤給 LLM 看，讓它自己修正。
 5. 如果跑滿 `max_iterations` 都還沒收到 `FinalAnswerAction` → append 一筆 `MaxIterationsObservation` 後 return。
 
@@ -61,8 +63,8 @@ FinalAnswerAction
 
 | Observation                    | 觸發時機                          | LLM 會看到的訊息                                  |
 | ------------------------------ | --------------------------------------- | ----------------------------------------------------- |
-| `ToolErrorObservation`         | 某個 skill 或它的 hook 拋出例外，或引數驗證失敗 | 例外的型別與訊息 |
-| `ValidationErrorObservation`   | 某個 validator 回傳 `Result(ok=False)`，或模型的回覆解析失敗（包含 skill 名稱不存在） | 那段 `feedback` 字串；下一輪由模型自己決定怎麼做 |
+| `ToolErrorObservation`         | 某個 tool 或它的 hook 拋出例外，或引數驗證失敗 | 例外的型別與訊息 |
+| `ValidationErrorObservation`   | 某個 validator 回傳 `Result(ok=False)`，或模型的回覆解析失敗（包含 tool 名稱不存在） | 那段 `feedback` 字串；下一輪由模型自己決定怎麼做 |
 | `MaxIterationsObservation`     | 跑滿 `max_iterations`             | `iterations`、`last_action_summary`，以及一份深拷貝的 `partial_state`；迴圈到此結束 |
 
 每一筆錯誤都會進到 stream，沒有任何一筆會以 exception 的形式跳出來。這是框架的硬性承諾：`agent.run` 要嘛回傳一個 `AgentState`，要嘛就只因為呼叫端自己的 bug（例如 `model=None`）才會 raise。

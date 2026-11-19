@@ -34,8 +34,8 @@ class ScriptedModel:
 
 
 def call(name, **args):
-    """模型想呼叫某個 skill 時給的回覆。"""
-    return {"thought": "use a tool", "action": {"skill_name": name, "args": args}}
+    """模型想呼叫某個 tool 時給的回覆。"""
+    return {"thought": "use a tool", "action": {"tool_name": name, "args": args}}
 
 
 def answer(text):
@@ -43,19 +43,19 @@ def answer(text):
     return {"thought": "done", "action": {"final_answer": text}}
 ```
 
-這兩種 JSON 形狀就是模型與 agent loop 之間的全部約定：要嘛用名稱加引數呼叫一個 skill，要嘛給出最終答案。真正的模型產生的也是同樣的 JSON；這裡由你親手寫，所以你能清楚看到 loop 是對什麼做出反應。
+這兩種 JSON 形狀就是模型與 agent loop 之間的全部約定：要嘛用名稱加引數呼叫一個 tool，要嘛給出最終答案。真正的模型產生的也是同樣的 JSON；這裡由你親手寫，所以你能清楚看到 loop 是對什麼做出反應。
 
 ## 2. 工具
 
-skill 就是一個有型別標註、有 docstring 的 Python 函式。`@skill` 會把它註冊起來，agent 再把它的名稱、說明與引數 schema 給模型看。
+tool 就是一個有型別標註、有 docstring 的 Python 函式，用 `@tool` 把它變成 tool。`@tool` 只負責建立 tool，不會把它加到任何地方：你要在下一步把 tool 交給 agent，agent 再把每個 tool 的名稱、說明與引數 schema 給模型看。
 
 ```python
-from cantus import skill
+from cantus import tool
 
 MENU = {"noodles": 60, "tea": 25}
 
 
-@skill
+@tool
 def menu_price(item: str) -> int:
     """查詢福利社某一樣品項的價格。
 
@@ -65,7 +65,7 @@ def menu_price(item: str) -> int:
     return MENU.get(item, 0)
 
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """把兩個整數相加。
 
@@ -76,12 +76,12 @@ def add(a: int, b: int) -> int:
     return a + b
 
 
-print(menu_price("tea"))  # skill 仍然是一個普通函式
+print(menu_price("tea"))  # tool 仍然可以自己直接呼叫
 ```
 
 ## 3. Loop
 
-把模型交給 `Agent`，再呼叫 `run`。agent 會組出 prompt、問模型、執行模型點名的 skill、把結果餵回去，如此重複，直到模型給出最終答案。
+把模型和 tool 交給 `Agent`，再呼叫 `run`。agent 會組出 prompt、問模型、執行模型點名的 tool、把結果餵回去，如此重複，直到模型給出最終答案。
 
 ```python
 from cantus import Agent
@@ -92,7 +92,7 @@ model = ScriptedModel([
     call("add", a=60, b=25),
     answer("Noodles and tea cost 85 dollars."),
 ])
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[menu_price, add])
 state = agent.run("How much are noodles and tea together?")
 
 for event in state.stream:
@@ -100,7 +100,7 @@ for event in state.stream:
 print(state.stream[-1].answer)
 ```
 
-`state.stream` 就是 `EventStream`：模型做的每一個決定（`Action`）和每一個回來的結果（`Observation`），依序排列。三次 skill 呼叫加一個最終答案，一共七個事件。
+`state.stream` 就是 `EventStream`：模型做的每一個決定（`Action`）和每一個回來的結果（`Observation`），依序排列。三次 tool 呼叫加一個最終答案，一共七個事件。
 
 ## 4. 身分
 
@@ -131,14 +131,14 @@ Send refund questions to the canteen office.
 """)
 
 model = ScriptedModel([answer("Hello! Ask me about the menu.")])
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 agent.run("Who are you?")
 print(model.prompts[0].splitlines()[0])  # prompt 現在以 soul 開頭
 ```
 
 ## 5. 防護
 
-validator 是一個 hook，會在模型看到 skill 的結果之前先檢查它。檢查不過時，agent 記下的是一個帶著你那段 feedback 的 `ValidationErrorObservation`，而不是原本的結果；模型會再得到一輪機會自己修正。
+validator 是一個 hook，會在模型看到 tool 的結果之前先檢查它。檢查不過時，agent 記下的是一個帶著你那段 feedback 的 `ValidationErrorObservation`，而不是原本的結果；模型會再得到一輪機會自己修正。
 
 ```python
 from cantus.hooks import Result, validator
@@ -152,7 +152,7 @@ def known_item(price: int) -> Result:
     return Result.failure("That item is not on the menu. Ask for noodles or tea.")
 
 
-@skill(post_hook=known_item)
+@tool(post_hook=known_item)
 def menu_price(item: str) -> int:
     """查詢福利社某一樣品項的價格。
 
@@ -167,12 +167,12 @@ model = ScriptedModel([
     call("menu_price", item="tea"),
     answer("Pizza is not on the menu; tea is 25 dollars."),
 ])
-state = Agent(model=model).run("How much is pizza?")
+state = Agent(model=model, tools=[menu_price, add]).run("How much is pizza?")
 print([type(event).__name__ for event in state.stream][1])
 print(state.stream[1].feedback)
 ```
 
-再註冊一次 `menu_price` 會取代先前同名的 skill，所以 agent 現在用的是有防護的那一個。
+第二個 `def menu_price` 會把你腳本裡的 `menu_price` 這個名稱重新綁定到有防護的 tool，所以這個 agent 和之後建立的每個 agent 用的都是有防護的那一個。
 
 ## 6. 記憶
 
@@ -200,7 +200,7 @@ model = ScriptedModel([
     answer("Nice to meet you, Mei."),
     answer("Your name is Mei."),
 ])
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 chat(agent, "My name is Mei.")
 print(chat(agent, "What is my name?"))
 print("My name is Mei." in model.prompts[-1])  # 第二個 prompt 帶著第一輪的內容
@@ -233,13 +233,13 @@ True
 from cantus import ChatModelAsHandle, load_chat_model
 
 model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
-agent = Agent(model=model, soul=soul)
+agent = Agent(model=model, tools=[menu_price, add], soul=soul)
 print(chat(agent, "How much is tea?"))
 ```
 
 `load_chat_model` 需要該 provider 的 extra 和一把 API key；[Quickstart（模型 API）](./quickstart-providers.md)列出八個 provider 各自的安裝指令、key 與 model spec，包含不需要 key 的本機後端。在 Colab 上，[Colab 版 Quickstart](./quickstart.md) 的 `mount_drive_and_load()` 回傳的就是可以直接交給 `Agent` 的 model handle。
 
-真正的模型會自己寫回覆，所以它會做出腳本從來不會做的事：點錯 skill、傳錯引數，或是什麼都沒回答。loop 會把這些情況各自變成一個 observation，讓模型在下一輪讀到。想知道一次 run 裡發生了什麼，就把它重播出來：
+真正的模型會自己寫回覆，所以它會做出腳本從來不會做的事：點錯 tool、傳錯引數，或是什麼都沒回答。loop 會把這些情況各自變成一個 observation，讓模型在下一輪讀到。想知道一次 run 裡發生了什麼，就把它重播出來：
 
 ```python
 from cantus import Inspector
@@ -251,6 +251,6 @@ Inspector(state.stream).replay()   # 每個事件一行
 ## 接下來
 
 - [Agent loop](./core/agent.md) — loop 的額度（`max_iterations`、`max_retries`）與三條錯誤路徑。
-- [Skill](./protocols/skill.md)、[Validator](./protocols/validator.md)、[Memory](./protocols/memory.md)、[Identity (Soul)](./protocols/identity.md) — 這一頁每一塊的完整說明。
-- [Workflows](./protocols/workflows.md) — 不靠模型，直接串接、分流、平行執行 skill。
-- [Serve (HTTP)](./protocols/serve.md) 與 [channel cookbook](./channels/line.md) — 把 skill 放到 HTTP server 後面，再把聊天平台的訊息接到你的 agent。
+- [Tool](./protocols/tool.md)、[Validator](./protocols/validator.md)、[Memory](./protocols/memory.md)、[Identity (Soul)](./protocols/identity.md) — 這一頁每一塊的完整說明。
+- [Workflows](./protocols/workflows.md) — 不靠模型，直接串接、分流、平行執行 tool。
+- [Serve (HTTP)](./protocols/serve.md) 與 [channel cookbook](./channels/line.md) — 把 tool 放到 HTTP server 後面，再把聊天平台的訊息接到你的 agent。

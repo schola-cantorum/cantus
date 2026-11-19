@@ -22,11 +22,11 @@ class EventStream:
 不跑 agent 也可以手動組一個 stream，直接看契約長什麼樣：
 
 ```python
-from cantus import EventStream, CallSkillAction, SkillObservation
+from cantus import EventStream, CallToolAction, ToolObservation
 
 stream = EventStream()
-stream.append(CallSkillAction(thought="add them", skill_name="add", args={"a": 1, "b": 2}))
-stream.append(SkillObservation(skill_name="add", result=3))
+stream.append(CallToolAction(thought="add them", tool_name="add", args={"a": 1, "b": 2}))
+stream.append(ToolObservation(tool_name="add", result=3))
 print(len(stream))
 print(stream.replay())
 
@@ -49,24 +49,24 @@ EventStream only accepts Action or Observation, got str
 
 ```
 Action (base, thought: str)
-├── CallSkillAction(skill_name: str, args: dict)
+├── CallToolAction(tool_name: str, args: dict)
 └── FinalAnswerAction(answer: str)
 ```
 
-- `CallSkillAction`：LLM 決定要呼叫某個 skill（也就是走 Skill protocol 那條路）。
+- `CallToolAction`：LLM 決定要「呼叫某個 tool」。
 - `FinalAnswerAction`：LLM 決定「夠了，回答使用者吧」，順手結束整個 loop。
 
 ## Observation 階層
 
 ```
 Observation (base, frozen)
-├── SkillObservation(skill_name, result)              # 成功
-├── ToolErrorObservation(skill_name, message)         # skill、hook 或引數驗證失敗
+├── ToolObservation(tool_name, result)                # 成功
+├── ToolErrorObservation(tool_name, message)          # Tool、hook 或引數驗證失敗
 ├── ValidationErrorObservation(validator_name, feedback)  # 給模型下一輪看的 feedback
 └── MaxIterationsObservation(iterations, last_action_summary, partial_state)  # loop 跑到上限了
 ```
 
-每一個 Observation 都帶著足夠的上下文，讓 LLM 在下一輪 prompt 裡看得懂剛剛發生了什麼事。舉個例子，模型點了一個沒註冊的 skill 時，`ValidationErrorObservation.feedback` 會把可用的 skill 名稱列出來，這樣模型就能自己修掉打錯的字。
+每一個 Observation 都帶著足夠的上下文，讓 LLM 在下一輪 prompt 裡看得懂剛剛發生了什麼事。舉個例子，模型點了一個 agent 沒有的 tool 時，`ValidationErrorObservation.feedback` 會把可用的 tool 名稱列出來，這樣模型就能自己修掉打錯的字。
 
 ## 為什麼要 frozen
 
