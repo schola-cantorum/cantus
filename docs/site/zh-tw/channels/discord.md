@@ -6,7 +6,7 @@
 
 - 一個 [Discord Developer Portal](https://discord.com/developers/applications) 帳號（你的一般 Discord 帳號就可以登入）。
 - 你自己擁有管理員權限的 Discord 伺服器（測試用，新開一個也行）。
-- 已安裝 `cantus-agent[serve]>=0.5.0` 與 `cloudflared`。
+- 已安裝 `cantus-agent[serve]>=0.7.0` 與 `cloudflared`。
 - 一台筆電，OS 不重要 — `pynacl` 與 `websockets` 在 Linux x86_64 / macOS arm64+x86_64 / Windows AMD64 都有 prebuilt wheel。
 
 ## 1. 在 Discord Developer Portal 開一個 application
@@ -23,22 +23,19 @@
    - **Bot Permissions** 勾 `Send Messages`、`Read Message History`、`Use Slash Commands`。
    - 複製下面生成的 URL，貼到瀏覽器執行，把 bot 加進你的測試伺服器。
 
-## 2. 寫 `myskills/app.py`
+## 2. 寫 `mytools/app.py`
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import DiscordRealtimeChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # 三個 secret 都從 CANTUS_SERVE_CHANNEL_DISCORD_* env vars 拿
 # （建構子也可以直接吃參數，但別把 secret 寫進原始碼）。
@@ -61,8 +58,8 @@ cantus **不會**自動讀 `.env`。要嘛用 `direnv`、要嘛 `source` 自己�
 cantus serve \
   --host 127.0.0.1 \
   --port 8765 \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:discord_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:discord_channel
 ```
 
 啟動後會看到 cantus 印 Discord Gateway 連線狀態（IDENTIFY → READY），bot 在 Discord client 上的「online/offline」會切到 online。FastAPI lifespan 把 `discord_channel.connect()` 包成 `asyncio.create_task` 在背景跑；`Ctrl-C` 觸發 lifespan shutdown，cantus 呼叫 `discord_channel.disconnect()` 乾淨斷線（close code 1000），bot 切回 offline。
@@ -109,7 +106,7 @@ cantus 收進來的 Discord event 會 push 到 `discord_channel` 的內部 queue
 ```python
 # scripts/worker.py
 import asyncio
-from myskills.app import discord_channel, registry
+from mytools.app import discord_channel, registry
 
 async def main():
     while True:

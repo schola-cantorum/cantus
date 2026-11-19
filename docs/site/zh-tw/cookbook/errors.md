@@ -2,12 +2,12 @@
 
 這份文件收集學生在 cantus 上最容易踩的雷，每條都配一段觸發它的程式碼，外加一個剛好夠用的修法。出狀況時直接對號入座即可。
 
-## 1. 呼叫不存在的 skill
+## 1. 呼叫不存在的 tool
 
-LLM 拼錯 skill 名稱時，agent loop 不會 raise。`step` 會回一個 `validator_name="action_parse"` 的 `ValidationErrorObservation`，feedback 裡寫著錯誤類型並列出已註冊的 skill，迴圈再把它餵回模型。本頁的範例都用一個「腳本模型」驅動 agent，讓每個錯誤都能重現：
+LLM 拼錯 tool 名稱時，agent loop 不會 raise。`step` 會回一個 `validator_name="action_parse"` 的 `ValidationErrorObservation`，feedback 裡寫著錯誤類型並列出 agent 擁有的 tool，迴圈再把它餵回模型。本頁的範例都用一個「腳本模型」驅動 agent，讓每個錯誤都能重現：
 
 ```python
-from cantus import Agent, ValidationErrorObservation, skill
+from cantus import Agent, ValidationErrorObservation, tool
 
 
 class ScriptedModel:
@@ -22,17 +22,17 @@ class ScriptedModel:
         return self.replies[0]  # 用完之後一直重複最後一句
 
 
-@skill
+@tool
 def search_book(topic: str) -> str:
     """搜尋目錄。"""
     return f"books about {topic}"
 
 
-# LLM 產生 {"action": {"skill_name": "serch_book", ...}}  # 拼錯
+# LLM 產生 {"action": {"tool_name": "serch_book", ...}}  # 拼錯
 agent = Agent(model=ScriptedModel([
-    '{"thought": "look it up", "action": {"skill_name": "serch_book", "args": {"topic": "sci-fi"}}}',
+    '{"thought": "look it up", "action": {"tool_name": "serch_book", "args": {"topic": "sci-fi"}}}',
     '{"thought": "give up", "action": {"final_answer": "no books found"}}',
-]))
+]), tools=[search_book])
 state = agent.run("find a science fiction novel")
 
 # 觀察 stream：feedback 的前兩行是錯誤類型與細節
@@ -50,12 +50,12 @@ for ev in state.stream:
 
 ## 2. Pydantic args 驗證失敗
 
-skill 的 args schema 由 function signature 推導。如果 LLM 傳了型別錯誤的值，會被 Pydantic 擋下：
+tool 的 args schema 由 function signature 推導。如果 LLM 傳了型別錯誤的值，會被 Pydantic 擋下：
 
 ```python
-from cantus import skill
+from cantus import tool
 
-@skill
+@tool
 def search_book(topic: str, n: int = 5) -> str:
     """搜尋目錄。"""
     return f"{n} books about {topic}"
@@ -73,7 +73,7 @@ print(search_book.spec_for_llm()["args_schema"])
 
 ## 3. Validator 沒回 Result
 
-Validator 的 contract 是 **必須回 `Result`**，否則 `__call__` 會直接 raise `TypeError`。（`validator` 和 `analyzer` 是 skill 的 hook helper，不是 protocol kind——把它們掛到某個 skill 上，dispatch 時才會跑。）
+Validator 的 contract 是 **必須回 `Result`**，否則 `__call__` 會直接 raise `TypeError`。（`validator` 和 `analyzer` 是 tool 的 hook helper，不是 protocol kind——把它們掛到某個 tool 上，dispatch 時才會跑。）
 
 ```python
 from cantus.hooks import validator
@@ -112,33 +112,33 @@ def ensure_isbn(book: Book) -> Result:
 
 `Result.failure` 的字串會以 `ValidationErrorObservation` 餵回 LLM，所以要寫成「LLM 看得懂、能改」的回饋。
 
-## 4. `@debug @skill` 順序顛倒
+## 4. `@debug` 與 `@tool` 順序顛倒
 
 `@debug` 必須在 **最外層**，因為它要 wrap 一個已經建立好的 protocol instance：
 
 ```python
-from cantus import debug, skill
+from cantus import debug, tool
 
 # 錯誤
 try:
-    @skill
+    @tool
     @debug
     def f(x: int) -> int:
         """把 x 乘以 2。"""
         return 2 * x
 except TypeError as exc:
     print(type(exc).__name__)
-# TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function
+# TypeError: @debug can only wrap a Tool or hook helper (Tool, Analyzer, Validator); got function. Make sure @debug is on top: `@debug` then `@tool`.
 
 # 正確
 @debug
-@skill
+@tool
 def f(x: int) -> int:
     """把 x 乘以 2。"""
     return 2 * x
 ```
 
-修法：永遠把 `@debug` 放最上面。Python decorator 由下往上套，`@skill` 要先把 function 變成 `Skill` instance，`@debug` 才能接到這個 instance。`@debug` 同樣可以 wrap `Analyzer` 和 `Validator` 這兩個 hook helper。
+修法：永遠把 `@debug` 放最上面。Python decorator 由下往上套，`@tool` 要先把 function 變成 `Tool` instance，`@debug` 才能接到這個 instance。`@debug` 同樣可以 wrap `Analyzer` 和 `Validator` 這兩個 hook helper。
 
 ## 5. Memory 用 decorator → ImportError
 
@@ -173,15 +173,15 @@ class TopicMemory(Memory):
 
 ## 6. Agent loop 停不下來
 
-LLM 如果一直回 `CallSkillAction`、不回 `FinalAnswerAction`，loop 會一直跑直到 `max_iterations`。框架會在最後塞一個 `MaxIterationsObservation`：
+LLM 如果一直回 `CallToolAction`、不回 `FinalAnswerAction`，loop 會一直跑直到 `max_iterations`。框架會在最後塞一個 `MaxIterationsObservation`：
 
 ```python
 from cantus import MaxIterationsObservation
 
 # 一個永遠不回 final_answer 的模型：
 agent = Agent(model=ScriptedModel([
-    '{"thought": "search again", "action": {"skill_name": "search_book", "args": {"topic": "sci-fi"}}}',
-]))
+    '{"thought": "search again", "action": {"tool_name": "search_book", "args": {"topic": "sci-fi"}}}',
+]), tools=[search_book])
 state = agent.run("query", max_iterations=8)
 if isinstance(state.stream[-1], MaxIterationsObservation):
     print("Hit the cap after", state.stream[-1].iterations, "iterations")
@@ -224,18 +224,18 @@ missing required keys 'thought' or 'action'
 常見原因：
 
 - LLM 把 thought 寫成 list / dict（必須是字串）。
-- skill_name 不在 registered enum 裡。
+- `tool_name` 不是 schema 允許的 tool 名稱之一。
 - args 寫成 string 而非 object。
 
 修法：用 `outlines` / `xgrammar` 套上 `build_schema(registry)` 的 schema 強制約束 decoding；或在 prompt 給 few-shot 範例。
 
 ## 8. 空 FinalAnswer 與小模型 robustness
 
-學生在 Colab 用 Gemma 4 E2B（2B 參數量）跑 cantus，最常踩到的雷長這樣：`agent.run` 第一輪就回 `FinalAnswerAction(answer="")`，loop 當場結束，一個 skill 都沒呼叫過。表面上看，agent 啥事沒做就交卷了。
+學生在 Colab 用 Gemma 4 E2B（2B 參數量）跑 cantus，最常踩到的雷長這樣：`agent.run` 第一輪就回 `FinalAnswerAction(answer="")`，loop 當場結束，一個 tool 都沒呼叫過。表面上看，agent 啥事沒做就交卷了。
 
 癥結在於小模型的偷懶習性。sub-3B 模型在 grammar-constrained decoding 下特別愛走捷徑——`final_answer` 既然吃任意字串，那最省 token 的合法輸出，當然就是空字串。v0.1.2 把這條捷徑分兩層堵掉，外加兩條給呼叫端的實用配套。
 
-先講堵漏的兩層。第一層在 schema：`cantus/grammar/tool_call.py` 的 `build_schema()` 給 `final_answer` 欄位加上 `{"type": "string", "minLength": 1}`，`outlines` / `xgrammar` 這類 grammar-constrained decoder 在生成階段就不會吐出空字串。第二層是 runtime fallback，補的是沒走 grammar 路徑的 caller——例如自己直接 `agent.step()`、或測試時塞了 mock model。這時 `_parse_action()` 解析完仍會做一次 `final_answer.strip() != ""` 檢查，沒過就 append 一筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer")` 進 `state.stream`，讓 loop 繼續 retry，直到 `max_retries` 或 `max_iterations` 其中一個先見底。
+先講堵漏的兩層。第一層在 schema：`cantus/grammar/tool_call.py` 的 `build_schema()` 給 `final_answer` 欄位加上 `{"type": "string", "minLength": 1}`，`outlines` / `xgrammar` 這類 grammar-constrained decoder 在生成階段就不會吐出空字串。第二層是 runtime fallback，補的是沒走 grammar 路徑的 caller——例如自己直接 `agent.step()`、或測試時塞了 mock model。這時 `_parse_action()` 解析完仍會做一次 `final_answer.strip() != ""` 檢查，沒過就 append 一筆 `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a tool or write a substantive answer")` 進 `state.stream`，讓 loop 繼續 retry，直到 `max_retries` 或 `max_iterations` 其中一個先見底。
 
 兩層刻意共用同一個 `validator_name`。這樣下游不管 grep 還是丟給 NotebookLM 建索引，盯一個字串就同時涵蓋了 schema 層和 runtime 層，省得追兩套命名。
 
@@ -254,13 +254,13 @@ state = agent.run("找一本科幻小說", max_iterations=12)
 from cantus import Agent, mount_drive_and_load
 
 handle = mount_drive_and_load(variant="E4B")
-agent = Agent(model=handle)
+agent = Agent(model=handle, tools=[search_book])
 state = agent.run("找一本詩集", max_iterations=12)
 print(state.stream.replay())
-# [0] Action      :: CallSkillAction(skill_name='search_book', ...)
+# [0] Action      :: CallToolAction(tool_name='search_book', ...)
 # [1] Observation :: ValidationErrorObservation(validator_name='non_empty_final_answer', feedback='FinalAnswerAction.answer must be non-empty...')
-# [2] Action      :: CallSkillAction(skill_name='search_book', ...)
-# [3] Observation :: SkillObservation(skill_name='search_book', result=[Book(title=...), ...])
+# [2] Action      :: CallToolAction(tool_name='search_book', ...)
+# [3] Observation :: ToolObservation(tool_name='search_book', result=[Book(title=...), ...])
 # [4] Action      :: FinalAnswerAction(answer='推薦《零號宇宙》— ...')
 ```
 

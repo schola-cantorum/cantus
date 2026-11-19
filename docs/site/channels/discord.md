@@ -6,7 +6,7 @@ This walkthrough takes you from an empty Discord application to a working `cantu
 
 - A [Discord Developer Portal](https://discord.com/developers/applications) account (your regular Discord account can sign in).
 - A Discord server where you have administrator rights (a fresh server for testing is fine).
-- `cantus-agent[serve]>=0.5.0` and `cloudflared` installed.
+- `cantus-agent[serve]>=0.7.0` and `cloudflared` installed.
 - A laptop on any OS. Both `pynacl` and `websockets` ship prebuilt wheels for Linux x86_64, macOS arm64 + x86_64, and Windows AMD64.
 
 ## 1. Create an application in the Discord Developer Portal
@@ -23,22 +23,19 @@ This walkthrough takes you from an empty Discord application to a working `cantu
    - Under **Bot Permissions**, check `Send Messages`, `Read Message History`, and `Use Slash Commands`.
    - Copy the generated URL, paste it into your browser, and use it to add the bot to your test server.
 
-## 2. Write `myskills/app.py`
+## 2. Write `mytools/app.py`
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import DiscordRealtimeChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # All three secrets come from the CANTUS_SERVE_CHANNEL_DISCORD_* env vars.
 # (The constructor also accepts them as arguments, but never put secrets in source.)
@@ -61,8 +58,8 @@ cantus does **not** read `.env` automatically. Either use `direnv` or `source` y
 cantus serve \
   --host 127.0.0.1 \
   --port 8765 \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:discord_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:discord_channel
 ```
 
 Once it starts, cantus prints the Discord Gateway connection progress (IDENTIFY → READY), and the bot flips from offline to online in your Discord client. The FastAPI lifespan wraps `discord_channel.connect()` in an `asyncio.create_task` that runs in the background; `Ctrl-C` triggers the lifespan shutdown, cantus calls `discord_channel.disconnect()` to close cleanly (close code 1000), and the bot goes back to offline.
@@ -109,7 +106,7 @@ The Discord events cantus receives are pushed onto an internal queue inside `dis
 ```python
 # scripts/worker.py
 import asyncio
-from myskills.app import discord_channel, registry
+from mytools.app import discord_channel, registry
 
 async def main():
     while True:

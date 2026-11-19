@@ -4,13 +4,13 @@
 
 ## 1. Pydantic 用法：可選參數、預設值、型別 validation
 
-skill 的 args schema 是從 function signature 推導出來的，所以你寫的 type hint 跟預設值，會直接決定 LLM 看到的 schema 長什麼樣子：
+tool 的 args schema 是從 function signature 推導出來的，所以你寫的 type hint 跟預設值，會直接決定 LLM 看到的 schema 長什麼樣子：
 
 ```python
 from typing import Optional
-from cantus import skill
+from cantus import tool
 
-@skill
+@tool
 def search_book(
     topic: str,                         # required
     n: int = 5,                         # 有預設值 → optional
@@ -32,7 +32,7 @@ print(search_book.spec_for_llm()["args_schema"])
 第一段文字會被當成 description；`Args:` 這個 block 則由 `parse_args_block` 解析、存進 `_args_descriptions`，之後可以餵給 LLM 當作每個參數的逐項說明：
 
 ```python
-@skill
+@tool
 def search_book(topic: str, n: int = 5) -> str:
     """在館藏中查詢書籍。
 
@@ -52,28 +52,29 @@ print(search_book.spec_for_llm()["args_schema"]["required"])
 
 ## 3. 三種入口，何時用哪一種
 
-註冊一個 skill 有三種寫法，三種寫出來的 `Skill` instance 完全等價：
+建立一個 tool 有三種寫法，三種最後都會得到一個 `Tool` instance：
 
 ```python
-from cantus import Skill, register_skill, skill
+from cantus import Registry, Tool, register_tool, tool
 
 # (A) Decorator —— 90% 場景，最簡。
-@skill
+@tool
 def f(x: int) -> int:
     """把 x 乘以 2。"""
     return 2 * x
 
-# (B) Function-pass —— 別人寫好的 plain function 想拿來註冊。
+# (B) Function-pass —— 把別人寫好的 plain function 變成 tool，放進你指定的 Registry。
 def third_party_function(x: int) -> int:
     """把 x 乘以 3。"""
     return 3 * x
 
-register_skill(third_party_function)
+registry = Registry()
+register_tool(third_party_function, registry=registry)
 
 # (C) Class-first —— 需要 instance state、複雜 init、或子類覆寫。
-class MySkill(Skill):
+class MyTool(Tool):
     """記住目前看過的每個 x。"""
-    name = "my_skill"
+    name = "my_tool"
     def __init__(self): super().__init__(); self.cache = {}
     def run(self, x: int) -> int: return self.cache.setdefault(x, x)
 ```
@@ -90,26 +91,26 @@ class MySkill(Skill):
 
 `EmbeddingMemory.recall` 第一次呼叫時會下載 model（約 80MB），並把整個語料庫 encode 一次；之後再呼叫就只需要 encode query。BM25 則完全跑在 CPU 上，不用下載任何 model。
 
-## 5. 某個 skill 開了 `@debug`，其他的也要開嗎？
+## 5. 某個 tool 開了 `@debug`，其他的也要開嗎？
 
-不必。`@debug` 是逐個 skill 各自決定要不要開（per-skill opt-in），只會 wrap 你貼上去的那一個：
+不必。`@debug` 是逐個 tool 各自決定要不要開（per-tool opt-in），只會 wrap 你貼上去的那一個：
 
 ```python
-from cantus import debug, skill
+from cantus import debug, tool
 
 @debug
-@skill
+@tool
 def search_book(topic: str) -> str:
     """搜尋目錄。"""
     return f"books about {topic}"   # 有 trace
 
-@skill
+@tool
 def parse_book_list(text: str) -> list[str]:
     """把以換行分隔的清單切開。"""
     return text.splitlines()   # 沒 trace
 ```
 
-一個不錯的做法：先讓全部 skill 安靜地跑一遍，等到發現某個 skill 行為怪怪的，再**只**對那一個加上 `@debug`。這樣輸出量會少很多，也好讀很多。至於 agent loop 本身則永遠是安靜的（這是一條硬性的 spec 要求），不會污染 stdout。
+一個不錯的做法：先讓全部 tool 安靜地跑一遍，等到發現某個 tool 行為怪怪的，再**只**對那一個加上 `@debug`。這樣輸出量會少很多，也好讀很多。至於 agent loop 本身則永遠是安靜的（這是一條硬性的 spec 要求），不會污染 stdout。
 
 ## 6. 把 Inspector trace 寫到檔案，而不是印到 stdout
 
@@ -119,7 +120,7 @@ def parse_book_list(text: str) -> list[str]:
 from cantus import Agent, ChatModelAsHandle, Inspector, load_chat_model
 
 model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[search_book])
 state = agent.run("找 3 本科幻小說", max_iterations=8)
 
 with open("run_trace.log", "w", encoding="utf-8") as f:
@@ -132,12 +133,12 @@ with open("run_trace.log", encoding="utf-8") as f:
 
 在 Colab 上有個常用的做法：先在一個 cell 把 trace 寫到檔案，再用 `!head -50 run_trace.log` 讀其中一段。這樣比把一大坨 trace 直接倒進 cell output 好讀多了。
 
-## 7. 加碼：測試隔離請用自己的 `Registry()`，別用全域那一個
+## 7. 加碼：讓多個 agent 與測試共用同一個 `Registry`
 
-`get_registry()` 回傳的是一個 process 範圍的 singleton，狀態會在不同 test case 之間互相污染。寫測試時，請改成自己建一個 `Registry()`：
+agent 會把你給的 tool 清單複製進它自己的 registry，但你直接傳入的 `Registry` 則原封不動地使用。當好幾個 agent 或好幾個測試要看到同一批 tool 時，就建一個 `Registry`，再傳給每一個：
 
 ```python
-from cantus import Agent, Registry, skill
+from cantus import Agent, Registry, tool
 
 class ScriptedModel:
     """代替 LLM：每次都回同一個 final answer。"""
@@ -145,15 +146,14 @@ class ScriptedModel:
     def generate(self, prompt: str, **kwargs) -> str:
         return '{"thought": "done", "action": {"final_answer": "ok"}}'
 
-@skill
-def my_skill(x: int) -> int:
+@tool
+def my_tool(x: int) -> int:
     """原樣回傳。"""
     return x
 
-reg = Registry()
-reg.register("skill", my_skill)
-agent = Agent(model=ScriptedModel(), registry=reg)
-print(reg.names_for("skill"))
+reg = Registry(tools=[my_tool])
+agent = Agent(model=ScriptedModel(), tools=reg)
+print(agent.registry.names_for("tool"))
 ```
 
 你應該看到，本頁可執行的技巧合起來：
@@ -161,7 +161,7 @@ print(reg.names_for("skill"))
 ```text
 ['topic']
 True
-['my_skill']
+['my_tool']
 ```
 
-用 `get_registry().clear()` 也行，但它會把同一個 session 裡其他 cell 也一起清掉，連帶受影響。
+為 cantus 0.6 寫的程式碼是把 tool 放在同一個全域 registry 裡；Tool 頁面的[遷移說明](../protocols/tool.md#migrating-from-skill)有交代。

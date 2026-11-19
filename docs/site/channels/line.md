@@ -5,7 +5,7 @@ This walkthrough takes you from zero to a LINE official account wired into `cant
 ## 0. What you'll need
 
 - A [LINE Developers Console](https://developers.line.biz/console/) account (sign in with the LINE app).
-- `cantus-agent[serve]>=0.4.5` and `cloudflared` installed.
+- `cantus-agent[serve]>=0.7.0` and `cloudflared` installed.
 - A laptop. The OS doesn't matter.
 
 ## 1. Create a Messaging API channel in the LINE Developers Console
@@ -19,24 +19,21 @@ This walkthrough takes you from zero to a LINE official account wired into `cant
 
 Both tokens are plain strings. Do **not** paste them into chat messages, commits, or issues.
 
-## 2. Write `myskills/app.py`
+## 2. Write `mytools/app.py`
 
 Keep the channel object and the registry as module-level variables. The cantus CLI resolves the `--channels` argument by dotted path, so they have to be importable:
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import LineWebhookChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # Channel secrets come from CANTUS_SERVE_CHANNEL_LINE_SECRET and
 # CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN env vars (no constructor args).
@@ -58,8 +55,8 @@ If you prefer a `.env` file, add it to `.gitignore`. cantus itself does **not** 
 cantus serve \
   --host 127.0.0.1 \
   --port 8765 \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:line_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:line_channel
 ```
 
 After the CLI parses your arguments, it pushes `line_channel` onto `app.state.channels`. `serve()` then calls `mount(app)` on it, which registers the `POST /channels/line` route. The FastAPI lifespan opens an app-scoped `httpx.AsyncClient` for outbound replies. `Ctrl-C` shuts everything down cleanly.
@@ -92,7 +89,7 @@ cantus pushes each incoming webhook payload onto `line_channel`'s internal queue
 ```python
 # scripts/worker.py
 import asyncio
-from myskills.app import line_channel, registry
+from mytools.app import line_channel, registry
 
 async def main():
     while True:

@@ -2,12 +2,12 @@
 
 Below are the mistakes students hit most often with cantus. Each entry shows the code that breaks, the error you get back, and the shortest fix.
 
-## 1. Calling a skill that doesn't exist
+## 1. Calling a tool that doesn't exist
 
-When the LLM misspells a skill name, the agent loop does not raise. `step` returns a `ValidationErrorObservation` with `validator_name="action_parse"` whose feedback names the error type and lists the skills that are registered, and the loop feeds it back to the model. The examples on this page drive the agent with a *scripted model* so each mistake is reproducible:
+When the LLM misspells a tool name, the agent loop does not raise. `step` returns a `ValidationErrorObservation` with `validator_name="action_parse"` whose feedback names the error type and lists the tools the agent has, and the loop feeds it back to the model. The examples on this page drive the agent with a *scripted model* so each mistake is reproducible:
 
 ```python
-from cantus import Agent, ValidationErrorObservation, skill
+from cantus import Agent, ValidationErrorObservation, tool
 
 
 class ScriptedModel:
@@ -22,17 +22,17 @@ class ScriptedModel:
         return self.replies[0]  # keep repeating the last reply
 
 
-@skill
+@tool
 def search_book(topic: str) -> str:
     """Search the catalog."""
     return f"books about {topic}"
 
 
-# The LLM produced {"action": {"skill_name": "serch_book", ...}}  # typo
+# The LLM produced {"action": {"tool_name": "serch_book", ...}}  # typo
 agent = Agent(model=ScriptedModel([
-    '{"thought": "look it up", "action": {"skill_name": "serch_book", "args": {"topic": "sci-fi"}}}',
+    '{"thought": "look it up", "action": {"tool_name": "serch_book", "args": {"topic": "sci-fi"}}}',
     '{"thought": "give up", "action": {"final_answer": "no books found"}}',
-]))
+]), tools=[search_book])
 state = agent.run("find a science fiction novel")
 
 # Inspect the stream: the feedback's first two lines are the error type and the detail
@@ -50,12 +50,12 @@ Fix: add the correct name to an example in the system prompt, or raise `max_retr
 
 ## 2. Pydantic argument validation fails
 
-A skill's argument schema is derived from its function signature. If the LLM passes a value of the wrong type, Pydantic rejects it:
+A tool's argument schema is derived from its function signature. If the LLM passes a value of the wrong type, Pydantic rejects it:
 
 ```python
-from cantus import skill
+from cantus import tool
 
-@skill
+@tool
 def search_book(topic: str, n: int = 5) -> str:
     """Search the catalog."""
     return f"{n} books about {topic}"
@@ -73,7 +73,7 @@ print(search_book.spec_for_llm()["args_schema"])
 
 ## 3. Validator doesn't return a Result
 
-A validator's contract is that it **must return a `Result`**. Otherwise `__call__` raises `TypeError` directly. (`validator` and `analyzer` are skill hook helpers, not protocol kinds — attach them to a skill so they run during dispatch.)
+A validator's contract is that it **must return a `Result`**. Otherwise `__call__` raises `TypeError` directly. (`validator` and `analyzer` are tool hook helpers, not protocol kinds — attach them to a tool so they run during dispatch.)
 
 ```python
 from cantus.hooks import validator
@@ -112,33 +112,33 @@ def ensure_isbn(book: Book) -> Result:
 
 The string passed to `Result.failure` is fed back to the LLM as a `ValidationErrorObservation`, so write it as feedback the LLM can read and act on.
 
-## 4. `@debug` and `@skill` in the wrong order
+## 4. `@debug` and `@tool` in the wrong order
 
 `@debug` must sit on the **outermost** layer, because it wraps a protocol instance that has already been built:
 
 ```python
-from cantus import debug, skill
+from cantus import debug, tool
 
 # Wrong
 try:
-    @skill
+    @tool
     @debug
     def f(x: int) -> int:
         """Double x."""
         return 2 * x
 except TypeError as exc:
     print(type(exc).__name__)
-# TypeError: @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got function
+# TypeError: @debug can only wrap a Tool or hook helper (Tool, Analyzer, Validator); got function. Make sure @debug is on top: `@debug` then `@tool`.
 
 # Correct
 @debug
-@skill
+@tool
 def f(x: int) -> int:
     """Double x."""
     return 2 * x
 ```
 
-Fix: always put `@debug` on top. Python applies decorators bottom-up, so `@skill` must first turn the function into a `Skill` instance before `@debug` can receive that instance. `@debug` also accepts the `Analyzer` and `Validator` hook helpers.
+Fix: always put `@debug` on top. Python applies decorators bottom-up, so `@tool` must first turn the function into a `Tool` instance before `@debug` can receive that instance. `@debug` also accepts the `Analyzer` and `Validator` hook helpers.
 
 ## 5. Using a decorator for Memory → ImportError
 
@@ -173,15 +173,15 @@ The reasoning: state can't be expressed with a single function call, and forcing
 
 ## 6. The agent loop won't stop
 
-If the LLM keeps returning `CallSkillAction` and never returns `FinalAnswerAction`, the loop runs until it reaches `max_iterations`. The framework then appends a `MaxIterationsObservation` at the end:
+If the LLM keeps returning `CallToolAction` and never returns `FinalAnswerAction`, the loop runs until it reaches `max_iterations`. The framework then appends a `MaxIterationsObservation` at the end:
 
 ```python
 from cantus import MaxIterationsObservation
 
 # A model that never returns final_answer:
 agent = Agent(model=ScriptedModel([
-    '{"thought": "search again", "action": {"skill_name": "search_book", "args": {"topic": "sci-fi"}}}',
-]))
+    '{"thought": "search again", "action": {"tool_name": "search_book", "args": {"topic": "sci-fi"}}}',
+]), tools=[search_book])
 state = agent.run("query", max_iterations=8)
 if isinstance(state.stream[-1], MaxIterationsObservation):
     print("Hit the cap after", state.stream[-1].iterations, "iterations")
@@ -210,7 +210,7 @@ except GrammarError as e:
 Common causes:
 
 - The LLM wrote `thought` as a list or dict (it must be a string).
-- `skill_name` is not in the registered enum.
+- `tool_name` is not one of the tool names the schema allows.
 - `args` was written as a string instead of an object.
 
 Fix: constrain decoding with `outlines` / `xgrammar` using the schema from `build_schema(registry)`, or supply few-shot examples in the prompt.
@@ -231,11 +231,11 @@ missing required keys 'thought' or 'action'
 
 ## 8. 空 FinalAnswer 與小模型 robustness (Empty FinalAnswer and small-model robustness)
 
-Run cantus on Colab with Gemma 4 E2B (2B parameters) and you will eventually hit this: `agent.run` returns `FinalAnswerAction(answer="")` on the very first turn and ends the loop, without ever calling a skill. The agent looks finished, but it did nothing. The reason is that sub-3B models cut corners under grammar-constrained decoding. Since `final_answer` accepts any string, the empty string is the cheapest legal output in tokens, so that is what the model reaches for. Since v0.1.2, cantus closes this shortcut on four levels:
+Run cantus on Colab with Gemma 4 E2B (2B parameters) and you will eventually hit this: `agent.run` returns `FinalAnswerAction(answer="")` on the very first turn and ends the loop, without ever calling a tool. The agent looks finished, but it did nothing. The reason is that sub-3B models cut corners under grammar-constrained decoding. Since `final_answer` accepts any string, the empty string is the cheapest legal output in tokens, so that is what the model reaches for. Since v0.1.2, cantus closes this shortcut on four levels:
 
 1. **Schema-level `minLength: 1` constraint**: `build_schema()` in `cantus/grammar/tool_call.py` adds `{"type": "string", "minLength": 1}` to the `final_answer` field, so a grammar-constrained decoder such as `outlines` / `xgrammar` won't emit an empty string during generation.
 
-2. **Runtime fallback `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`**: if the caller doesn't go through the grammar path (for example, calling `agent.step()` directly or testing with a mock model), `_parse_action()` still checks `final_answer.strip() != ""` after parsing. On failure it appends `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer")` to `state.stream`, and the loop keeps retrying until `max_retries` or `max_iterations` is exhausted. The same `validator_name` is used at the grammar layer, so a downstream grep or NotebookLM index covers both layers with one string.
+2. **Runtime fallback `ValidationErrorObservation(validator_name="non_empty_final_answer", ...)`**: if the caller doesn't go through the grammar path (for example, calling `agent.step()` directly or testing with a mock model), `_parse_action()` still checks `final_answer.strip() != ""` after parsing. On failure it appends `ValidationErrorObservation(validator_name="non_empty_final_answer", feedback="FinalAnswerAction.answer must be non-empty after str.strip(); call a tool or write a substantive answer")` to `state.stream`, and the loop keeps retrying until `max_retries` or `max_iterations` is exhausted. The same `validator_name` is used at the grammar layer, so a downstream grep or NotebookLM index covers both layers with one string.
 
 3. **Suggested `max_iterations=12` for sub-3B models**: `Agent.run` defaults to `max_iterations=8`, which is enough for 4B+ models. But sub-3B models (Gemma 4 E2B and other 2B-class instruct variants) can burn through 8 retries before producing a non-empty answer, so passing `max_iterations=12` explicitly gives them more headroom:
 
@@ -252,13 +252,13 @@ Run cantus on Colab with Gemma 4 E2B (2B parameters) and you will eventually hit
    from cantus import Agent, mount_drive_and_load
 
    handle = mount_drive_and_load(variant="E4B")
-   agent = Agent(model=handle)
+   agent = Agent(model=handle, tools=[search_book])
    state = agent.run("Find a poetry collection", max_iterations=12)
    print(state.stream.replay())
-   # [0] Action      :: CallSkillAction(skill_name='search_book', ...)
+   # [0] Action      :: CallToolAction(tool_name='search_book', ...)
    # [1] Observation :: ValidationErrorObservation(validator_name='non_empty_final_answer', feedback='FinalAnswerAction.answer must be non-empty...')
-   # [2] Action      :: CallSkillAction(skill_name='search_book', ...)
-   # [3] Observation :: SkillObservation(skill_name='search_book', result=[Book(title=...), ...])
+   # [2] Action      :: CallToolAction(tool_name='search_book', ...)
+   # [3] Observation :: ToolObservation(tool_name='search_book', result=[Book(title=...), ...])
    # [4] Action      :: FinalAnswerAction(answer='I recommend "Universe Zero" — ...')
    ```
 

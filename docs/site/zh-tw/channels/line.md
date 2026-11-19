@@ -5,7 +5,7 @@
 ## 0. 你會用到的東西
 
 - 一個 [LINE Developers Console](https://developers.line.biz/console/) 帳號（直接用 LINE App 登入就行）。
-- 裝好 `cantus-agent[serve]>=0.4.5` 和 `cloudflared`。
+- 裝好 `cantus-agent[serve]>=0.7.0` 和 `cloudflared`。
 - 一台筆電。是 macOS、Windows 還是 Linux 都沒差。
 
 ## 1. 在 LINE Developers Console 開一個 Messaging API channel
@@ -19,24 +19,21 @@
 
 這兩個 token 都只是普通字串。**千萬不要**把它們貼進聊天訊息、commit 或 issue 裡。
 
-## 2. 寫 `myskills/app.py`
+## 2. 寫 `mytools/app.py`
 
 把 channel 物件和 registry 都放在 module 最外層當變數。cantus CLI 的 `--channels` 參數是靠 dotted path 去 import 的，所以這兩個東西一定要能被 import 到：
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import LineWebhookChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # Channel secrets come from CANTUS_SERVE_CHANNEL_LINE_SECRET and
 # CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN env vars (no constructor args).
@@ -58,8 +55,8 @@ export CANTUS_SERVE_CHANNEL_LINE_ACCESS_TOKEN="<channel access token from step 1
 cantus serve \
   --host 127.0.0.1 \
   --port 8765 \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:line_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:line_channel
 ```
 
 CLI 解析完你的參數後，會把 `line_channel` 推進 `app.state.channels`。接著 `serve()` 會對它呼叫 `mount(app)`，註冊出 `POST /channels/line` 這條路由。FastAPI 的 lifespan 會開一個 app 等級的 `httpx.AsyncClient`，專門用來送回覆。按 `Ctrl-C` 就會把整套乾淨關掉。
@@ -92,7 +89,7 @@ cloudflared tunnel --url http://127.0.0.1:8765
 ```python
 # scripts/worker.py
 import asyncio
-from myskills.app import line_channel, registry
+from mytools.app import line_channel, registry
 
 async def main():
     while True:
