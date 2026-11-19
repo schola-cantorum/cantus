@@ -295,3 +295,8 @@ R6 與 I1～I11 達成。guide 的每個條目以標題結尾的 ID 標示，文
   plan). At the release (S-23): rewrite the guide's "Status: unreleased" line and V5, and note that
   the warnings link `blob/v0.7.0/...`, which is 404 until the tag. The older adapter notes under
   `docs/protocols/` still show `_RemoteSkillBase` (FB-16; history, outside the sweep).
+- **Open items at push (2026-11-19).** The user approved the push without answering the open
+  items, so they stay as they are: S-07 (commit the V2-4 table with reasons and deciding tickets),
+  S-18 (Checklist and Index to the top), S-21 (deduplicate F1 against W11/W12 and X1 against I8),
+  S-17 (section names), P-17 (the Checklist, kept). Fixes made after stage 6 (`73fd75c`, `b994485`,
+  `ee380ac`) were verified by the harness, the mutation check and stage 8, not re-reviewed.
