@@ -28,7 +28,7 @@ function sidebar(base: string) {
     {
       text: 'Protocols',
       items: [
-        { text: 'Skill', link: `${base}/protocols/skill` },
+        { text: 'Tool', link: `${base}/protocols/tool` },
         { text: 'Memory', link: `${base}/protocols/memory` },
         { text: 'Analyzer', link: `${base}/protocols/analyzer` },
         { text: 'Validator', link: `${base}/protocols/validator` },
@@ -71,7 +71,7 @@ function nav(base: string) {
   return [
     { text: 'Overview', link: `${base}/overview` },
     { text: 'Quickstart', link: `${base}/quickstart` },
-    { text: 'Protocols', link: `${base}/protocols/skill` },
+    { text: 'Protocols', link: `${base}/protocols/tool` },
     { text: 'Interactive manual', link: '/interactive/', target: '_blank', rel: 'noopener' },
     {
       text: 'Links',
