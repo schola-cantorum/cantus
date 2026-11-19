@@ -57,9 +57,13 @@ class ScriptedModel:
 Reaching `Skill` on `cantus` or on `cantus.protocols.skill` warns. It is the same class as `Tool`.
 The old name is served on attribute access, so it is not in `vars(cantus)`.
 
+Warning text:
+
 ```text warning W1
 cantus.Skill is deprecated since cantus 0.7.0 and will be removed in a later release; use cantus.Tool instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W1
 from cantus import Skill
@@ -75,6 +79,8 @@ class Greet(Skill):
 
 print(Greet()(who="Ada"))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Tool
@@ -96,9 +102,13 @@ print(Greet()(who="Ada"))
 `@skill`, `@skill(pre_hook=...)` and `skill(fn)` warn once per decoration. `@tool` builds the tool
 but, unlike `@skill`, does **not** put it in a global registry: hand it to the agent yourself.
 
+Warning text:
+
 ```text warning W2
 @skill is deprecated since cantus 0.7.0 and will be removed in a later release; use @tool instead. @tool does not register the tool; pass it with Agent(model, tools=[...]). See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W2
 from cantus import skill
@@ -112,6 +122,8 @@ def add(a: int, b: int) -> int:
 
 print(add(2, 3))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, tool
@@ -132,9 +144,13 @@ agent = Agent(ScriptedModel(), tools=[add])  # the agent sees only the tools you
 `register_skill` (also reached through `cantus.protocols.skill`) put the tool in the global
 registry. `register_tool` needs the `Registry` to put it in.
 
+Warning text:
+
 ```text warning W3
 register_skill() is deprecated since cantus 0.7.0 and will be removed in a later release; use register_tool(fn, registry=...) instead. register_tool needs an explicit Registry. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W3
 from cantus import register_skill
@@ -148,6 +164,8 @@ def add(a: int, b: int) -> int:
 add_tool = register_skill(add)
 print(add_tool(a=2, b=3))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry, register_tool
@@ -168,9 +186,13 @@ print(add_tool(a=2, b=3))
 Reaching `CallSkillAction` on `cantus`, `cantus.core.action` or `cantus.core.agent` warns. It is the
 same class as `CallToolAction`.
 
+Warning text:
+
 ```text warning W4
 CallSkillAction is deprecated since cantus 0.7.0 and will be removed in a later release; use CallToolAction instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W4
 from cantus.core.action import CallSkillAction, FinalAnswerAction
@@ -178,6 +200,8 @@ from cantus.core.action import CallSkillAction, FinalAnswerAction
 events = [FinalAnswerAction(answer="5")]
 print(sum(isinstance(e, CallSkillAction) for e in events))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.core.action import CallToolAction, FinalAnswerAction
@@ -191,9 +215,13 @@ print(sum(isinstance(e, CallToolAction) for e in events))
 Reaching `SkillObservation` on `cantus`, `cantus.core.observation` or `cantus.core.agent` warns. It
 is the same class as `ToolObservation`.
 
+Warning text:
+
 ```text warning W5
 SkillObservation is deprecated since cantus 0.7.0 and will be removed in a later release; use ToolObservation instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W5
 from cantus.core.action import FinalAnswerAction
@@ -202,6 +230,8 @@ from cantus.core.observation import SkillObservation
 events = [FinalAnswerAction(answer="5")]
 print(sum(isinstance(e, SkillObservation) for e in events))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.core.action import FinalAnswerAction
@@ -216,9 +246,13 @@ print(sum(isinstance(e, ToolObservation) for e in events))
 Reaching `SkillEntry` on `cantus.serve` or `cantus.serve.introspection` warns. It is the same class
 as `ToolEntry`.
 
+Warning text:
+
 ```text warning W6
 SkillEntry is deprecated since cantus 0.7.0 and will be removed in a later release; use ToolEntry instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W6
 from cantus.serve import SkillEntry
@@ -226,6 +260,8 @@ from cantus.serve import SkillEntry
 entry = SkillEntry(name="add", description="Add two integers.", args_schema={})
 print(entry.name)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.serve import ToolEntry
@@ -242,9 +278,13 @@ on a `ParsedToolCall` warns and still works. A keyword pattern `case CallToolAct
 still matches, with the warning. `ToolErrorObservation` keeps its class name; only its field
 changes. Passing both `tool_name` and `skill_name` raises `TypeError` before any warning.
 
+Warning text:
+
 ```text warning W7
 skill_name is deprecated since cantus 0.7.0 and will be removed in a later release; use tool_name instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W7
 from cantus.core.observation import ToolErrorObservation
@@ -252,6 +292,8 @@ from cantus.core.observation import ToolErrorObservation
 error = ToolErrorObservation(skill_name="add", message="boom")
 print(error.skill_name)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.core.observation import ToolErrorObservation
@@ -265,9 +307,13 @@ print(error.tool_name)
 The global registry still exists during the alias period, but there is no longer a way to reach it
 without a warning: build a `Registry`, or pass the tools straight to the agent.
 
+Warning text:
+
 ```text warning W8
 get_registry() is deprecated since cantus 0.7.0 and will be removed in a later release; use a Registry you build yourself instead. Pass tools with Agent(model, tools=[...]). See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W8
 from cantus import get_registry
@@ -275,6 +321,8 @@ from cantus import get_registry
 registry = get_registry()
 print(type(registry).__name__)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry
@@ -299,9 +347,13 @@ only the key `"tool"`, and some ways of reading it behave differently:
 - Writing `"skill"` into it (`spec["skill"] = ...`, `setdefault`, `update`) is not aliased: it adds
   a literal `"skill"` key.
 
+Warning text:
+
 ```text warning W9
 the registry kind "skill" is deprecated since cantus 0.7.0 and will be removed in a later release; use "tool" instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W9
 from cantus import Registry
@@ -309,6 +361,8 @@ from cantus import Registry
 registry = Registry()
 print(registry.names_for("skill"), registry.spec_for_llm()["skill"])
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry
@@ -324,9 +378,13 @@ The keyword `registry=` warns. `tools=` takes a list of tools (copied into a new
 a `Registry` or `None` (`None` means "not given" and falls back, see F1); v0.6 accepted any object. Passing the registry positionally, `Agent(model, registry)`,
 works on both versions without a warning.
 
+Warning text:
+
 ```text warning W10
 Agent(registry=...) is deprecated since cantus 0.7.0 and will be removed in a later release; use Agent(tools=...) instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W10
 from cantus import Agent, Registry
@@ -335,6 +393,8 @@ registry = Registry()
 agent = Agent(ScriptedModel(), registry=registry)
 print(agent.registry is registry)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, Registry
@@ -352,11 +412,15 @@ when you set `agent.tools = None` or call `dataclasses.replace(agent, tools=None
 while building a `@dataclass` subclass of `Agent` points at the generated `__init__`, not at your
 line. The rule itself is under [the fallback rule](#the-fallback-rule-f1).
 
+Warning text:
+
 ```text warning W11
 creating an Agent without tools= is deprecated since cantus 0.7.0 and will be removed in a later release; use Agent(model, tools=[...]) instead. This agent is using tools from the global registry, which @skill and register_skill fill (possibly inside a library you use). See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
 
 The before block below prints W2, W11 and W13 on v0.7.0: it uses three legacy forms.
+
+**Before (v0.6.0):**
 
 ```python before W2 W11 W13
 from cantus import Agent, skill
@@ -375,6 +439,8 @@ model = ScriptedModel(
 state = Agent(model).run("What is 2 + 3?")
 print(state.stream[1].result)  # the tool's result
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, tool
@@ -401,13 +467,19 @@ back to the global registry and warn when it holds a tool. Unlike W13, this warn
 exception under an error filter. It is emitted when the call starts, even if the input then fails
 to parse; on model output that uses the old key, W12 comes first and W13 after it.
 
+Warning text:
+
 ```text warning W12:build_schema
 calling build_schema without registry= is deprecated since cantus 0.7.0 and will be removed in a later release; use build_schema(..., registry=...) instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
 
+Warning text:
+
 ```text warning W12:parse_tool_call
 calling parse_tool_call without registry= is deprecated since cantus 0.7.0 and will be removed in a later release; use parse_tool_call(..., registry=...) instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W2 W12:build_schema
 from cantus import skill
@@ -424,6 +496,8 @@ schema = build_schema()
 print(sorted(schema))
 ```
 
+**After (v0.7.0):**
+
 ```python after
 from cantus import Registry, tool
 from cantus.grammar.tool_call import build_schema
@@ -439,6 +513,8 @@ schema = build_schema(registry=Registry(tools=[add]))
 print(sorted(schema))
 ```
 
+**Before (v0.6.0):**
+
 ```python before W2 W12:parse_tool_call
 from cantus import skill
 from cantus.grammar.tool_call import parse_tool_call
@@ -453,6 +529,8 @@ def add(a: int, b: int) -> int:
 call = parse_tool_call('{"thought": "", "action": {"final_answer": "5"}}')
 print(call.final_answer)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry, tool
@@ -480,9 +558,13 @@ cantus catches it and keeps parsing, so under an error filter it disappears with
 Update scripted and few-shot outputs to `"tool_name"`. The agent parses each reply with
 `parse_tool_call`, which the example calls directly.
 
+Warning text:
+
 ```text warning W13
 the action key "skill_name" is deprecated since cantus 0.7.0 and will be removed in a later release; use "tool_name" instead. Update scripted or few-shot model outputs. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W13
 from cantus import Registry
@@ -492,6 +574,8 @@ reply = '{"thought": "", "action": {"skill_name": "add", "args": {"a": 2, "b": 3
 call = parse_tool_call(reply, registry=Registry())
 print(call.args)
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry
@@ -507,9 +591,13 @@ print(call.args)
 Reaching `SkillsPane` on `cantus.tui.widgets` warns. It is the same class as `ToolsPane`. The tab
 itself changed too: see [X6](#the-tui-tab-x6).
 
+Warning text:
+
 ```text warning W14
 SkillsPane is deprecated since cantus 0.7.0 and will be removed in a later release; use ToolsPane instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W14
 from textual.widgets import DataTable
@@ -522,6 +610,8 @@ class MyPane(SkillsPane):
 
 print(issubclass(MyPane, DataTable))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from textual.widgets import DataTable
@@ -540,9 +630,13 @@ print(issubclass(MyPane, DataTable))
 Reaching `active_skill_names` on `cantus.tui.widgets` warns. It is the same function as
 `active_tool_names`, which recognises both `skill:<name>` and `tool:<name>` sources.
 
+Warning text:
+
 ```text warning W15
 active_skill_names is deprecated since cantus 0.7.0 and will be removed in a later release; use active_tool_names instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W15
 from cantus.tui.widgets import active_skill_names
@@ -550,6 +644,8 @@ from cantus.tui.widgets import active_skill_names
 sessions = [{"source": "skill:add", "status": "running"}]
 print(sorted(active_skill_names(sessions)))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.tui.widgets import active_tool_names
@@ -563,9 +659,13 @@ print(sorted(active_tool_names(sessions)))
 Reaching `collect_skills` on `cantus.serve.introspection` warns. It is the same function as
 `collect_tools`.
 
+Warning text:
+
 ```text warning W16
 collect_skills is deprecated since cantus 0.7.0 and will be removed in a later release; use collect_tools instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W16
 from cantus import Registry
@@ -573,6 +673,8 @@ from cantus.serve.introspection import collect_skills
 
 print(collect_skills(Registry()))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry
@@ -586,11 +688,15 @@ print(collect_tools(Registry()))
 Calling `update_skills()` on the pane warns and still fills the table. Every call warns; filling
 rows needs a mounted pane, as in the example.
 
+Warning text:
+
 ```text warning W17
 update_skills() is deprecated since cantus 0.7.0 and will be removed in a later release; use update_tools() instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
 
 The before block also prints W14, because it names `SkillsPane`.
+
+**Before (v0.6.0):**
 
 ```python before W14 W17
 import asyncio
@@ -613,6 +719,8 @@ async def main():
 
 asyncio.run(main())
 ```
+
+**After (v0.7.0):**
 
 ```python after
 import asyncio
@@ -649,13 +757,19 @@ old keywords warn and still work. The `expose_as_*` functions check for their SD
 `expose_as_hf_tool` examples (before and after) need the `huggingface` extra
 (`pip install 'cantus-agent[huggingface]'`).
 
+Warning text:
+
 ```text warning W18:skill
 the keyword skill= is deprecated since cantus 0.7.0 and will be removed in a later release; use tool= instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
 
+Warning text:
+
 ```text warning W18:skills
 the keyword skills= is deprecated since cantus 0.7.0 and will be removed in a later release; use tools= instead. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
 ```
+
+**Before (v0.6.0):**
 
 ```python before W2 W18:skills
 from cantus import skill
@@ -672,6 +786,8 @@ server = export_as_mcp_server(skills=[add], name="demo", version="1.0")
 print([t["name"] for t in server.tools])
 ```
 
+**After (v0.7.0):**
+
 ```python after
 from cantus import tool
 from cantus.adapters import export_as_mcp_server
@@ -686,6 +802,8 @@ def add(a: int, b: int) -> int:
 server = export_as_mcp_server(tools=[add], name="demo", version="1.0")
 print([t["name"] for t in server.tools])
 ```
+
+**Before (v0.6.0):**
 
 ```python before W2 W18:skill
 from cantus import skill
@@ -706,6 +824,8 @@ def add(a: int, b: int) -> int:
 hf_tool = expose_as_hf_tool(skill=add)
 print(hf_tool(a=2, b=3))
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import tool
@@ -796,17 +916,25 @@ PYTHONPATH=. cantus serve --registry-import mytools:registry
 
 Tools are served under `/tools/{name}`. The legacy route still answers during the alias period.
 
+**Before (v0.6.0):**
+
 ```bash before
 curl -sS -X POST http://127.0.0.1:8765/skills/add -H 'content-type: application/json' -d '{"a": 2, "b": 3}'
 ```
+
+Output:
 
 ```text output
 {"result":5}
 ```
 
+**After (v0.7.0):**
+
 ```bash after
 curl -sS -X POST http://127.0.0.1:8765/tools/add -H 'content-type: application/json' -d '{"a": 2, "b": 3}'
 ```
+
+Output:
 
 ```text output
 {"result":5}
@@ -814,17 +942,25 @@ curl -sS -X POST http://127.0.0.1:8765/tools/add -H 'content-type: application/j
 
 ### `GET /skills` → `GET /tools` (R2)
 
+**Before (v0.6.0):**
+
 ```bash before
 curl -sS http://127.0.0.1:8765/skills | python3 -c 'import json, sys; print([t["name"] for t in json.load(sys.stdin)])'
 ```
+
+Output:
 
 ```text output
 ['add']
 ```
 
+**After (v0.7.0):**
+
 ```bash after
 curl -sS http://127.0.0.1:8765/tools | python3 -c 'import json, sys; print([t["name"] for t in json.load(sys.stdin)])'
 ```
+
+Output:
 
 ```text output
 ['add']
@@ -832,17 +968,25 @@ curl -sS http://127.0.0.1:8765/tools | python3 -c 'import json, sys; print([t["n
 
 ### `GET /introspection/skills` → `GET /introspection/tools` (R3)
 
+**Before (v0.6.0):**
+
 ```bash before
 curl -sS http://127.0.0.1:8765/introspection/skills | python3 -c 'import json, sys; print([t["name"] for t in json.load(sys.stdin)])'
 ```
+
+Output:
 
 ```text output
 ['add']
 ```
 
+**After (v0.7.0):**
+
 ```bash after
 curl -sS http://127.0.0.1:8765/introspection/tools | python3 -c 'import json, sys; print([t["name"] for t in json.load(sys.stdin)])'
 ```
+
+Output:
 
 ```text output
 ['add']
@@ -855,6 +999,8 @@ headers (RFC 9745; the exceptions are in [R7](#how-legacy-routes-behave-r7)). `@
 deprecation date, 2026-11-12T00:00:00Z, as a Unix timestamp. cantus sends the header names in
 lower case; HTTP header names are case-insensitive.
 
+Output:
+
 ```text output
 deprecation: @1794441600
 link: <https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md>; rel="deprecation"; type="text/markdown"
@@ -866,6 +1012,8 @@ The first request to each legacy route template in one `serve()` application log
 the logger `cantus.serve` at level WARNING. The template is shared by every tool
 (`/skills/{name}`), so the record appears once per template, not once per tool. With no logging
 configured, `cantus serve` prints the bare message:
+
+Output:
 
 ```text output
 Legacy route /skills/{name} is deprecated since cantus 0.7.0; use /tools/{name}. See https://github.com/schola-cantorum/cantus/blob/v0.7.0/docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md
@@ -921,6 +1069,8 @@ name, its field changes). `ParsedToolCall`'s `fields`, `repr`, `asdict` keys and
 use `tool_name` too. The introspection trace's `type` is the class name. Code that compares
 class names as strings fails silently; compare classes with `isinstance`.
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus import Agent, skill
 
@@ -939,9 +1089,13 @@ state = Agent(model).run("What is 2 + 3?")
 print(sum(type(e).__name__ == "SkillObservation" for e in state.stream))
 ```
 
+Output:
+
 ```text output
 1
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, ToolObservation, tool
@@ -961,6 +1115,8 @@ state = Agent(model, tools=[add]).run("What is 2 + 3?")
 print(sum(isinstance(e, ToolObservation) for e in state.stream))
 ```
 
+Output:
+
 ```text output
 1
 ```
@@ -970,6 +1126,8 @@ print(sum(isinstance(e, ToolObservation) for e in state.stream))
 The `error_type` for a call to a tool that is not registered is now `unknown_tool` (was
 `unknown_skill`), and the texts fed back to the model name `tool_name` and `tool`. Code that
 searches the feedback for `unknown_skill` finds nothing.
+
+**Before (v0.6.0):**
 
 ```python before
 from cantus import Agent, skill
@@ -991,9 +1149,13 @@ errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
 print(sum("unknown_skill" in e.feedback for e in errors))
 ```
 
+Output:
+
 ```text output
 1
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, tool
@@ -1015,6 +1177,8 @@ errors = [e for e in state.stream if isinstance(e, ValidationErrorObservation)]
 print(sum("unknown_tool" in e.feedback for e in errors))
 ```
 
+Output:
+
 ```text output
 1
 ```
@@ -1022,6 +1186,8 @@ print(sum("unknown_tool" in e.feedback for e in errors))
 The feedback is three lines (`error_type: ...`, `detail: ...`, `raw_output_preview: ...`). The
 `error_type` values are `missing_field` and `unknown_skill` (now `unknown_tool`). The `detail`
 texts, the empty-answer feedback and the dispatch message, v0.6 then v0.7:
+
+v0.6.0:
 
 ```text old
 action object missing or not a JSON object; required keys: skill_name or final_answer
@@ -1031,6 +1197,8 @@ skill_name '<x>' not in current skill registry; available: [<names>]
 FinalAnswerAction.answer must be non-empty after str.strip(); call a skill or write a substantive answer
 skill '<x>' not registered. Available: [<names>]
 ```
+
+v0.7.0:
 
 ```text new
 action object missing or not a JSON object; required keys: tool_name or final_answer
@@ -1045,21 +1213,29 @@ tool '<x>' not registered. Available: [<names>]
 
 `Registry.KINDS` is `("tool",)` (was `("skill",)`).
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus import Registry
 
 print("skill" in Registry.KINDS)
 ```
 
+Output:
+
 ```text output
 True
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry
 
 print("tool" in Registry.KINDS)
 ```
+
+Output:
 
 ```text output
 True
@@ -1069,6 +1245,8 @@ True
 
 Serialized, the result of `spec_for_llm()` and the tool catalog in the prompt carry the key
 `"tool"` (was `"skill"`). Code that serializes and then indexes the JSON must use the new key.
+
+**Before (v0.6.0):**
 
 ```python before
 import json
@@ -1086,9 +1264,13 @@ payload = json.loads(json.dumps(get_registry().spec_for_llm()))
 print([t["name"] for t in payload["skill"]])
 ```
 
+Output:
+
 ```text output
 ['add']
 ```
+
+**After (v0.7.0):**
 
 ```python after
 import json
@@ -1106,6 +1288,8 @@ payload = json.loads(json.dumps(Registry(tools=[add]).spec_for_llm()))
 print([t["name"] for t in payload["tool"]])
 ```
 
+Output:
+
 ```text output
 ['add']
 ```
@@ -1118,6 +1302,8 @@ summaries `CallToolAction tool='<name>' ...`, `ToolObservation tool='<name>' ...
 `ToolErrorObservation tool='<name>'`. With the [R0](#the-server-used-by-the-examples-r0) server running, this example calls a tool, then
 reads the session sources.
 
+**Before (v0.6.0):**
+
 ```python before
 import httpx
 
@@ -1127,9 +1313,13 @@ sessions = httpx.get(f"{base}/introspection").json()["sessions"]
 print([s["source"].split(":", 1)[1] for s in sessions if s["source"].startswith("skill:")])
 ```
 
+Output:
+
 ```text output
 ['add']
 ```
+
+**After (v0.7.0):**
 
 ```python after
 import httpx
@@ -1139,6 +1329,8 @@ httpx.post(f"{base}/tools/add", json={"a": 2, "b": 3})
 sessions = httpx.get(f"{base}/introspection").json()["sessions"]
 print([s["source"].split(":", 1)[1] for s in sessions if s["source"].startswith("tool:")])
 ```
+
+Output:
 
 ```text output
 ['add']
@@ -1157,6 +1349,8 @@ column header is `tool`, and the footer reads `2 Tools`. The table keeps the wid
 The example below styles the pane with a type selector, then queries it by name. Run on v0.7.0,
 the before block prints `tools 100h` (`100h` is Textual's default, so the rule was ignored) and
 then fails on the query.
+
+**Before (v0.6.0):**
 
 ```python before
 import asyncio
@@ -1180,10 +1374,14 @@ async def main():
 asyncio.run(main())
 ```
 
+Output:
+
 ```text output
 skills 5
 SkillsPane
 ```
+
+**After (v0.7.0):**
 
 ```python after
 import asyncio
@@ -1207,6 +1405,8 @@ async def main():
 asyncio.run(main())
 ```
 
+Output:
+
 ```text output
 tools 5
 ToolsPane
@@ -1218,6 +1418,8 @@ ToolsPane
 `/tools`, `/tools/{name}` and `/introspection/tools` exist. A registry with a tool named
 `tools` no longer serves: `serve()` raises `ValueError` (the text is under [K1](#serve-collision-texts-k1)).
 Rename the tool.
+
+**Before (v0.6.0):**
 
 ```python before
 from cantus import get_registry, skill
@@ -1234,9 +1436,13 @@ app = serve(get_registry())
 print("built")
 ```
 
+Output:
+
 ```text output
 built
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Registry, tool
@@ -1253,6 +1459,8 @@ app = serve(Registry(tools=[list_things]))
 print("built")
 ```
 
+Output:
+
 ```text output
 built
 ```
@@ -1268,6 +1476,8 @@ not see a method assigned to the class or to an instance after the class exists,
 below an intermediate class whose `__init_subclass__` does not call `super()`. Override
 `_dispatch_tool` and read `action.tool_name`. A check there runs only when an agent calls the
 tool: `cantus serve` calls tools directly ([V6](#http-calls-do-not-run-hooks-v6)).
+
+**Before (v0.6.0):**
 
 ```python before
 from cantus import Agent, skill
@@ -1293,10 +1503,14 @@ state = CheckedAgent(model).run("What is 2 + 3?")
 print(state.stream[-1].answer)
 ```
 
+Output:
+
 ```text output
 checking add
 5
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Agent, tool
@@ -1322,6 +1536,8 @@ state = CheckedAgent(model, tools=[add]).run("What is 2 + 3?")
 print(state.stream[-1].answer)
 ```
 
+Output:
+
 ```text output
 checking add
 5
@@ -1333,21 +1549,29 @@ A star import of `cantus` brings the new names and, of the legacy names, only th
 `skill`, `register_skill` and `get_registry` (they warn when called). `Skill`, `CallSkillAction` and
 `SkillObservation` must be imported by name.
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus import *
 
 print(Skill.__name__)
 ```
 
+Output:
+
 ```text output
 Skill
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import Tool
 
 print(Tool.__name__)
 ```
+
+Output:
 
 ```text output
 Tool
@@ -1375,6 +1599,8 @@ round, during the alias period a rule written for the `/tools` paths must also c
 
 These texts name Tool instead of Skill. v0.6, then v0.7:
 
+v0.6.0:
+
 ```text old
 @debug can only wrap a Skill or hook helper (Skill, Analyzer, Validator); got <type>. Make sure @debug is on top: `@debug` then `@skill`.
 [debug] <role> '<hook>' invoked from skill '<name>'
@@ -1382,6 +1608,8 @@ Protocol kind 'analyzer' was removed in cantus v0.3.0. Analyzer and Validator ar
 Unknown protocol kind: 'nope'. Valid: ('skill',)
 Cannot register skill without a `name` attribute on the instance
 ```
+
+v0.7.0:
 
 ```text new
 @debug can only wrap a Tool or hook helper (Tool, Analyzer, Validator); got <type>. Make sure @debug is on top: `@debug` then `@tool`.
@@ -1395,11 +1623,15 @@ Cannot register tool without a `name` attribute on the instance
 
 ### `serve()` collision texts (K1)
 
+v0.6.0:
+
 ```text old
 Skill name 'skills' collides with a reserved dashboard path (reserved dashboard path)
 Skill name 'channels' collides with a reserved channel path (reserved channel path)
 Skill name 'introspection' collides with a reserved introspection path (reserved introspection path)
 ```
+
+v0.7.0:
 
 ```text new
 Tool name 'skills' collides with a reserved dashboard path (reserved dashboard path)
@@ -1411,11 +1643,15 @@ The name `tools` collides too, with the same text; in v0.6 it did not (see [X7](
 
 ### Adapter texts (K2)
 
+v0.6.0:
+
 ```text old
 expose_as_langchain_tool expects Skill, got <type>
 export_as_mcp_server expects list[Skill], got element of type <type>
 export_as_mcp_server requires at least one Skill in the input list
 ```
+
+v0.7.0:
 
 ```text new
 expose_as_langchain_tool expects Tool, got <type>
@@ -1438,10 +1674,14 @@ identical). Reading `["skills"]` keeps working during the alias period; prefer `
 
 ### `GrammarError` texts (K5)
 
+v0.6.0:
+
 ```text old
 skill_name must be a string
 skill_name '<x>' not registered; available: [<names>]
 ```
+
+v0.7.0:
 
 ```text new
 tool_name must be a string
@@ -1460,11 +1700,15 @@ validates `skill_name` outputs against it must change.
 Calls that were already wrong now raise `TypeError` with a message, where v0.6 raised
 `AttributeError`:
 
+v0.6.0:
+
 ```text old
 skill(42)                                   -> AttributeError
 skill(existing_tool, post_hook=h)           -> AttributeError
 register_skill(existing_tool, pre_hook=h)   -> AttributeError
 ```
+
+v0.7.0:
 
 ```text new
 skill(42)                                   -> TypeError: expected a function or a Tool, got int
@@ -1489,6 +1733,8 @@ names are gone, with no alias:
 
 Import the new names from `cantus` (or `cantus.tui.widgets`) instead.
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus.core.agent import get_registry
 from cantus.protocols.debug import Skill
@@ -1497,15 +1743,21 @@ from cantus.serve.app import CallSkillAction
 print(Skill.__name__, CallSkillAction.__name__, callable(get_registry))
 ```
 
+Output:
+
 ```text output
 Skill CallSkillAction True
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus import CallToolAction, Registry, Tool
 
 print(Tool.__name__, CallToolAction.__name__, callable(Registry))
 ```
+
+Output:
 
 ```text output
 Tool CallToolAction True
@@ -1526,6 +1778,8 @@ shim, and its base class `_RemoteSkillBase` is `_RemoteToolBase`. `_RemoteSkillB
 from `cantus.adapters.mcp_client`, `dspy`, `huggingface` and `langchain`. The class is private, but
 the older adapter notes under `docs/protocols/` show subclassing it:
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus.adapters._remote_skill import _RemoteSkillBase
 
@@ -1539,9 +1793,13 @@ echo = Echo(name="echo", description="Echo the arguments.", args_schema_dict={"t
 print(echo.name, echo.is_remote)
 ```
 
+Output:
+
 ```text output
 echo True
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.adapters._remote_tool import _RemoteToolBase
@@ -1555,6 +1813,8 @@ class Echo(_RemoteToolBase):
 echo = Echo(name="echo", description="Echo the arguments.", args_schema_dict={"type": "object"})
 print(echo.name, echo.is_remote)
 ```
+
+Output:
 
 ```text output
 echo True
@@ -1577,21 +1837,29 @@ In v0.6, `cantus.adapters.huggingface.Tool` was smolagents' `Tool` class. It is 
 smolagents' class is `SmolagentsTool` there. The import does not fail, it gives you the other
 class. Import smolagents' class from smolagents.
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus.adapters.huggingface import Tool
 
 print(Tool.__module__)
 ```
 
+Output:
+
 ```text output
 smolagents.tools
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from smolagents import Tool
 
 print(Tool.__module__)
 ```
+
+Output:
 
 ```text output
 smolagents.tools
@@ -1614,21 +1882,29 @@ Star imports of these modules no longer bind legacy names:
 - `cantus.serve`, `cantus.serve.introspection`, `cantus.tui.widgets`: not `SkillEntry`,
   `collect_skills`, `SkillsPane` or `active_skill_names`.
 
+**Before (v0.6.0):**
+
 ```python before
 from cantus.serve.introspection import *
 
 print(SkillEntry.__name__)
 ```
 
+Output:
+
 ```text output
 SkillEntry
 ```
+
+**After (v0.7.0):**
 
 ```python after
 from cantus.serve.introspection import ToolEntry
 
 print(ToolEntry.__name__)
 ```
+
+Output:
 
 ```text output
 ToolEntry
@@ -1666,6 +1942,8 @@ patterns still work. `agent.registry = x` accepts only a
 library's line (once per process), except on a subclass with its own `__init__`, where it raises;
 use `replace(agent, tools=r)`.
 
+**Before (v0.6.0):**
+
 ```python before
 import dataclasses
 
@@ -1677,10 +1955,14 @@ copy = dataclasses.replace(agent, registry=Registry())
 print(type(copy.registry).__name__)
 ```
 
+Output:
+
 ```text output
 ['model', 'registry', 'soul']
 Registry
 ```
+
+**After (v0.7.0):**
 
 ```python after
 import dataclasses
@@ -1692,6 +1974,8 @@ print([f.name for f in dataclasses.fields(agent)])
 copy = dataclasses.replace(agent, tools=Registry())
 print(type(copy.registry).__name__)
 ```
+
+Output:
 
 ```text output
 ['model', 'tools', 'soul']
@@ -1758,6 +2042,8 @@ pytest's `-W` and `filterwarnings` can name it. A library that installs a blanke
 `ignore` filter after `import cantus` hides later warnings too. Silencing the whole category also
 hides W11, which tells you an agent is using tools that a library registered; prefer fixing the
 warnings, or silence one message with `filterwarnings("ignore", message=...)`.
+
+**Example (v0.7.0):**
 
 ```python after
 import warnings
