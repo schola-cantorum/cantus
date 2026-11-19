@@ -2,7 +2,7 @@
 id: T-0017
 title: Documentation site — the Tool page and the protocol pages
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0015]
 ---
 
@@ -51,6 +51,9 @@ its marker block) and the protocol pages; T-0018 does the rest of the site. Read
   `docs/api/protocols/` find nothing.
 
 - **Readings approved at stage 5 (2026-11-19).**
+  These are the user's stage-5 decisions D1-D13 (`.scratch/T-0017/test-plan-v2.md` section 4); no
+  round-2 finding id applies to D1 or D2, which came from the 16:20 stage-5 handoff ("What moved
+  since stage 4").
   - **D1 (TR-137, workflows.md).** `protocols/workflows.md` no longer names `_dispatch_skill`
     (c79efea, #50, removed an untrue sentence: the building blocks call their steps directly), so
     TR-137 is met for that page by naming no `_dispatch_skill`; no `_dispatch_tool` sentence is
@@ -71,10 +74,18 @@ its marker block) and the protocol pages; T-0018 does the rest of the site. Read
     `skills` key, `gated_routes`, the reserved name `skills`, the operator note (X11, R2-6) and the
     TUI's v0.6 fallback; full warning texts and before/after code are the migration guide's.
   - **D11 (memory page).** The hardening example is the `AutoMemory.tools` docstring's code
-    verbatim (plus a model line so the page runs), with no extra explanatory sentences, as T-0014's
-    D4b. SEC-T0014-1, -2 and -4 are not addressed here (close-out and retrospective).
+    verbatim (plus the imports, a `MarkdownMemory` backend and a model line so the page runs), with
+    no extra explanatory sentences, as T-0014's D4b. SEC-T0014-1, -2 and -4 are not addressed here (close-out and retrospective).
   - **D12 (identity page).** `Agent(model=m)` stays; only the "byte-identical to v0.3.0" claim is
     corrected.
+  - **D5 (the `@debug` expected output).** "Checked by running the snippet" is met by the scratch
+    harness `debugcheck.py` (H3), run at stage 5 and on the ticket build at stage 8; `debug.md` does
+    not join `IN_SCOPE_PAGES`.
+  - **D8.** The serve page carries no legacy route or value; it links to the Tool page's migration
+    section. **D9.** On the adapters page, sentences that told history in old names are rewritten as
+    statements of what exists now. **D10.** The main session wrote the English Tool page, the moved
+    pages and `test_moved_page.py`; `harness-executor` wrote the rest in two runs. **D13.** The
+    rewritten zh-tw pages also get Taiwan usage (`子行程`, `物件`, `身分`, `子類別`, `設定`).
 
 ## Review findings carried
 
@@ -89,10 +100,11 @@ its marker block) and the protocol pages; T-0018 does the rest of the site. Read
 sweep 測試才不會在文件上失敗。
 
 stage 5（2026-11-19）核准的讀法：workflows.md 已不提 `_dispatch_skill`，即滿足 TR-137，不加回
-`_dispatch_tool`（D1）；「舊名只在 legacy 段落」只適用自己寫的頁面，不含 changelog 與整檔豁免的
+`_dispatch_tool`（D1，這個讀法也與 Deliverable 原文「analyzer 與 workflows 都要寫 `_dispatch_tool`」不同）；「舊名只在 legacy 段落」只適用自己寫的頁面，不含 changelog 與整檔豁免的
 moved page（D2）；guide 連結用 `blob/main` 絕對網址，T-0019 合入前 404（D3）；legacy 段落固定 anchor
-`#migrating-from-skill`、內容如英文段落所列（D4）；memory 頁照 docstring 範例、不加說明句（D11）；
-identity 頁只修正「byte-identical」一句（D12）。Test plan 共 16 列，列號清單在 Comments。
+`#migrating-from-skill`、內容如英文段落所列（D4）；memory 頁照 docstring 範例、不加說明句，SEC-T0014-1／-2／-4 不在本票處理（D11）；
+identity 頁只修正「byte-identical」一句（D12）；debug 頁的預期輸出由 scratch harness 檢查（D5）；serve 頁不寫舊值、只連過去（D8）；
+adapters 的歷史句改寫成現況（D9）；重寫的 zh-tw 頁一併改成台灣用語（D13）。Test plan 共 16 列，列號清單在 Comments。
 
 ## Comments
 
@@ -137,7 +149,11 @@ identity 頁只修正「byte-identical」一句（D12）。Test plan 共 16 列�
   existed: `red-part0.txt` (rows 1–3: the moved page had 56 non-blank lines, `protocols/tool.md`
   missing), `scan-baseline-3edfb93.txt` (row 5: 21 files), `pagewarn-baseline-90e0ed3.txt` (row 6:
   4 pages printed 13 cantus warnings), `debugcheck-red-naive-rename.txt` (row 7: a plain `@skill` →
-  `@tool` rename still fails on the stale `TypeError` line). The zh-tw href test
+  `@tool` rename still fails on the stale `TypeError` line). Row 4 (skip ratchet) also failed in
+  `red-part0.txt`, only because `protocols/tool.md` did not exist yet; it passed once the page
+  existed. The harnesses named in the row list are the stage-5 prototypes; the final evidence
+  comes from their second versions `scan2.py` and `pagewarn2.py` (touched-file scope, marker
+  pairing, a `cantus.__file__` probe per page). The zh-tw href test
   (`test_zh_tw_moved_page_links_where_the_english_one_does`) was green on arrival (both pages had
   no link); the mutation check kills it. The main session wrote the English Tool page, the moved
   page and `test_moved_page.py`; `harness-executor` wrote the rest in two runs (briefs
@@ -148,17 +164,55 @@ identity 頁只修正「byte-identical」一句（D12）。Test plan 共 16 列�
 
   | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
-  | moved page (en, zh-tw) | `tests/docs/test_moved_page.py` (3 tests), rows 1–2 | 3 passed; 14 mutations killed (`mutations.txt`) | AC-37/TR-135, TR-132 (moved page), V2-15 | — |
-  | Tool page (en, zh-tw) | `IN_SCOPE_PAGES` parametrised tests (well-formed, runs, parity, install pin), row 3; H2 | runner passes, 0 cantus warnings (`h2h3-stage5.txt`) | TR-131/132/134, R2-14, R2-15 | prose rows judged at stage 6 |
-  | self-check over touched files | H1 `scan2.py`, row 5 | `FILES FAILING: 0` over 33 files (`scan2-final.txt`); 12 H1 mutations killed | self-check, AC-37 | `supp` lines left on purpose: the anchor `#migrating-from-skill`, the moved page's path in `pages.py`, `test_moved_page.py`, `gen_docs_api.mjs` |
-  | executed protocol pages | H2 `pagewarn2.py`, row 6 | 5 pages, 0 warnings, `cantus.__file__` recorded | Deliverable | page execution on Python 3.10–3.12 could not run locally (below) |
-  | `@debug` output (en, zh-tw) | H3 `debugcheck.py`, row 7; parse mode, row 8 | 5/5 lines match on both pages; 8 pages parse; 5 H3 mutations killed | Deliverable | the four non-executed pages (adapters, debug, identity, serve) only parse |
-  | `docs/api` | `npm run docs:api`, row 9 | `docs/api/protocols/tool.md` tracked; no drift | TR-136 | — |
-  | navigation, build, anchors | `build-dist-checks.txt`, rows 10–11 | build exit 0; nav and sidebar point to `/protocols/tool` in both locales; `id="migrating-from-skill"` on both Tool pages; markers absent from the HTML | TR-134, AC-37 | the GitHub guide URL is 404 until T-0019 lands |
-  | TR-137 | row 12 | analyzer en, zh-tw, `docs/api`: `_dispatch_tool` 1, `_dispatch_skill` 0 | TR-137 | workflows per reading D1 |
+  | moved page (en, zh-tw) | `tests/docs/test_moved_page.py` (3 tests), rows 1–2 | 3 passed; 18 mutations killed (15 English, 2 zh-tw, 1 the zh-tw href test run by pytest on a mutated copy) (`mutations.txt`) | AC-37/TR-135, TR-132 (moved page), V2-15 | — |
+  | Tool page (en, zh-tw) | `IN_SCOPE_PAGES` parametrised tests (well-formed, runs, parity), row 3; H2 | runner passes, 0 cantus warnings (`after-review-checks.txt`) | TR-131/132/134, R2-14, R2-15 | the install-pin test passes vacuously for this page (it has no shell fence); prose rows judged at stage 6 |
+  | skip ratchet | `tests/docs/test_skip_ratchet.py`, row 4 | total 13 unchanged (`pytest-full.txt`) | skip ratchet | — |
+  | self-check over touched files | H1 `scan2.py`, row 5 | `FILES FAILING: 0` over the 31 touched files in the 4.1 scan set (the ticket file is outside it) (`scan2-final.txt`); 11 H1 mutations killed | self-check, AC-37 | `supp` lines left on purpose: the anchor `#migrating-from-skill` in `serve.md` (en, zh-tw, lines 43 and 254), the moved page's path in `gen_docs_api.mjs:40` and in `test_moved_page.py` |
+  | executed protocol pages | H2 `pagewarn2.py`, row 6 | 5 pages, 0 warnings, `cantus.__file__` recorded; 2 H2 mutations killed | Deliverable | — |
+  | `@debug` output (en, zh-tw) | H3 `debugcheck.py`, row 7; parse mode, row 8 | 5/5 lines and the wrapping line count match on both pages (`h3-stage5/`); the 8 non-executed pages parse (`parse-stage5.txt`); 5 H3 mutations killed | Deliverable | adapters, debug, identity and serve code blocks only parse |
+  | `docs/api` | `npm run docs:api`, row 9 | `docs/api/protocols/tool.md` tracked; `git status --porcelain` empty after regeneration at `0fb8419` | TR-136 | — |
+  | navigation, build, anchors | `build-dist-checks.txt`, rows 10–11 | build exit 0; 29 of 30 English pages and 29 of 29 zh-tw pages link `/protocols/tool` in their locale (`404.html` has no navigation); no page links nav to the moved page; ids `migrating-from-skill`, `do-not-name-a-variable-tool` on both Tool pages and `automemory-production-warning` on both memory pages | TR-134, AC-37 | the GitHub guide URL is 404 until T-0019 lands |
+  | TR-137 | row 12 | analyzer en, zh-tw, `docs/api`: `_dispatch_tool` 1, `_dispatch_skill` 0; 1 mutation killed | TR-137 | workflows per reading D1 |
   | repository | row 14 (`pytest-full.txt`, `repo-checks.txt`) | 1851 passed, 3 skipped; ruff, mypy, `check_no_dev_paths.sh`, `verify-project.py` pass | ticket-rules §3 | — |
-  | Python 3.10–3.14 | row 15 (`matrix-tests-docs.txt`, `matrix-base-3edfb93.txt`) | 3.13, 3.14: 181 passed; 3.10–3.12: the ticket's tests pass, but every page-execution test fails locally, at `3edfb93` too (same 15 tests, the runner's socket patch breaks the `ssl` import on this macOS setup) | — | page execution on 3.10–3.12 is left to CI (green on `main` at `3edfb93`) |
+  | Python 3.10–3.14 | row 15 (`matrix-failures.txt`) | 3.13, 3.14: 181 passed. 3.10–3.12: 15 failed, the same 15 at `3edfb93` by name except that the swapped page id is `protocols/tool.md` instead of `protocols/skill.md`; every page-execution test fails there because importing pydantic reaches `ssl` after the runner's preamble replaced `socket.socket` | — | page execution on 3.10–3.12 is left to CI (green on `main` at `3edfb93`); the PR's CI run is the evidence |
 
   One harness bug was found and fixed during the run: `debugcheck.py` resolved a relative
   interpreter path from its temporary directory, which made every H3 run fail; after the fix the
-  controls pass and the H3 mutations are killed for the right reason.
+  controls pass and the H3 mutations are killed for the right reason. In total `mutations.txt` has
+  44 rows after review fixes: 37 mutations killed, 7 controls passing, none surviving.
+- **Stage 6 (2026-11-19, review of `3edfb93..48624a5`).** One Workflow ran three `harness-reviewer`
+  axes: Standards (28 findings, S-01 to S-28), Spec requirements with a per-row mapping (18, P-01 to
+  P-18) and Spec page facts (21, F-01 to F-21); seven findings are medium severity (S-01, S-02, P-01, P-09, F-01, F-02, F-03), the rest low.
+  Every finding and its disposition is in `.scratch/T-0017/stage6-findings.md`. Fixed in
+  `0fb8419`: the `collect_skills` location in the legacy table (P-01), the legacy intro's claim that
+  every old name keeps working and warns (P-02, F-10), `validate_args` and hooks running only under
+  an `Agent` (F-02), exported adapter tools running without hooks (F-03), the adapters history and
+  example parameter (P-03, P-04), the TUI running-session condition, log per route template, a
+  positive `Registry(tools=...)` example and other page facts, zh-tw wording, and the moved-page
+  test's checks (S-10, S-12, S-13). Fixed in this record: the coverage numbers and evidence gaps
+  (S-01 to S-09, P-06 to P-09, P-12, P-13) and the missing readings (S-23, S-24, S-28). Shown to
+  the user, not changed: S-11 (commit self-tests for the checker), S-26/P-14 (`docs/api` relative
+  links and `{#...}` anchors need a generator change), F-01 (pages call the whole prompt a "system
+  prompt" though `ChatModelAsHandle` sends it as a user message), F-04, F-13, F-18, F-19, F-21
+  (statements that predate this ticket on the pages it rewrote), P-05 (the adapters Anthropic
+  sentence follows the brief, not the plan's "wrap with your own `@tool`", which does not apply on
+  that path).
+- **Stage 7.** Report: `.proj.specs/0001-tool-rename-phase-one/review/security-T-0017.md`. Five
+  candidates, all rejected by independent false-positive checks; no finding reaches the reporting
+  threshold. Three non-security suggestions from the checks were applied in `0fb8419` (operator
+  note in both directions, `Available: [...]` wording, a shared `Registry` object). Chain-analysis
+  inputs: SEC-T0017-1 (R2-6, X11 family), SEC-T0017-3 (R2-15, SEC-T0011-1), SEC-T0017-5 (R2-15), and
+  F-02/F-03 (R2-5 family).
+- **Stage 8 (ticket build `0fb8419`, ADR-0018).** Wheel from `git archive 0fb8419`, sha256
+  `0b470415cfb0b9e3dfa0ff852eeb9779343ef2c5c9e0d85f54d8c55b0896defb`, installed in a fresh Python
+  3.13.11 venv on macOS 26.6.2 arm64; `cantus.__file__` in that venv's site-packages; the harnesses
+  ran from the extracted tree outside the checkout with `PYTHONPATH` and `PYTHONWARNINGS` unset and
+  the checkout as a forbidden origin. Surface 1, Python API in a script: H2 ran the five executed
+  protocol pages (runner passes, 0 cantus warnings, each page's `cantus.__file__` is the venv's); H3
+  matched all debug lines on both locales. Transcript: `.scratch/T-0017/stage8/stage8-transcript.txt`
+  and `stage8/out/`. Surface 2, the built site in a browser: `npm run docs:build` at `0fb8419`
+  served by `vitepress preview`, driven with the desktop app's built-in browser pane (DOM
+  evaluation over 17 pages, two click-throughs, three screenshots); notes in
+  `.scratch/T-0017/stage8/browser.md`. Not covered: the other 9 in-scope pages on the ticket build
+  (CI runs them on the PR), Python 3.10–3.12 page execution (CI), the guide link target (404 until
+  T-0019), keyboard and screen-reader behaviour, other browsers.
