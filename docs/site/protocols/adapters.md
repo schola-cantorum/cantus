@@ -12,7 +12,7 @@
 
 Design principles:
 
-- **Pure wrapper layer** — an adapter does **not** change the runtime behavior of a Tool or Memory; it only translates schemas.
+- **Pure wrapper layer** — an adapter only translates schemas. An exported tool is run directly by the other framework, so its `pre_hook` and `post_hook` do not run; an imported remote tool carries no hooks.
 - **No new protocol kind** — `Registry.KINDS` stays `("tool",)`.
 - **`Tool.spec_for_llm()` shape is unchanged** — any schema conversion happens on the adapter side, so the existing v0.3.0 contract still passes.
 
@@ -34,7 +34,7 @@ resp = anthropic.Anthropic().messages.create(
 )
 ```
 
-**LLM-driven CRUD foot-gun warning (carried over from the v0.3.1 AutoMemory Trap-10)**: inside this tool_use loop, Claude has full CRUD access to the cantus Memory — it can `view`, `create`, `str_replace`, or `delete` any record. Before you ship to production, add filtering in the host-code dispatch layer (the part where you receive a `tool_use` and dispatch back to `memory.recall` / `memory.remember`). On this path Claude's `tool_use` goes to your host code, not through cantus's dispatcher, so cantus hooks do not run: the filter belongs in that dispatch layer. See the "`AutoMemory`: LLM-driven CRUD and the production warning" section in `docs/protocols/memory.md`.
+**LLM-driven CRUD foot-gun warning (carried over from the v0.3.1 AutoMemory Trap-10)**: inside this tool_use loop, Claude has full CRUD access to the cantus Memory — it can `view`, `create`, `str_replace`, or `delete` any record. Before you ship to production, add filtering in the host-code dispatch layer (the part where you receive a `tool_use` and dispatch back to `memory.recall` / `memory.remember`). On this path Claude's `tool_use` goes to your host code, not through cantus's dispatcher, so cantus hooks do not run: the filter belongs in that dispatch layer. See [the `AutoMemory` production warning](./memory.md#automemory-production-warning) on the Memory page.
 
 ## `export_as_mcp_server` five-line example (stdio)
 
@@ -76,9 +76,10 @@ With `port=0` the actual port is chosen by the SDK. If you need to read back the
 ## `import_mcp_server` five-line example (stdio)
 
 ```python
-from cantus import Agent
+from cantus import Agent, ChatModelAsHandle, load_chat_model
 from cantus.adapters import import_mcp_server
 
+model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # any model handle
 remote_tools = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
 agent = Agent(model, tools=remote_tools)  # the agent sees exactly these remote tools
 ```
@@ -256,23 +257,23 @@ The three core patterns of a remote tool live in a private shared base, `cantus.
 2. **`spec_for_llm()` returns `{"name", "description", "args_schema"}` directly** — `is_remote = True` does not leak into that dict.
 3. **`validate_args()` accepts a dict and dict-casts it** — trust the remote framework's schema to validate itself.
 
-To add a new `import_*` adapter (for example `import_hf_tool`, `import_openhands_action`, or `mcp_memory_server`), you only need:
+To add a new `import_*` adapter for another framework, you only need:
 
 ```python
 from cantus.adapters._remote_tool import _RemoteToolBase
 
 class _MyRemoteTool(_RemoteToolBase):
-    def __init__(self, *, tool):
+    def __init__(self, *, remote):
         super().__init__(
-            name=tool.name,
-            description=tool.description,
-            args_schema_dict=_derive_schema(tool),
+            name=remote.name,
+            description=remote.description,
+            args_schema_dict=_derive_schema(remote),
         )
-        self._tool = tool
+        self._remote = remote
 
     def run(self, **kwargs):
         try:
-            return self._tool.dispatch(**kwargs)
+            return self._remote.dispatch(**kwargs)
         except Exception as exc:
             raise RuntimeError(
                 f"myframework_remote_error: {self.name!r} failed: {exc}"
@@ -290,7 +291,7 @@ class _MyRemoteTool(_RemoteToolBase):
 
 v0.3.3 batch2 shipped six cross-framework callables at once, but HuggingFace and OpenHands each had only the export direction, marked in the spec as "deferred to v0.3.4 batch3 evaluation." v0.3.4 cleans up that deferral:
 
-- **HuggingFace** import direction is **done**: the new `import_hf_tool(tool) -> Tool` aligns with the existing `_RemoteToolBase` plus lazy SDK gate pattern from v0.3.2 / v0.3.3.
+- **HuggingFace** import direction is **done**: the new `import_hf_tool(tool) -> Tool` builds on `_RemoteToolBase` and the lazy SDK gate.
 - **OpenHands** import direction is **permanently dropped** (the spec wording changes from deferred to not applicable): `openhands.events.Action` is a declarative event record that the host runtime dispatches; it has no `__call__`, so cantus `Tool.run(**kwargs)` has no callable to delegate to. Wrapping an Action as a Tool would mean re-implementing the OpenHands runtime inside cantus, which falls outside the scope of an adapter.
 
 After the v0.3.4 close-out, the cross-framework bidirectional matrix for `cantus.adapters` stands at:

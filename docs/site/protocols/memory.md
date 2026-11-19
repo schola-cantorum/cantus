@@ -90,7 +90,7 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 Every rejection completes **before** the file is opened. A rejected path is never created, opened, or touched by any IO beyond the `stat()` needed to classify it.
 
-## `AutoMemory`: autonomous LLM CRUD, and a production warning
+## `AutoMemory`: autonomous LLM CRUD, and a production warning {#automemory-production-warning}
 
 The four tools returned by `AutoMemory.tools` **let the LLM read and write memory by default**, with no built-in content filter. In a teaching setting that is intentional: students need to see the trade-offs of letting an LLM write on its own. The base `Memory` protocol has no hard delete, so `delete` only reports how many turns matched, and `str_replace` remembers a corrected copy next to the original. **Before any production use**, put a tool of your own in front of a memory tool and give the agent only the tools it needs:
 

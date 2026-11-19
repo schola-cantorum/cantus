@@ -40,7 +40,7 @@ Expected response:
 
 Every tool in the registry is automatically mounted at `POST /tools/{spec_for_llm.name}`. Arguments go in the JSON body, and the response shape is `{"result": <jsonable>}`. The Swagger UI is mounted at `/docs` by default, the OpenAPI JSON at `/openapi.json`, and ReDoc at `/redoc`. Each tool's `args_schema` is projected straight into the `requestBody.application/json.schema` of its endpoint, so a student can open the Swagger UI and see exactly how to call any tool.
 
-During the alias period the v0.6 route names still answer, with deprecation headers; see the [Tool page's migration section](./tool.md#migrating-from-skill).
+During the alias period the v0.6 route paths still answer, with deprecation headers; see the [Tool page's migration section](./tool.md#migrating-from-skill).
 
 ## Configuration
 
@@ -251,7 +251,7 @@ app = serve(registry, settings=Settings(dashboard=False))
 
 ### Reserved paths: tool names cannot collide
 
-The names `tools`, `health`, and `events` are reserved for the dashboard (and so are the route names of the alias period, listed in the [Tool page's migration section](./tool.md#migrating-from-skill)). If any tool in the registry has a `spec_for_llm()["name"]` equal to one of these reserved names, `serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`. Two more names are reserved the same way: `channels` (`"reserved channel path"`) and `introspection` (`"reserved introspection path"`).
+The names `tools`, `health`, and `events` are reserved for the dashboard (the alias period reserves one more name, listed in the [Tool page's migration section](./tool.md#migrating-from-skill)). If any tool in the registry has a `spec_for_llm()["name"]` equal to one of these reserved names, `serve(...)` raises `ValueError` during app build, with a message containing the literal `"reserved dashboard path"`. Two more names are reserved the same way: `channels` (`"reserved channel path"`) and `introspection` (`"reserved introspection path"`).
 
 ```python
 # Suppose bad_tool.spec_for_llm()["name"] == "health"

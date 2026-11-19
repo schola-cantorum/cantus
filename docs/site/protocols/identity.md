@@ -82,7 +82,7 @@ except SoulParseError as exc:
 <soul.to_system_prompt()>\n\n<the system prompt cantus builds>
 ```
 
-In other words, the `soul.to_system_prompt()` string comes first, followed by two newlines, followed by the system prompt cantus builds anyway. When `soul=None` (the default), cantus adds nothing, so the system prompt is exactly the one it builds without a soul.
+In other words, the `soul.to_system_prompt()` string comes first, followed by two newlines, followed by the system prompt cantus builds anyway. When `soul=None` (the default), nothing is prepended.
 
 ```python
 from cantus import Agent

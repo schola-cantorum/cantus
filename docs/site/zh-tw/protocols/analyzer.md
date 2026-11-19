@@ -115,7 +115,7 @@ Analyzer **不會**透過 registry 曝露給 LLM，所以你**不會**在 agent 
 
 - 在 `Agent._dispatch_tool` 裡，模型給的參數會先依 **tool** 的簽章驗證（`validate_args`）。pre_hook 在這之後、tool body 之前執行。
 - pre_hook 的呼叫方式是 `pre_hook(**args)`，所以它的參數名稱必須跟 tool 的一致。
-- pre_hook 如果回傳 `dict`，這個 dict 會「**取代**」參數，工具的 body 改以這些關鍵字參數（`**dict`）呼叫。其他回傳值則當成唯一的 positional 參數傳給 body，上面的 `clean_city` 就是這樣。
+- pre_hook 如果回傳 `dict`，這個 dict 會「**取代**」參數，tool 的 body 改以這些關鍵字參數（`**dict`）呼叫。其他回傳值則當成唯一的 positional 參數傳給 body，上面的 `clean_city` 就是這樣。
 - 如果 pre_hook 拋出例外，你會拿到 `ToolErrorObservation(message="pre_hook <ExcType>: <msg>")`，而且那一輪 turn 不會繼續執行 tool body。
 
 pre_hook 沒辦法改變「要模型給什麼型別」。給模型看的 schema 和參數驗證都來自 tool 的簽章，所以把字串轉成另一種型別的 analyzer（例如 `text: str -> Location`）在 dispatch 時會失敗：模型給的字串在 pre_hook 執行之前，就被 `validate_args` 擋下來了。

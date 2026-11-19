@@ -1,6 +1,6 @@
 # `cantus.serve` core
 
-`cantus.serve` 是 cantus 的 HTTP 入口。它接手你先前已經組好的 tool registry，把它原封不動地用 HTTP/JSON expose 出去。你只要呼叫 `serve(registry)`，就會拿回一個配置好的 FastAPI app，可以直接交給 uvicorn（或任何 ASGI server）跑起來。
+`cantus.serve` 是 cantus 的 HTTP 入口。它接手你先前已經組好的 tool registry，把它原封不動地用 HTTP/JSON expose 出去。你只要呼叫 `serve(registry)`，就會拿回一個設定好的 FastAPI app，可以直接交給 uvicorn（或任何 ASGI server）跑起來。
 
 本頁涵蓋四個對外的面向：Quick start、`cantus.config.Settings` 這套 12-factor 設定、唯讀的 dashboard endpoint，以及 Channel Protocol 抽象層搭配 `LocalMockReceiver`。
 
@@ -40,7 +40,7 @@ curl http://localhost:8765/health
 
 registry 裡的每個 tool 都會自動掛在 `POST /tools/{spec_for_llm.name}`。引數放在 JSON body 裡，回傳的形狀是 `{"result": <jsonable>}`。Swagger UI 預設掛在 `/docs`、OpenAPI JSON 在 `/openapi.json`、ReDoc 在 `/redoc`。每個 tool 的 `args_schema` 會直接投影到該 endpoint 的 `requestBody.application/json.schema`，所以學生只要打開 Swagger UI，就能一眼看出每個 tool 該怎麼呼叫。
 
-別名過渡期內，v0.6 的路由名稱仍然可以呼叫，並會帶上 deprecation header；請見 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)。
+別名過渡期內，v0.6 的路由路徑仍然可以呼叫，並會帶上 deprecation header；請見 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)。
 
 ## Configuration
 
@@ -223,7 +223,7 @@ curl http://localhost:8765/tools
 curl 'http://localhost:8765/events?limit=20&offset=0'
 ```
 
-如果 EventStream 還沒配置，或是還沒有任何事件被記錄下來，這個 endpoint 會回一個空 list `[]`，HTTP 狀態是 `200`（**不是** `404`）。
+如果 EventStream 還沒設定，或是還沒有任何事件被記錄下來，這個 endpoint 會回一個空 list `[]`，HTTP 狀態是 `200`（**不是** `404`）。
 
 `serve()` 不會替你接上持久化層。建好 app 之後自己掛上去，否則這個 endpoint 永遠回 `[]`：
 
@@ -251,7 +251,7 @@ app = serve(registry, settings=Settings(dashboard=False))
 
 ### 保留路徑：tool 名稱不能撞名
 
-`tools`、`health`、`events` 這幾個名字保留給 dashboard（別名過渡期的路由名稱也一併保留，列在 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)）。如果 registry 裡有哪個 tool 的 `spec_for_llm()["name"]` 剛好等於這些保留名稱之一，`serve(...)` 會在建構 app 的階段丟出 `ValueError`，訊息裡帶著字面的 `"reserved dashboard path"`。另外還有兩個名字用同樣的方式保留：`channels`（`"reserved channel path"`）與 `introspection`（`"reserved introspection path"`）。
+`tools`、`health`、`events` 這幾個名字保留給 dashboard（別名過渡期另外還保留一個名稱，列在 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)）。如果 registry 裡有哪個 tool 的 `spec_for_llm()["name"]` 剛好等於這些保留名稱之一，`serve(...)` 會在建構 app 的階段丟出 `ValueError`，訊息裡帶著字面的 `"reserved dashboard path"`。另外還有兩個名字用同樣的方式保留：`channels`（`"reserved channel path"`）與 `introspection`（`"reserved introspection path"`）。
 
 ```python
 # 假設 bad_tool.spec_for_llm()["name"] == "health"

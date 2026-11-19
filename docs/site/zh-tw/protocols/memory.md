@@ -75,7 +75,7 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 **設計細節**：
 
-- `AutoMemory` 採用 **composition**：它持有任何一個 `Memory` 當 backend，而不是去繼承 `Memory`，所以它不會干擾底層的 ABI。`AutoMemory` 自己並不是 `Memory` 的子類。
+- `AutoMemory` 採用 **composition**：它持有任何一個 `Memory` 當 backend，而不是去繼承 `Memory`，所以它不會干擾底層的 ABI。`AutoMemory` 自己並不是 `Memory` 的子類別。
 - `auto.tools` 是一個 **instance-level 的 cache**：每次存取都回傳**同一個 list 物件**，所以 LLM 看到的 spec 不會在多輪 turn 之間 drift。
 - `tools` property 的 docstring 永遠包含字面字串 `"LLM has full CRUD access"`，這樣靜態 introspection 跟 IDE hover 都能把這個警告浮出來。
 
@@ -90,7 +90,7 @@ print([t.name for t in auto.tools])             # ['view', 'create', 'str_replac
 
 每一個 rejection 都在開檔**之前**就完成。被拒絕的路徑，除了分類所需的那一次 `stat()` 之外，不會被任何 IO 建立、開啟、或碰到。
 
-## `AutoMemory`：LLM 自主 CRUD 與正式應用警告
+## `AutoMemory`：LLM 自主 CRUD 與正式應用警告 {#automemory-production-warning}
 
 `AutoMemory.tools` 回傳的四個 tool，**預設就讓 LLM 讀寫 memory**，而且沒有內建任何內容過濾。在教學情境下這是刻意的：學生需要親眼看到「讓 LLM 自己寫入」會帶來什麼樣的權衡。基礎的 `Memory` protocol 沒有硬刪除，所以 `delete` 只回報有幾筆符合，`str_replace` 則是在原本那筆旁邊再記一筆修正後的版本。但是在**任何正式應用之前**，請在 memory tool 前面放一個你自己寫的 tool，並且只把 agent 需要的 tool 交給它：
 

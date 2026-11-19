@@ -82,7 +82,7 @@ except SoulParseError as exc:
 <soul.to_system_prompt()>\n\n<the system prompt cantus builds>
 ```
 
-換句話說，`soul.to_system_prompt()` 這個字串擺在最前面，後面接兩個換行，再接上 cantus 本來就會建出的 system prompt。當 `soul=None`（也就是預設值）時，cantus 什麼都不加，所以 system prompt 就是不帶 soul 時建出來的那一份。
+換句話說，`soul.to_system_prompt()` 這個字串擺在最前面，後面接兩個換行，再接上 cantus 本來就會建出的 system prompt。當 `soul=None`（也就是預設值）時，前面什麼都不會加。
 
 ```python
 from cantus import Agent
