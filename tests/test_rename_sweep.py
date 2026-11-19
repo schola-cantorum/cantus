@@ -40,8 +40,6 @@ SCAN_FILES = frozenset(
 NOT_SCANNED_DIRS = ("docs/site/public/",)
 NOT_SCANNED_FILES = frozenset({"tests/fixtures/skill_spec_for_llm_v0_2_1.json"})
 
-ROOT_FILES = tuple(sorted(SCAN_FILES))
-
 # Traceability 4.2: the patterns, one (id, regex) pair per cell.
 PATTERNS = (
     ("P1", r"(?<!Agent )\bSkill\b"),
@@ -207,7 +205,19 @@ def _hit_paths(root: Path) -> set[str]:
         "notebooks/n.ipynb",
         "docs/site/p.md",
         "docs/api/p.md",
-        *ROOT_FILES,
+        # The 12 root files of traceability 4.1, written out independently of SCAN_FILES.
+        "README.md",
+        "README.zhTW.md",
+        "llms.txt",
+        "CONTRIBUTING.md",
+        "CONTRIBUTING.zhTW.md",
+        "docs/quickstart-desktop.md",
+        "docs/llms-txt.md",
+        "docs/README.md",
+        "pyproject.toml",
+        "scripts/smoke_install.sh",
+        "scripts/gen_docs_api.mjs",
+        ".github/workflows/cross-platform-install.yml",
     ],
 )
 def test_a_planted_legacy_line_is_found_in_every_scanned_path(tmp_path: Path, path: str) -> None:
@@ -490,10 +500,12 @@ def test_a_file_that_only_resembles_an_exempt_one_is_reported(
 
 
 def test_a_root_that_is_not_the_repository_top_level_is_refused(tmp_path: Path) -> None:
-    repo = _repo(tmp_path, {"cantus/m.py": "x = 1\n"})
+    # A copy of the tree inside another repository: from the subdirectory, git lists a scan set
+    # that looks complete (it has README.md), so only the top-level check can refuse it.
+    repo = _repo(tmp_path, {"inner/README.md": "readme\n", "inner/cantus/m.py": "@skill\n"})
 
     with pytest.raises(SweepSetupError):
-        tracked_files(repo / "cantus")
+        tracked_files(repo / "inner")
 
 
 def test_a_repository_with_no_file_in_the_scan_set_is_refused(tmp_path: Path) -> None:
