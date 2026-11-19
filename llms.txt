@@ -66,7 +66,7 @@ def search_book(title: str, lang: str = "zh-TW") -> str:
 
 The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block is parsed, but it is not part of the args schema yet, so the LLM does not see it. `@tool` registers nothing: give the tool to an agent with `Agent(model, tools=[search_book])`.
 
-Function-pass form: `register_tool(search_book, registry=registry)` adds it to a `Registry` you build (`registry = Registry()`); the registry is required.
+Function-pass form: `register_tool(search_book, registry=registry)` adds it to a `Registry` you build (`registry = Registry()`); the registry is required. Give the registry to the agent with `Agent(model, tools=registry)`.
 Class-first form:
 
 ```python
@@ -107,7 +107,7 @@ def search_book(title: str) -> str:
     ...
 ```
 
-When an `Agent` calls the tool, it runs `pre_hook(**args)` before it and `post_hook(result)` after it (a direct call or `cantus serve` runs no hook). A `post_hook` returning `Result(ok=False, ...)` becomes a `ValidationErrorObservation`; the LLM sees the feedback and is asked again, until `max_iterations`. A validator must always return `Result.success(...)` or `Result.failure(...)`. The names `non_empty_final_answer` and `action_parse` are reserved for the framework's own validators.
+When an `Agent` calls the tool, the agent runs `pre_hook(**args)` before the tool and `post_hook(result)` after it; a direct call, a workflow step or `cantus serve` runs no hook. The pre_hook receives the tool's arguments by name, so its parameter names must match the tool's; if it returns a dict, that dict becomes the tool's arguments, and any other value is passed to the tool as its only argument. A `post_hook` returning `Result(ok=False, ...)` becomes a `ValidationErrorObservation`; the LLM sees the feedback and is asked again, until `max_iterations`. A validator must always return `Result.success(...)` or `Result.failure(...)`. The names `non_empty_final_answer` and `action_parse` are reserved for the framework's own validators.
 
 ## Workflows — five plain-Python building blocks
 
@@ -145,7 +145,7 @@ Built-in implementations:
 - `BM25Memory(top_k=5)` — keyword retrieval (requires `cantus-agent[memory]`)
 - `EmbeddingMemory(top_k=5)` — semantic retrieval (requires `cantus-agent[memory]`)
 - `MarkdownMemory(path)` — turns persisted as Markdown chunks on disk
-- `AutoMemory(backend)` — wraps any `Memory` and exposes `view` / `create` / `str_replace` / `delete` tools (`auto.tools`) so the LLM edits its own memory
+- `AutoMemory(backend)` — wraps any `Memory` and exposes `view` / `create` / `str_replace` / `delete` tools (`auto.tools`; give them to the agent with `Agent(model, tools=auto.tools)`) so the LLM can read and add to its memory (`delete` only counts matches and `str_replace` stores an edited copy)
 
 ## Tool-call grammar (for reference)
 

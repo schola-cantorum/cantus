@@ -29,7 +29,7 @@ Cantus 是一套教學框架，主要為了在 Google Colab 上教學生組裝 L
 - **Python**：black（line-length 100）+ ruff（default rules）。CI 會跑 lint，PR 必須過。
 - **Type hints**：所有 public API 必須有完整 type hint；internal helper 視情況。
 - **Docstring**：所有 public function/class 用 Google-style docstring；至少含 summary、Args、Returns。
-- **命名**：protocol class 維持無前綴形式（`Tool`、`Analyzer`、`Validator`、`Workflow`、`Memory`、`Agent`），不要加 `Cantus` 前綴。
+- **命名**：protocol class 維持無前綴形式（`Tool`、`Analyzer`、`Validator`、`Memory`、`Agent`），不要加 `Cantus` 前綴。
 - **No silent fallback**：寧可 raise `ImportError`、`TypeError`、`ValueError` 也不要靜默 degrade。
 
 ## Scope（什麼 PR 會被拒）

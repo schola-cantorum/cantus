@@ -117,7 +117,7 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@tool` before relying on it.
+Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training; check it with a small `chat(..., tools=[...])` call before relying on it. An agent's `@tool` tools do not use provider function calling.
 
 ## Local LLMs via MLX (Apple Silicon)
 

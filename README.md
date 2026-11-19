@@ -175,7 +175,7 @@ print(getattr(final, "answer", final))
 Two protocol kinds (the things cantus formally registers and dispatches):
 
 - **Tool** — a function the agent can call (tool use). Decorate it with `@tool` (or subclass `Tool`) and give it to the agent with `Agent(model, tools=[...])`.
-- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`, `MarkdownMemory`, plus the `AutoMemory` wrapper that exposes any backend to the LLM as four tools.
+- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`, `MarkdownMemory`, plus the `AutoMemory` wrapper that exposes any backend to the LLM as four tools (`auto.tools`, given to the agent with `tools=`).
 
 Hook helpers (pre- / post-loop tooling, not protocol kinds):
 

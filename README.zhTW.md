@@ -175,7 +175,7 @@ print(getattr(final, "answer", final))
 兩個 protocol kind（cantus 正式註冊與 dispatch 的對象）：
 
 - **Tool** —— agent 可以呼叫的函式（tool use）。以 `@tool` 裝飾（或繼承 `Tool` 類別），再用 `Agent(model, tools=[...])` 交給 agent。
-- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`、`MarkdownMemory`，以及把任一 backend 以四個工具開放給 LLM 操作的 `AutoMemory` 包裝。
+- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`、`MarkdownMemory`，以及把任一 backend 以四個 tool（`auto.tools`，用 `tools=` 交給 agent）開放給 LLM 操作的 `AutoMemory` 包裝。
 
 Hook helper（pre- ／ post-loop 工具，不屬於 protocol kind）：
 

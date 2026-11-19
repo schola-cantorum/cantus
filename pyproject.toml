@@ -114,7 +114,7 @@ openhands = [
 # v0.4.0 — `cantus.serve` / `cantus.config` framework entrypoint. Pulls
 # the FastAPI web framework, the Uvicorn ASGI server, and the
 # pydantic-settings BaseSettings package (pydantic 2.x sibling) so that
-# `cantus.serve(registry)` can expose tool endpoints + Swagger UI and
+# `cantus.serve.serve(registry)` can expose tool endpoints + Swagger UI and
 # `cantus.config.Settings` can read `CANTUS_SERVE_*` env variables.
 serve = [
     "fastapi>=0.115,<1",
