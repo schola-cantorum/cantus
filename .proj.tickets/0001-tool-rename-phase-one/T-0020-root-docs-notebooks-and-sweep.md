@@ -2,7 +2,7 @@
 id: T-0020
 title: Root documents, notebooks and the rename sweep — the epic's last ticket
 epic: 0001-tool-rename-phase-one
-status: processing
+status: review
 blocked_by: [T-0016, T-0018, T-0019]
 ---
 
@@ -188,3 +188,29 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   C. G full pytest, ruff, mypy, dev-path check, verify-project, `docs:api` no diff, `docs:build`;
   M. G mutation check of the sweep and of every H/N row, controls, re-run after review fixes;
   X. G rows 1–9 on Python 3.10–3.14.
+- **Stage 5 result (2026-11-19, commits `7483acb`, `12cc4c8`, `2d18e62`).** Executor run A wrote
+  `tests/test_rename_sweep.py` slice by slice (A1–A6 red first: `NameError`/failing output recorded
+  before code; A7 the real-tree test, red with 69 cell hits = 65 pattern hits on 61 lines in 14 files at
+  13ddcbc, then only the eleven document files after A8–A10; A8–A10 guards with no red). The main
+  session added the physical-line tests (green on arrival, shown to discriminate by a `splitlines`
+  mutation), wrote the documents, notebooks, script and workflow with one count-asserted patch
+  script (`.scratch/T-0020/doc_patch.py`, dry-run on an archive first) and the zh-TW mirrors itself
+  (no executor run B). The sweep mutation check found two test gaps (a root-file list derived from
+  the module's own constant; a subdirectory case refused by the README rule instead of the top-level
+  check), fixed in `2d18e62`. Harness defects found before trusting green runs: the document
+  harness's build-identity check resolved the interpreter symlink; the notebook harness counted
+  IPython's own `forkpty` DeprecationWarning and expected a hash uv does not write; N1b originally let
+  the post-hook binding overwrite the pre-hook binding; the matrix loop ran no tests (zsh did not split
+  the file list). Each was fixed and re-run. Readings re-checked mechanically
+  (`readings-check-12cc4c8.txt`, 17 checks pass; 7 fail on the base as expected).
+- **Coverage report** (evidence files in `.scratch/T-0020/`, numbers recounted from them):
+
+  | Seam | Tests | Measured coverage | AC | Uncovered, and why |
+  |---|---|---|---|---|
+  | `tests/test_rename_sweep.py` (rows 1–6) | 96 tests | line+branch 99% (216 statements, 38 branches; the miss is `format_violations`, which runs only on failure and is exercised in `row1-red-after-partA.txt`) — `coverage-sweep-2d18e62.txt`; mutations 42/42 killed by the claimed test, controls 2/2 — `mutations-sweep-2d18e62.txt`; Python 3.10–3.14 pass — `matrix-2d18e62/summary.txt` | AC-36, TR-130 | UTF-16 files; identifiers glued to CJK text (`\b` is Unicode-aware); symlinks are read through to their target; the index is not read (working-tree files only); a missing `git` is not exercised |
+  | rows 7–9 (`test_parity.py`, `test_guardrail_config.py`, `test_check_no_dev_paths.py`) | existing tests, samples rewritten | pass on 3.10–3.14 (pre-existing skips: tomllib on 3.10, a PEP 701 case on 3.10/3.11) | Deliverable | — |
+  | row 10 (TR-131, TR-132) | `tests/docs` | full suite 1947 passed, 3 skipped (`repo-checks-12cc4c8.txt`); `tests/docs` on 3.10–3.14 (`matrix-12cc4c8/`) | AC-36 | executed pages on 3.10–3.12 were green locally this time; the PR's CI is the record |
+  | H1–H9 (`doccheck20.py`) | 36 rows | base 18 rows fail (`doccheck-red-13ddcbc.txt`); head 36/36 (`doccheck-green-12cc4c8.txt`); mutations 19/19, controls 2/2 (`mutations-docs-12cc4c8.txt`) | Deliverable, TR-133 (H8) | three Ollama/MLX fences of the root quickstart are not run (unchanged; need local servers); prose is stage 6's |
+  | N1–N5 (`nbrun20.py`) | 8 rows | base 5 rows fail (`nbrun-red-13ddcbc.txt`); head 8/8 (`nbrun-green-12cc4c8.txt`; the strengthened N1b passes in the mutation control NC0); mutations 8/8, control 1/1 (`mutations-nb-12cc4c8.txt`) | R2-13, C2-F20, Deliverable | real providers (N5 uses stand-in chat models); Colab (stage 8); the notebook's E2B/E4B claims |
+  | repository checks | ruff, mypy (89 files), dev paths, verify-project, `docs:api` no diff, `docs:build` | all pass (`repo-checks-12cc4c8.txt`) | — | — |
+  | TR-133 in CI | the `cross-platform-install` workflow | pending: runs on the PR | AC-36 | recorded after the push |
