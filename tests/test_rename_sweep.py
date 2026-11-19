@@ -110,14 +110,22 @@ def is_scanned(path: str) -> bool:
     return path.startswith(SCAN_DIRS) or path in SCAN_FILES
 
 
+def _git_env() -> dict[str, str]:
+    """The caller's environment without GIT_DIR and friends, so ``git -C`` alone picks the repository."""
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def tracked_files(root: Path) -> list[str]:
     top = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "--show-toplevel"], check=True, capture_output=True
+        ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+        check=True,
+        capture_output=True,
+        env=_git_env(),
     ).stdout
     if Path(os.fsdecode(top).strip()).resolve() != root.resolve():
         raise SweepSetupError("%s is not the top level of its Git repository" % root)
     raw = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "-z"], check=True, capture_output=True
+        ["git", "-C", str(root), "ls-files", "-z"], check=True, capture_output=True, env=_git_env()
     ).stdout
     names = [os.fsdecode(entry) for entry in raw.split(b"\0") if entry]
     scanned = sorted(name for name in names if is_scanned(name))
@@ -139,6 +147,8 @@ def _block_exempt_lines(lines: list[str]) -> set[int]:
     for start, line in enumerate(lines):
         if BLOCK_START not in line:
             continue
+        if BLOCK_END in line[line.index(BLOCK_START) + len(BLOCK_START):]:
+            continue  # the next end is on the start's own line: no line lies between them
         for end in range(start + 1, len(lines)):
             if BLOCK_END in lines[end]:
                 exempt.update(range(start + 1, end))
@@ -186,11 +196,18 @@ def _repo(tmp_path: Path, files: dict[str, bytes | str]) -> Path:
         target = tmp_path / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data if isinstance(data, bytes) else data.encode("utf-8"))
-    subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True, env=_TMP_GIT_ENV)
     subprocess.run(
-        ["git", "-C", str(tmp_path), "-c", "core.autocrlf=false", "add", "-A"], check=True
+        ["git", "-C", str(tmp_path), "-c", "core.autocrlf=false", "add", "-A"],
+        check=True,
+        env=_TMP_GIT_ENV,
     )
     return tmp_path
+
+
+# Throwaway repositories ignore the developer's global and system Git configuration (for example a
+# global excludes file that would leave a planted *.bak file untracked).
+_TMP_GIT_ENV = {**_git_env(), "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
 def _hit_paths(root: Path) -> set[str]:
@@ -205,6 +222,8 @@ def _hit_paths(root: Path) -> set[str]:
         "notebooks/n.ipynb",
         "docs/site/p.md",
         "docs/api/p.md",
+        "docs/site/publication.md",
+        "tests/fixtures/other.json",
         # The 12 root files of traceability 4.1, written out independently of SCAN_FILES.
         "README.md",
         "README.zhTW.md",
@@ -235,10 +254,13 @@ def test_a_planted_legacy_line_is_found_in_every_scanned_path(tmp_path: Path, pa
         "CHANGELOG.md",
         ".claude/skills/x.md",
         "scripts/other.sh",
+        "cantusx/m.py",
+        "docs/sitemap.md",
     ],
 )
 def test_a_planted_legacy_line_is_ignored_outside_the_scan_set(tmp_path: Path, path: str) -> None:
-    root = _repo(tmp_path, {path: "@skill\n"})
+    every_planted_line = "".join(planted + "\n" for _label, planted, _cell in PATTERN_CASES)
+    root = _repo(tmp_path, {path: every_planted_line})
 
     assert _hit_paths(root) == set()
 
@@ -273,7 +295,7 @@ def test_odd_bytes_are_still_scanned_and_do_not_abort_the_scan(
 
 @pytest.mark.parametrize(
     ("data", "line"),
-    [(b"a\x0cb\n@skill\n", 2), ("x y\n@skill\n".encode(), 2), (b"a\r\n@skill\r\n", 2)],
+    [(b"a\x0cb\n@skill\n", 2), ("x\u2028y\n@skill\n".encode(), 2), (b"a\r\n@skill\r\n", 2)],
     ids=["form-feed", "line-separator", "crlf"],
 )
 def test_a_violation_names_the_physical_line(tmp_path: Path, data: bytes, line: int) -> None:
@@ -308,6 +330,30 @@ CELL_P9_HELPERS = (
 CELL_P9_INVOKE = r"\binvoke_skill_"
 CELL_P10_ROOT = r"(?<![A-Za-z._-])/skills\b"
 CELL_P10_INTROSPECTION = r"/introspection/skills\b"
+
+CELL_IDS = {
+    CELL_P1: "P1",
+    CELL_P2_DECORATOR: "P2",
+    CELL_P2_CALL: "P2",
+    CELL_P3_REGISTER: "P3",
+    CELL_P3_REGISTRY: "P3",
+    CELL_P4: "P4",
+    CELL_P5_NAME: "P5",
+    CELL_P5_UNKNOWN: "P5",
+    CELL_P6: "P6",
+    CELL_P7_KIND: "P7",
+    CELL_P7_PREFIX: "P7",
+    CELL_P8: "P8",
+    CELL_P9_HELPERS: "P9",
+    CELL_P9_INVOKE: "P9",
+    CELL_P10_ROOT: "P10",
+    CELL_P10_INTROSPECTION: "P10",
+}
+
+
+def test_the_scanner_uses_exactly_the_16_cells_of_the_table_in_order() -> None:
+    assert [(pid, source) for pid, source, _compiled in COMPILED] == [(pid, cell) for cell, pid in CELL_IDS.items()]
+
 
 PATTERN_CASES = [
     ("Skill", "class Skill:", CELL_P1),
@@ -352,7 +398,7 @@ def test_each_pattern_cell_reports_exactly_its_own_hit(
 
     found = sweep(root)
 
-    assert [violation.regex for violation in found] == [cell]
+    assert [(violation.rule, violation.regex) for violation in found] == [(CELL_IDS[cell], cell)]
 
 
 def test_every_cell_of_the_table_has_a_planted_case() -> None:
@@ -378,7 +424,7 @@ def test_every_cell_of_the_table_has_a_planted_case() -> None:
 
 @pytest.mark.parametrize(
     "planted",
-    ["see Agent Skill docs", "path .claude/skills/x", "import cantus/protocols/tool.py"],
+    ["see Agent Skill docs", "path .claude/skills/x", "import cantus/protocols/skill.py"],
 )
 def test_text_that_only_resembles_a_legacy_name_is_not_reported(
     tmp_path: Path, planted: str
@@ -400,6 +446,12 @@ def test_the_line_marker_exempts_a_line_under_cantus_and_tests(
     root = _repo(tmp_path, {path: line + "\n"})
 
     assert sweep(root) == []
+
+
+def test_the_line_marker_exempts_only_its_own_line(tmp_path: Path) -> None:
+    root = _repo(tmp_path, {"cantus/m.py": "@skill  # legacy-alias\n@skill\n"})
+
+    assert [violation.line for violation in sweep(root)] == [2]
 
 
 @pytest.mark.parametrize("path", ["notebooks/n.ipynb", "docs/site/p.md", "README.md"])
@@ -438,10 +490,29 @@ def test_a_block_exempts_the_lines_strictly_between_its_markers(
 
 
 @pytest.mark.parametrize("path", TOOL_PAGES)
+def test_each_start_pairs_with_the_next_end(tmp_path: Path, path: str) -> None:
+    text = _lines(
+        "@skill", MARKER_START, "@skill", MARKER_END, "@skill", MARKER_START, "@skill", MARKER_END
+    )
+    root = _repo(tmp_path, {path: text})
+
+    assert _reported_lines(root, path) == [1, 5]
+
+
+@pytest.mark.parametrize("path", TOOL_PAGES)
 def test_an_unclosed_start_marker_exempts_nothing(tmp_path: Path, path: str) -> None:
     root = _repo(tmp_path, {path: _lines(MARKER_START, "@skill", "@skill")})
 
     assert _reported_lines(root, path) == [2, 3]
+
+
+@pytest.mark.parametrize("path", TOOL_PAGES)
+def test_a_start_and_end_on_one_line_exempt_nothing(tmp_path: Path, path: str) -> None:
+    # The next end after the start is on the start's own line, so no line lies between them;
+    # a later orphan end must not be paired with that start.
+    root = _repo(tmp_path, {path: _lines(MARKER_START + " " + MARKER_END, "@skill", MARKER_END)})
+
+    assert _reported_lines(root, path) == [2]
 
 
 @pytest.mark.parametrize("path", TOOL_PAGES)
@@ -458,6 +529,7 @@ def test_an_orphan_end_marker_exempts_nothing(tmp_path: Path, path: str) -> None
         "tests/legacy/x.py",
         "docs/site/protocols/skill.md",
         "tests/test_rename_sweep.py",
+        "docs/site/x/protocols/tool.md",
     ],
 )
 def test_a_block_marker_outside_the_tool_pages_is_reported(tmp_path: Path, path: str) -> None:
@@ -489,7 +561,12 @@ def test_a_wholly_exempt_file_reports_no_legacy_line(tmp_path: Path, path: str) 
 
 @pytest.mark.parametrize(
     "path",
-    ["tests/legacy_x.py", "tests/legacyfoo/c.py", "docs/site/protocols/skill.md.bak"],
+    [
+        "tests/legacy_x.py",
+        "tests/legacyfoo/c.py",
+        "docs/site/protocols/skill.md.bak",
+        "cantus/test_rename_sweep.py",
+    ],
 )
 def test_a_file_that_only_resembles_an_exempt_one_is_reported(
     tmp_path: Path, path: str
@@ -511,7 +588,9 @@ def test_a_root_that_is_not_the_repository_top_level_is_refused(tmp_path: Path) 
 def test_a_repository_with_no_file_in_the_scan_set_is_refused(tmp_path: Path) -> None:
     repo = _repo(tmp_path, {"other.txt": "x\n"})
     (repo / "README.md").unlink()
-    subprocess.run(["git", "-C", str(repo), "rm", "-q", "--cached", "README.md"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "rm", "-q", "--cached", "README.md"], check=True, env=_TMP_GIT_ENV
+    )
 
     with pytest.raises(SweepSetupError):
         tracked_files(repo)
@@ -519,7 +598,9 @@ def test_a_repository_with_no_file_in_the_scan_set_is_refused(tmp_path: Path) ->
 
 def test_a_scan_set_without_the_readme_is_refused(tmp_path: Path) -> None:
     repo = _repo(tmp_path, {"cantus/m.py": "x = 1\n"})
-    subprocess.run(["git", "-C", str(repo), "rm", "-q", "--cached", "README.md"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "rm", "-q", "--cached", "README.md"], check=True, env=_TMP_GIT_ENV
+    )
 
     with pytest.raises(SweepSetupError):
         tracked_files(repo)
