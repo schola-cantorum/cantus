@@ -7,13 +7,13 @@
 ## 完整範例
 
 ```python
-from cantus import skill, Agent, mount_drive_and_load
+from cantus import tool, Agent, mount_drive_and_load
 
 # 1. Load Gemma 4 (mounts Google Drive automatically to reach the cache)
 model = mount_drive_and_load(variant="E2B")  # or "E4B"
 
-# 2. Write a skill: every skill is a plain Python function
-@skill
+# 2. Write a tool: a plain Python function turned into a tool with @tool
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers.
 
@@ -23,11 +23,11 @@ def add(a: int, b: int) -> int:
     """
     return a + b
 
-# 3. To chain skills into a flow, use a cantus.workflows building block.
-#    This example shows a single skill; see the cookbook for composition.
+# 3. To chain tools into a flow, use a cantus.workflows building block.
+#    This example shows a single tool; see the cookbook for composition.
 
-# 4. Hand the model handle to Agent, then start the loop with a natural-language query
-agent = Agent(model=model)
+# 4. Hand the model handle and the tools to Agent, then start the loop with a natural-language query
+agent = Agent(model=model, tools=[add])
 state = agent.run("Please compute 3 + 4 + 5 and report the result back to me")
 
 # 5. Print the result (state.stream is the complete EventStream)
@@ -49,6 +49,6 @@ Inspector(state.stream).summary()     # print action / observation statistics
 
 - `max_iterations=8`：這個 loop 最多跑 8 步，所以就算 model 想不清楚、開始繞圈圈，它也會停下來，不會無止盡跑下去。
 - `max_retries=3`：這個參數會被接受，但目前不會限制 loop。當某個 validator 回傳 `Result(ok=False)`，feedback 會送回給模型，由模型決定下一步怎麼試；每試一次就用掉一次 `max_iterations`。
-- skill 丟出的例外（包含你在 skill 裡呼叫的 workflow），都會變成一個 `ToolErrorObservation`。framework 會把它餵回 prompt 裡，而不是讓它直接中斷整次執行。
+- agent 執行 tool 時，tool 丟出的例外（包含你在 tool 裡呼叫的 workflow），都會變成一個 `ToolErrorObservation`。framework 會把它餵回 prompt 裡，而不是讓它直接中斷整次執行。
 
-那一個 cell 就是整個 loop 的縮影。把它讀懂，後面的 channels、serving、memory 章節，其實都是同樣三塊積木的不同組法：一個 model handle、一個 skill，以及一條你隨時可以 replay 的 EventStream。
+那一個 cell 就是整個 loop 的縮影。把它讀懂，後面的 channels、serving、memory 章節，其實都是同樣三塊積木的不同組法：一個 model handle、一個 tool，以及一條你隨時可以 replay 的 EventStream。

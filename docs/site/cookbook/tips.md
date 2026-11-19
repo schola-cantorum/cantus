@@ -4,13 +4,13 @@ This page collects small techniques for cantus that are optional but make daily 
 
 ## 1. Pydantic patterns: optional arguments, defaults, type validation
 
-A skill's args schema is derived from the function signature, so your type hints and default values directly determine the schema the LLM sees:
+A tool's args schema is derived from the function signature, so your type hints and default values directly determine the schema the LLM sees:
 
 ```python
 from typing import Optional
-from cantus import skill
+from cantus import tool
 
-@skill
+@tool
 def search_book(
     topic: str,                         # required
     n: int = 5,                         # has a default → optional
@@ -32,7 +32,7 @@ When the LLM passes `n="3"`, Pydantic coerces it to `int(3)` automatically; only
 The first paragraph becomes the description. The `Args:` block is parsed by `parse_args_block` and stored in `_args_descriptions`, so it can later be fed to the LLM as per-argument documentation:
 
 ```python
-@skill
+@tool
 def search_book(topic: str, n: int = 5) -> str:
     """Search the catalog for books.
 
@@ -52,28 +52,29 @@ The format is strict: one `name: description` per line, with an optional `(type)
 
 ## 3. Three entry points and when to use each
 
-There are three ways to register a skill. The resulting `Skill` instance is identical in all three cases:
+There are three ways to build a tool. All three end up as a `Tool` instance:
 
 ```python
-from cantus import Skill, register_skill, skill
+from cantus import Registry, Tool, register_tool, tool
 
 # (A) Decorator — covers 90% of cases, the simplest.
-@skill
+@tool
 def f(x: int) -> int:
     """Double x."""
     return 2 * x
 
-# (B) Function-pass — register a plain function someone else already wrote.
+# (B) Function-pass — turn a plain function someone else already wrote into a tool, in a Registry you name.
 def third_party_function(x: int) -> int:
     """Triple x."""
     return 3 * x
 
-register_skill(third_party_function)
+registry = Registry()
+register_tool(third_party_function, registry=registry)
 
 # (C) Class-first — when you need instance state, complex init, or subclass overrides.
-class MySkill(Skill):
+class MyTool(Tool):
     """Remember every x seen so far."""
-    name = "my_skill"
+    name = "my_tool"
     def __init__(self): super().__init__(); self.cache = {}
     def run(self, x: int) -> int: return self.cache.setdefault(x, x)
 ```
@@ -90,26 +91,26 @@ Rule of thumb: no state, use (A); third-party function, use (B); stateful, use (
 
 The first call to `EmbeddingMemory.recall` downloads the model (~80MB) and encodes the entire corpus once; later calls only encode the query. BM25 runs entirely on CPU with no model download.
 
-## 5. If you turn on `@debug` for one skill, do the others need it too?
+## 5. If you turn on `@debug` for one tool, do the others need it too?
 
-No. `@debug` is per-skill opt-in, and only wraps the one you attach it to:
+No. `@debug` is per-tool opt-in, and only wraps the one you attach it to:
 
 ```python
-from cantus import debug, skill
+from cantus import debug, tool
 
 @debug
-@skill
+@tool
 def search_book(topic: str) -> str:
     """Search the catalog."""
     return f"books about {topic}"   # traced
 
-@skill
+@tool
 def parse_book_list(text: str) -> list[str]:
     """Split a newline-separated list."""
     return text.splitlines()   # not traced
 ```
 
-A good strategy: run everything quietly first, and when one skill misbehaves, add `@debug` to that skill **only**. The output stays much smaller and easier to read. The agent loop itself is always quiet (a hard spec requirement) and never pollutes stdout.
+A good strategy: run everything quietly first, and when one tool misbehaves, add `@debug` to that tool **only**. The output stays much smaller and easier to read. The agent loop itself is always quiet (a hard spec requirement) and never pollutes stdout.
 
 ## 6. Sending the Inspector trace to a file instead of stdout
 
@@ -119,7 +120,7 @@ Both `Inspector.replay` and `Inspector.summary` take an `out` argument, which de
 from cantus import Agent, ChatModelAsHandle, Inspector, load_chat_model
 
 model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[search_book])
 state = agent.run("find 3 science fiction books", max_iterations=8)
 
 with open("run_trace.log", "w", encoding="utf-8") as f:
@@ -132,12 +133,12 @@ with open("run_trace.log", encoding="utf-8") as f:
 
 A common pattern on Colab: write to a file in one cell, then read a slice with `!head -50 run_trace.log`. That reads better than dumping a huge trace straight into the cell output.
 
-## 7. Bonus: isolate tests with `Registry()` instead of the global one
+## 7. Bonus: share one `Registry` between agents and tests
 
-`get_registry()` returns a process-wide singleton, which leaks state between test cases. In tests, create your own `Registry()` instead:
+An agent copies a list of tools into a registry of its own, but uses a `Registry` you pass as it is. When several agents, or several tests, should see the same tools, build one `Registry` and pass it to each:
 
 ```python
-from cantus import Agent, Registry, skill
+from cantus import Agent, Registry, tool
 
 class ScriptedModel:
     """Stands in for the LLM: every reply is the same final answer."""
@@ -145,15 +146,15 @@ class ScriptedModel:
     def generate(self, prompt: str, **kwargs) -> str:
         return '{"thought": "done", "action": {"final_answer": "ok"}}'
 
-@skill
-def my_skill(x: int) -> int:
+@tool
+def my_tool(x: int) -> int:
     """Identity."""
     return x
 
-reg = Registry()
-reg.register("skill", my_skill)
-agent = Agent(model=ScriptedModel(), registry=reg)
-print(reg.names_for("skill"))
+reg = Registry(tools=[my_tool])
+agent = Agent(model=ScriptedModel(), tools=reg)
+print(agent.registry.names_for("tool"))
+print(agent.registry is reg)
 ```
 
 You should see, across the runnable tips on this page:
@@ -161,7 +162,10 @@ You should see, across the runnable tips on this page:
 ```text
 ['topic']
 True
-['my_skill']
+['my_tool']
+True
 ```
 
-`get_registry().clear()` also works, but it affects every other cell in the session.
+Because the `Registry` is shared, a tool you add to it later reaches every agent that holds it. Give each test, and each agent that should not see the others' tools, its own list or `Registry`.
+
+Code written for cantus 0.6 kept its tools in one global registry instead; the Tool page's [migration notes](../protocols/tool.md#migrating-from-skill) cover it.

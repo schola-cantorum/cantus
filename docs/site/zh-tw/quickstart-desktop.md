@@ -33,24 +33,24 @@ $env:OPENAI_API_KEY = "sk-..."
 set OPENAI_API_KEY=sk-...
 ```
 
-### 3. 定義一個 skill
+### 3. 定義一個 tool
 
 ```python
-from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
+from cantus import tool, Agent, ChatModelAsHandle, load_chat_model
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """把兩個整數相加。"""
     return a + b
 
-print(add(17, 25))  # skill 仍然是普通函式，你可以自己呼叫
+print(add(17, 25))  # tool 仍然可以自己直接呼叫
 ```
 
 ### 4. 載入 chat model
 
 ```python
 model = ChatModelAsHandle(load_chat_model("openai/gpt-4o-mini"))  # under docs tests: cantus_docs_model()
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[add])
 ```
 
 `load_chat_model("openai/gpt-4o-mini")` 會從環境變數讀取 `OPENAI_API_KEY`，再走 OpenAI Chat Completions API。同一個 factory 也吃 `"anthropic/claude-..."`、`"google/gemini-..."`、`"groq/..."`，前提是你裝好對應的 extras（`uv pip install "cantus-agent[anthropic,google,groq]"`）。`Agent` 只認 Tier 1 的 `.generate(prompt) -> str` 介面，所以 `ChatModel` 一定要先用 `ChatModelAsHandle` 包起來再交給它。
@@ -75,7 +75,7 @@ print(getattr(final, "answer", final))
 
 ```bash
 pip install cantus-agent[serve]
-cantus serve --host 0.0.0.0 --port 8765 --registry-import myskills.app:registry
+cantus serve --host 0.0.0.0 --port 8765 --registry-import mytools.app:registry
 ```
 
 這個 CLI 接受幾種覆寫參數：`--host`、`--port`、`--auth-mode {none,bearer,api-key}`、`--dashboard` / `--no-dashboard`，以及一個或多個 `--channels DOTTED_PATH`。沒設定的旗標會往下退到 `CANTUS_SERVE_*` 環境變數，最後再退到 `Settings` 預設值；按 `Ctrl-C` 就能讓 uvicorn 優雅關機。
@@ -90,7 +90,7 @@ cloudflared tunnel --url http://127.0.0.1:8765
 
 `cloudflared` 會印出一個隨機指派的 `https://<slug>.trycloudflare.com` URL。按 `Ctrl-C` 就能把 tunnel 收掉——那個 URL 會立刻失效、解析不到。
 
-**安全提醒：** 這種 quick-tunnel 模式沒有任何驗證，任何人只要拿到 URL，就能直接打你的 FastAPI app。把它搭配 `cantus serve --auth-mode bearer` 一起用，這樣呼叫方就得帶上 token 才行，而且記得每次 session 之間都把 token 換掉。唯讀的 `/introspection` 端點也是同一回事：它們預設就開著，從 tunnel 一樣打得到——`cantus serve --auth-mode bearer` 會跟 `/skills` 一起把它們保護起來（若是 `auth_mode=none`，伺服器啟動時會印出一行警告，提醒你 `/introspection` 正開著沒擋）。quick-tunnel 模式不會把任何 token 寫到硬碟上；之後如果你升級成 named tunnel，產生出來的 `cert.pem` 千萬不要 commit 進版控（它是你整個 tunnel namespace 的長期憑證）。
+**安全提醒：** 這種 quick-tunnel 模式沒有任何驗證，任何人只要拿到 URL，就能直接打你的 FastAPI app。把它搭配 `cantus serve --auth-mode bearer` 一起用，這樣呼叫方就得帶上 token 才行，而且記得每次 session 之間都把 token 換掉。唯讀的 `/introspection` 端點也是同一回事：它們預設就開著，從 tunnel 一樣打得到——`cantus serve --auth-mode bearer` 會跟 `/tools` 路由一起把它們保護起來（若是 `auth_mode=none`，伺服器啟動時會印出一行警告，提醒你 `/introspection` 正開著沒擋）。quick-tunnel 模式不會把任何 token 寫到硬碟上；之後如果你升級成 named tunnel，產生出來的 `cert.pem` 千萬不要 commit 進版控（它是你整個 tunnel namespace 的長期憑證）。
 
 ## 用 `cantus tui` 觀測
 
@@ -101,7 +101,7 @@ pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-它會開出五個分頁——**Dashboard**、**Skills**、**Permissions**、**Dataflow**、**Inspector**——用按鍵 `1`–`5` 切換；在 Sessions 清單的某一列上按 `Enter`，就能跳到那次執行的 step trace（在 Inspector 裡看）。`--auth-mode` 要跟伺服器對上：用 `--auth-mode bearer` 時，它會從環境變數讀 `CANTUS_SERVE_BEARER_TOKEN`；用 `--auth-mode api-key` 時則讀 `CANTUS_SERVE_API_KEY`——兩者都當成機密看待，絕對別記進 log，也別分享出去。workflow 的 step trace 只會顯示去敏化後的摘要（skill 名稱、參數的 key 名稱，以及結果／例外的型別名稱，永遠不會是它們的值），所以就算對方是走 tunnel 的伺服器，觀測起來也很安全。完整的 pane 說明請見 [Terminal UI](./tui.md)。
+它會開出五個分頁——**Dashboard**、**Tools**、**Permissions**、**Dataflow**、**Inspector**——用按鍵 `1`–`5` 切換；在 Sessions 清單的某一列上按 `Enter`，就能跳到那次執行的 step trace（在 Inspector 裡看）。`--auth-mode` 要跟伺服器對上：用 `--auth-mode bearer` 時，它會從環境變數讀 `CANTUS_SERVE_BEARER_TOKEN`；用 `--auth-mode api-key` 時則讀 `CANTUS_SERVE_API_KEY`——兩者都當成機密看待，絕對別記進 log，也別分享出去。workflow 的 step trace 只會顯示去敏化後的摘要（tool 名稱、參數的 key 名稱，以及結果／例外的型別名稱，永遠不會是它們的值），所以就算對方是走 tunnel 的伺服器，觀測起來也很安全。完整的 pane 說明請見 [Terminal UI](./tui.md)。
 
 ## 透過 Ollama 跑本機 LLM
 
@@ -124,7 +124,7 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-能不能用 tool-use 要看模型本身：`OllamaChatModel.supports_tool_use` 是 `True`（從 `OpenAIChatModel` 繼承而來），但某個特定的 Ollama 模型究竟支不支援 OpenAI 風格的 function calling，得看那個模型怎麼訓練的。正式依賴它之前，先寫一個小小的 `@skill` 驗證一下。
+能不能用 tool-use 要看模型本身：`OllamaChatModel.supports_tool_use` 是 `True`（從 `OpenAIChatModel` 繼承而來），但某個特定的 Ollama 模型究竟支不支援 OpenAI 風格的 function calling，得看那個模型怎麼訓練的。正式依賴它之前，先寫一個小小的 `@tool` 驗證一下。
 
 ## 透過 MLX 跑本機 LLM（Apple Silicon）
 
@@ -176,6 +176,6 @@ print(response.message.content)
 - [`quickstart.md`](./quickstart.md) — Colab 優先的快速上手，透過 Google Drive 快取載入 4-bit Gemma。
 - [Quickstart（模型 API）](./quickstart-providers.md) — 同一個 agent，換上八種 provider 各跑一次。
 - [Quickstart（建置 Agent）](./quickstart-agent.md) — 一塊一塊加上身分、防護與記憶。
-- [Cookbook：patterns](./cookbook/patterns.md) — 可直接跑的食譜，示範怎麼組合 skill、hook、workflow 與 memory。
+- [Cookbook：patterns](./cookbook/patterns.md) — 可直接跑的食譜，示範怎麼組合 tool、hook、workflow 與 memory。
 - `cantus-agent[serve]` — 把你的 agent 包進一個 FastAPI HTTP 端點背後（`from cantus.serve import serve`）。
 - repository 裡的 `docs/llm_wiki/research/cloudflare_tunnel_vs_ngrok.md` — 為什麼這份教學選了 `cloudflared` 而不是 `ngrok`（免費隨機子網域、不會留下 auth token、`Ctrl-C` 收得乾淨俐落）。

@@ -8,7 +8,7 @@ This walkthrough takes a Google Chat app from zero to a working echo bot on `can
 
 - A [Google Cloud](https://console.cloud.google.com/) account (Google Workspace or a regular Gmail account both work).
 - A [Google Chat space](https://chat.google.com/) you can administer, to use as the test target.
-- `cantus-agent[serve]>=0.4.7` installed.
+- `cantus-agent[serve]>=0.7.0` installed.
 - A laptop on any OS. `google-cloud-pubsub` and its transitive dependency `grpcio` ship prebuilt wheels for Linux x86_64, macOS arm64 and x86_64, and Windows AMD64.
 - **No** `cloudflared`, `ngrok`, or any tunnel.
 
@@ -69,22 +69,19 @@ curl -X POST \
 
 `YOUR_SPACE_ID` comes from the URL of the Chat space you want the bot to listen to (for example the `AAAA...` part in `https://chat.google.com/room/AAAA...`).
 
-## 5. Write `myskills/app.py`
+## 5. Write `mytools/app.py`
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import GoogleChatPubSubChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # All three values come from CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_* env vars.
 # (The constructor accepts them directly too, but keep the SA path out of
@@ -106,8 +103,8 @@ export CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SPACE=spaces/YOUR_SPACE_ID
 
 ```bash
 cantus serve \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:google_chat_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:google_chat_channel
 ```
 
 Expected log (cantus startup lines omitted above it):
@@ -121,8 +118,8 @@ INFO cantus.serve.channels GoogleChatPubSubChannel connected: projects/.../subsc
 Go to your Google Chat space and say `hello`. cantus should:
 
 1. Pull a `google.workspace.chat.message.v1.created` event from Pub/Sub.
-2. Put the event on an internal queue (your skill can `receive` it for processing).
-3. Assuming the skill calls `channel.send({"data": {"text": "hello back"}})`, the bot replies `hello back` in the same space.
+2. Put the event on an internal queue (your worker, a loop like the one in the [LINE cookbook](./line.md), can `receive` it for processing).
+3. Assuming your worker calls `channel.send({"data": {"text": "hello back"}})`, the bot replies `hello back` in the same space.
 
 If no events arrive, check in order:
 - `gcloud pubsub subscriptions pull cantus-chat-sub --auto-ack --limit=10` to see whether the topic actually has messages. If not, the Workspace Events API subscription may have failed.
@@ -147,4 +144,4 @@ gcloud pubsub topics delete cantus-chat-events
 - **Never commit the SA JSON file.** Add patterns like `*sa.json` and `*service-account*.json` to `.gitignore`.
 - For production, replace the static SA key with [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) to avoid the risk of leaking long-lived keys.
 - When `CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH` is unset, cantus falls back to `GOOGLE_APPLICATION_CREDENTIALS` (Google's standard ADC variable). So if neither is set, the channel fails fast at construction time with a fixed error string that does not echo any input value.
-- `cantus serve --auth-mode bearer` or `--auth-mode api-key` adds auth to the Skill HTTP endpoints. Channel inbound traffic goes over Pub/Sub pull, so there is no HTTP route to protect there.
+- `cantus serve --auth-mode bearer` or `--auth-mode api-key` adds auth to the tool HTTP endpoints (`/tools`). Channel inbound traffic goes over Pub/Sub pull, so there is no HTTP route to protect there.

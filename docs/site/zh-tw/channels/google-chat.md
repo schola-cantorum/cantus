@@ -8,7 +8,7 @@
 
 - 一個 [Google Cloud](https://console.cloud.google.com/) 帳號（Google Workspace 或一般 Gmail 帳號都可以）。
 - 一個你能管理的 [Google Chat space](https://chat.google.com/)，拿來當測試目標。
-- 已安裝 `cantus-agent[serve]>=0.4.7`。
+- 已安裝 `cantus-agent[serve]>=0.7.0`。
 - 一台筆電，什麼作業系統都行。`google-cloud-pubsub` 和它連帶會裝進來的依賴 `grpcio`，在 Linux x86_64、macOS arm64 與 x86_64、Windows AMD64 上都有預先編好的 wheel。
 - **不需要** `cloudflared`、`ngrok` 或任何 tunnel。
 
@@ -69,22 +69,19 @@ curl -X POST \
 
 `YOUR_SPACE_ID` 來自你想讓 bot 監聽的那個 Chat space 的網址（例如 `https://chat.google.com/room/AAAA...` 裡的 `AAAA...` 這一段）。
 
-## 5. 寫 `myskills/app.py`
+## 5. 寫 `mytools/app.py`
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import GoogleChatPubSubChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # 這三個值都從 CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_* 這組環境變數讀進來。
 # （建構子其實也能直接吃這些參數，但把 SA 路徑留在原始碼之外，
@@ -106,8 +103,8 @@ export CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_SPACE=spaces/YOUR_SPACE_ID
 
 ```bash
 cantus serve \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:google_chat_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:google_chat_channel
 ```
 
 預期會看到的 log（上面 cantus 啟動的那幾行先省略）：
@@ -121,8 +118,8 @@ INFO cantus.serve.channels GoogleChatPubSubChannel connected: projects/.../subsc
 到你的 Google Chat space，打一句 `hello`。這時 cantus 應該會：
 
 1. 從 Pub/Sub pull 出一個 `google.workspace.chat.message.v1.created` 事件。
-2. 把這個事件放進內部的 queue（你的 skill 可以用 `receive` 把它拿出來處理）。
-3. 假設 skill 呼叫了 `channel.send({"data": {"text": "hello back"}})`，bot 就會在同一個 space 裡回你 `hello back`。
+2. 把這個事件放進內部的 queue（你的 worker，也就是像 [LINE cookbook](./line.md) 裡那樣的迴圈，可以用 `receive` 把它拿出來處理）。
+3. 假設你的 worker 呼叫了 `channel.send({"data": {"text": "hello back"}})`，bot 就會在同一個 space 裡回你 `hello back`。
 
 如果遲遲沒有事件進來，照這個順序檢查：
 - 執行 `gcloud pubsub subscriptions pull cantus-chat-sub --auto-ack --limit=10`，看看這條 subscription 裡到底有沒有訊息在排隊。如果是空的，多半是 Workspace Events API 的訂閱沒設成功。
@@ -147,4 +144,4 @@ gcloud pubsub topics delete cantus-chat-events
 - **絕對不要把 SA JSON 檔 commit 進去。** 在 `.gitignore` 裡加上 `*sa.json`、`*service-account*.json` 這類 pattern。
 - 上正式環境時，把靜態的 SA key 換成 [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)，這樣可以避開長期金鑰外洩的風險。
 - 當 `CANTUS_SERVE_CHANNEL_GOOGLE_CHAT_CREDENTIALS_PATH` 沒設定時，cantus 會回退去找 `GOOGLE_APPLICATION_CREDENTIALS`（Google 標準的 ADC 變數）。所以如果兩個都沒設，這個 channel 會在建構的當下就直接 fail-fast，丟出一個固定的錯誤字串，而且不會把你輸入的任何值回傳出來。
-- `cantus serve --auth-mode bearer` 或 `--auth-mode api-key` 會替 Skill 的 HTTP 端點加上認證。Channel 的 inbound 流量是走 Pub/Sub pull，所以那邊沒有 HTTP route 需要保護。
+- `cantus serve --auth-mode bearer` 或 `--auth-mode api-key` 會替 tool 的 HTTP 端點（`/tools`）加上認證。Channel 的 inbound 流量是走 Pub/Sub pull，所以那邊沒有 HTTP route 需要保護。

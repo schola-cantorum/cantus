@@ -23,13 +23,13 @@ model id 由 provider 決定，而且會隨時間變動。這一頁出現的都�
 
 ## 會重複使用的 agent
 
-先定義一個 skill 和一個小工具函式。下面每一節都只是把不同的模型交給同一個 `ask`。
+先定義一個 tool 和一個輔助函式（helper）。下面每一節都只是把不同的模型交給同一個 `ask`。
 
 ```python
-from cantus import Agent, ChatModelAsHandle, load_chat_model, skill
+from cantus import Agent, ChatModelAsHandle, load_chat_model, tool
 
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """把兩個整數相加。
 
@@ -42,12 +42,12 @@ def add(a: int, b: int) -> int:
 
 def ask(model) -> str:
     """跑一次 agent，回傳它的最終答案。"""
-    state = Agent(model=model).run("What is 17 plus 25?")
+    state = Agent(model=model, tools=[add]).run("What is 17 plus 25?")
     final = state.stream[-1]
     return getattr(final, "answer", repr(final))
 
 
-print(add(17, 25))  # skill 仍然是一個可以自己呼叫的普通函式
+print(add(17, 25))  # tool 仍然可以自己直接呼叫
 ```
 
 `load_chat_model` 回傳的是 `ChatModel`，它講的是 `chat(messages)`。`Agent` 要的是 model handle，講的是 `generate(prompt)`。`ChatModelAsHandle` 就是兩者之間的轉接頭，所以每一節都會用它把載入的模型包起來。

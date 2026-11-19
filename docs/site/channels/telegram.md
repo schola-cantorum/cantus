@@ -5,7 +5,7 @@ This walkthrough takes you from zero to a Telegram bot wired into `cantus serve`
 ## 0. What you'll need
 
 - A Telegram account (signed in through the app).
-- `cantus-agent[serve]>=0.4.5` and `cloudflared` installed.
+- `cantus-agent[serve]>=0.7.0` and `cloudflared` installed.
 
 ## 1. Register a bot with `@BotFather`
 
@@ -25,22 +25,19 @@ export CANTUS_SERVE_CHANNEL_TELEGRAM_SECRET_TOKEN="$(openssl rand -hex 32)"
 
 `openssl rand -hex 32` gives you a 64-character hex string. Telegram requires the secret_token to be 1–256 characters drawn from `A-Z a-z 0-9 _ -`, so a hex string is perfectly valid.
 
-## 3. Write `myskills/app.py`
+## 3. Write `mytools/app.py`
 
 ```python
-# myskills/app.py
-from cantus.core.registry import Registry
-from cantus.protocols.skill import register_skill
+# mytools/app.py
+from cantus import Registry, tool
 from cantus.serve import TelegramWebhookChannel
 
-registry = Registry()
-
-@register_skill
+@tool
 def echo(text: str) -> str:
     """Echo back whatever the user said."""
     return text
 
-registry.register("skill", echo)
+registry = Registry(tools=[echo])
 
 # Secrets come from env vars (CANTUS_SERVE_CHANNEL_TELEGRAM_*).
 telegram_channel = TelegramWebhookChannel()
@@ -52,8 +49,8 @@ telegram_channel = TelegramWebhookChannel()
 cantus serve \
   --host 127.0.0.1 \
   --port 8765 \
-  --registry-import myskills.app:registry \
-  --channels myskills.app:telegram_channel
+  --registry-import mytools.app:registry \
+  --channels mytools.app:telegram_channel
 ```
 
 ## 5. Cloudflare Tunnel
@@ -93,7 +90,7 @@ curl "https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook"
 ```python
 # scripts/worker.py
 import asyncio
-from myskills.app import telegram_channel
+from mytools.app import telegram_channel
 
 async def main():
     while True:

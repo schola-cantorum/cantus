@@ -22,9 +22,9 @@ Both methods accept an optional `out: IO[str]`. Leave it out and the text goes t
 To make the trace below reproducible on any machine, this example drives the agent with a *scripted model*: an object whose `generate` returns fixed replies in order. Any object with a `generate(prompt) -> str` method works as a model, so you can swap in a real one at the end.
 
 ```python
-from cantus import Agent, Inspector, skill
+from cantus import Agent, Inspector, tool
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
@@ -41,12 +41,12 @@ class ScriptedModel:
         return self.replies[0]  # keep repeating the last reply
 
 model = ScriptedModel([
-    '{"thought": "add the first two", "action": {"skill_name": "add", "args": {"a": 3, "b": 4}}}',
-    '{"thought": "now add 5", "action": {"skill_name": "add", "args": {"a": 7, "b": 5}}}',
+    '{"thought": "add the first two", "action": {"tool_name": "add", "args": {"a": 3, "b": 4}}}',
+    '{"thought": "now add 5", "action": {"tool_name": "add", "args": {"a": 7, "b": 5}}}',
     '{"thought": "done", "action": {"final_answer": "3+4+5 = 12"}}',
 ])
 
-agent = Agent(model=model)
+agent = Agent(model=model, tools=[add])
 state = agent.run("Please compute 3 + 4 + 5")
 
 # Print the whole trace: which Action / Observation happened at each step
@@ -78,4 +78,4 @@ trace_str = buf.getvalue()           # dump it to a file, upload to wandb, or as
 
 ## When output appears automatically
 
-Trace lines only show up mid-run when you have separately wrapped a protocol with the `@debug` decorator. That output comes from `@debug`, not from the Inspector. `@debug` stacks on top of a Skill (or a hook helper such as an analyzer or validator) and prints a structured trace on every call. The Inspector never runs during the loop; you reach for it once the run is over and you want to read back what happened.
+Trace lines only show up mid-run when you have separately wrapped a protocol with the `@debug` decorator. That output comes from `@debug`, not from the Inspector. `@debug` stacks on top of a Tool (or a hook helper such as an analyzer or validator) and prints a structured trace on every call. The Inspector never runs during the loop; you reach for it once the run is over and you want to read back what happened.

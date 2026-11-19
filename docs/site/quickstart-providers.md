@@ -23,13 +23,13 @@ Model ids belong to the provider and change over time. The ones on this page are
 
 ## The agent you will reuse
 
-Define one skill and one helper. Every section below hands a different model to the same `ask` function.
+Define one tool and one helper. Every section below hands a different model to the same `ask` function.
 
 ```python
-from cantus import Agent, ChatModelAsHandle, load_chat_model, skill
+from cantus import Agent, ChatModelAsHandle, load_chat_model, tool
 
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers.
 
@@ -42,12 +42,12 @@ def add(a: int, b: int) -> int:
 
 def ask(model) -> str:
     """Run the agent once and return its final answer."""
-    state = Agent(model=model).run("What is 17 plus 25?")
+    state = Agent(model=model, tools=[add]).run("What is 17 plus 25?")
     final = state.stream[-1]
     return getattr(final, "answer", repr(final))
 
 
-print(add(17, 25))  # a skill is still a plain function you can call yourself
+print(add(17, 25))  # a tool is still callable by hand
 ```
 
 `load_chat_model` returns a `ChatModel`, which speaks `chat(messages)`. `Agent` wants a model handle, which speaks `generate(prompt)`. `ChatModelAsHandle` is the adapter between the two, so every section wraps the loaded model in it.

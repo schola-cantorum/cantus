@@ -2,14 +2,14 @@
 
 This page collects the ways cantus pieces tend to fit together on real tasks. Each recipe ships with code you can paste straight into a Colab cell and run.
 
-A quick orientation before the recipes. cantus has exactly two protocol kinds: a **Skill** is something the agent can call, and a **Memory** is stateful and therefore class-only. `analyzer` and `validator` are not protocol kinds — they are **hook helpers** that attach to a Skill as a `pre_hook` or `post_hook`. Multi-step composition lives in `cantus.workflows`, which gives you five plain-Python building blocks: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`.
+A quick orientation before the recipes. cantus has exactly two protocol kinds: a **Tool** is something the agent can call, and a **Memory** is stateful and therefore class-only. `analyzer` and `validator` are not protocol kinds — they are **hook helpers** that attach to a Tool as a `pre_hook` or `post_hook`. Multi-step composition lives in `cantus.workflows`, which gives you five plain-Python building blocks: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`.
 
-## Recipe 1: the "parse-then-validate" skill
+## Recipe 1: the "parse-then-validate" tool
 
-The most common shape: a skill fetches a string from the outside world, an analyzer parses that string into a Pydantic model, and a validator checks the result at the semantic level. You wire all three together by attaching the analyzer and validator to the skill as hooks.
+The most common shape: a tool fetches a string from the outside world, an analyzer parses that string into a Pydantic model, and a validator checks the result at the semantic level. You wire all three together by attaching the analyzer and validator to the tool as hooks.
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.hooks import analyzer, validator, Result
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ def ensure_isbn(book: Book) -> Result:
         return Result.success(book)
     return Result.failure("ISBN checksum mismatch — re-check the digits.")
 
-@skill(pre_hook=parse_book, post_hook=ensure_isbn)
+@tool(pre_hook=parse_book, post_hook=ensure_isbn)
 def lookup_book(text: str) -> Book:
     """Read a book from a 'title|isbn' record and validate it."""
     return text  # the pre_hook turns the raw string into a Book first
@@ -41,14 +41,14 @@ book = parse_book("Dune|9780441013593")
 print(book.title, ensure_isbn(book).ok)
 ```
 
-The point is that each piece has a single job and they do not overlap. The skill does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry.
+The point is that each piece has a single job and they do not overlap. The tool does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry. The hooks run when an agent calls `lookup_book`; calling it yourself runs only its body.
 
 ## Recipe 2: class-first shared state
 
-When a skill needs to keep state across calls — a connection pool, a cache, a counter — the decorator form cannot help you, because a free function has no instance state. Switch to the class-first form instead:
+When a tool needs to keep state across calls — a connection pool, a cache, a counter — the decorator form cannot help you, because a free function has no instance state. Switch to the class-first form instead:
 
 ```python
-from cantus import Skill
+from cantus import Tool
 
 calls = {"count": 0}
 
@@ -56,7 +56,7 @@ def expensive_api_call(topic: str) -> str:
     calls["count"] += 1
     return f"results for {topic}"
 
-class CachedSearch(Skill):
+class CachedSearch(Tool):
     """Fetch a book from an API, querying each topic only once."""
 
     name = "search_book"
@@ -70,10 +70,8 @@ class CachedSearch(Skill):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# Class-first skills do not register themselves — register one by hand.
-from cantus.core.registry import get_registry
+# A class-first tool is an instance you build; hand it to an agent with tools=[search].
 search = CachedSearch()
-get_registry().register("skill", search)
 
 search("space opera")
 search("space opera")
@@ -82,25 +80,25 @@ print(calls["count"])  # the API was hit once
 
 Reach for this when you need a cross-call cache, an external connection, a counter, or a lazily loaded resource. The decorator form shares module-level globals on every call, which is hard to test and hard to reset.
 
-## Recipe 3: chaining several skills
+## Recipe 3: chaining several tools
 
-A `PromptChain` runs a sequence of skills in order, threading each one's output into the next one's input. The classes in `cantus.workflows` are plain Python: they take registered skills (or any callable) in the constructor and expose a `.run(input)` method. They never touch the runtime registry and never show up in the spec the agent sees.
+A `PromptChain` runs a sequence of tools in order, threading each one's output into the next one's input. The classes in `cantus.workflows` are plain Python: they take tools (or any callable) in the constructor and expose a `.run(input)` method. They call each step directly, without argument validation or hooks, never go through a registry, and never show up in the spec the agent sees.
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.workflows import PromptChain
 
-@skill
+@tool
 def outline(topic: str) -> str:
     """Sketch an outline for the given topic."""
     return f"outline: {topic}"
 
-@skill
+@tool
 def draft(outline: str) -> str:
     """Expand an outline into prose."""
     return f"draft of {outline}"
 
-@skill
+@tool
 def polish(text: str) -> str:
     """Tighten the prose."""
     return f"{text} (polished)"
@@ -118,7 +116,7 @@ Dune True
 draft of outline: write a haiku about Tainan (polished)
 ```
 
-When the branches are independent rather than sequential, use `Parallel` to fan out and collect; when the next step depends on classifying the input first, use `Router`. `OrchestratorWorker` and `EvaluatorOptimizer` cover the cases where one skill plans work for others, or where a generator and a critic iterate together. All five share the same `.run(input)` shape, so you can nest them: a step inside a `PromptChain` can itself be another workflow.
+When the branches are independent rather than sequential, use `Parallel` to fan out and collect; when the next step depends on classifying the input first, use `Router`. `OrchestratorWorker` and `EvaluatorOptimizer` cover the cases where one tool plans work for others, or where a generator and a critic iterate together. All five share the same `.run(input)` shape, so you can nest them: a step inside a `PromptChain` can itself be another workflow.
 
 ## Recipe 4: swapping between the three Memory implementations
 

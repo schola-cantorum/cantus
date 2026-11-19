@@ -2,14 +2,14 @@
 
 這一頁把 cantus 各個零件在真實任務裡常見的搭配方式整理起來。每個 recipe 都附了程式碼，你可以直接貼進 Colab cell 就跑得起來。
 
-進到 recipe 之前先快速建立一個座標。cantus 只有兩種 protocol kind：**Skill** 是 agent 可以呼叫的東西，**Memory** 則是有狀態的，所以只能用 class 形式寫。`analyzer` 和 `validator` 不是 protocol kind，它們是 **hook helper**，以 `pre_hook` 或 `post_hook` 的身分掛在某個 Skill 上。多步驟的組合則住在 `cantus.workflows`，它給你五個純 Python 的 building block：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker`、`EvaluatorOptimizer`。
+進到 recipe 之前先快速建立一個座標。cantus 只有兩種 protocol kind：**Tool** 是 agent 可以呼叫的東西，**Memory** 則是有狀態的，所以只能用 class 形式寫。`analyzer` 和 `validator` 不是 protocol kind，它們是 **hook helper**，以 `pre_hook` 或 `post_hook` 的身分掛在某個 Tool 上。多步驟的組合則住在 `cantus.workflows`，它給你五個純 Python 的 building block：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker`、`EvaluatorOptimizer`。
 
-## Recipe 1：「parse-then-validate」這種 skill
+## Recipe 1：「parse-then-validate」這種 tool
 
-最常見的形狀：一個 skill 從外部世界抓回一段字串，analyzer 把那段字串解析成 Pydantic model，validator 再從語意層級檢查結果對不對。把 analyzer 和 validator 當成 hook 掛到 skill 上，三者就串起來了。
+最常見的形狀：一個 tool 從外部世界抓回一段字串，analyzer 把那段字串解析成 Pydantic model，validator 再從語意層級檢查結果對不對。把 analyzer 和 validator 當成 hook 掛到 tool 上，三者就串起來了。
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.hooks import analyzer, validator, Result
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ def ensure_isbn(book: Book) -> Result:
         return Result.success(book)
     return Result.failure("ISBN checksum mismatch — re-check the digits.")
 
-@skill(pre_hook=parse_book, post_hook=ensure_isbn)
+@tool(pre_hook=parse_book, post_hook=ensure_isbn)
 def lookup_book(text: str) -> Book:
     """Read a book from a 'title|isbn' record and validate it."""
     return text  # pre_hook 會先把原始字串變成 Book
@@ -41,14 +41,14 @@ book = parse_book("Dune|9780441013593")
 print(book.title, ensure_isbn(book).ok)
 ```
 
-重點在於每個零件只做一件事，而且彼此不重疊。skill 不負責解析，analyzer 不負責驗證，validator 永遠只回一個 `Result`。當 validator 失敗時，agent loop 會把那個 `Result.failure` 的回饋轉成一筆 observation 再餵回去，讓模型可以重試。
+重點在於每個零件只做一件事，而且彼此不重疊。tool 不負責解析，analyzer 不負責驗證，validator 永遠只回一個 `Result`。當 validator 失敗時，agent loop 會把那個 `Result.failure` 的回饋轉成一筆 observation 再餵回去，讓模型可以重試。這些 hook 只有在 agent 呼叫 `lookup_book` 時才會執行；自己直接呼叫它，只會跑它的本體。
 
 ## Recipe 2：class-first 的共享狀態
 
-當一個 skill 需要在多次呼叫之間保留狀態——連線池、快取、計數器——decorator 寫法就幫不上忙了，因為一個獨立函式沒有 instance state。這時改用 class-first 寫法：
+當一個 tool 需要在多次呼叫之間保留狀態——連線池、快取、計數器——decorator 寫法就幫不上忙了，因為一個獨立函式沒有 instance state。這時改用 class-first 寫法：
 
 ```python
-from cantus import Skill
+from cantus import Tool
 
 calls = {"count": 0}
 
@@ -56,7 +56,7 @@ def expensive_api_call(topic: str) -> str:
     calls["count"] += 1
     return f"results for {topic}"
 
-class CachedSearch(Skill):
+class CachedSearch(Tool):
     """Fetch a book from an API, querying each topic only once."""
 
     name = "search_book"
@@ -70,10 +70,8 @@ class CachedSearch(Skill):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# class-first 的 skill 不會自己註冊，要手動註冊一個。
-from cantus.core.registry import get_registry
+# class-first 的 tool 是你自己建立的 instance；用 tools=[search] 把它交給 agent。
 search = CachedSearch()
-get_registry().register("skill", search)
 
 search("space opera")
 search("space opera")
@@ -82,25 +80,25 @@ print(calls["count"])  # API 只被打了一次
 
 什麼時候該用它：當你需要跨呼叫的快取、一條對外連線、一個計數器，或一個延遲載入的資源。decorator 寫法每次呼叫都共用 module 層級的全域變數，這既難測試也難重置。
 
-## Recipe 3：把幾個 skill 串成一條鏈
+## Recipe 3：把幾個 tool 串成一條鏈
 
-`PromptChain` 會依序跑過一連串 skill，把每一個的輸出接到下一個的輸入。`cantus.workflows` 裡的這些 class 都是純 Python：它們在建構子裡吃進已註冊的 skill（或任何 callable），對外只暴露一個 `.run(input)` 方法。它們從來不碰 runtime registry，也不會出現在 agent 看到的 spec 裡。
+`PromptChain` 會依序跑過一連串 tool，把每一個的輸出接到下一個的輸入。`cantus.workflows` 裡的這些 class 都是純 Python：它們在建構子裡吃進 tool（或任何 callable），對外只暴露一個 `.run(input)` 方法。它們直接呼叫每一步（不做引數驗證，也不跑 hook），不經過任何 registry，也不會出現在 agent 看到的 spec 裡。
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.workflows import PromptChain
 
-@skill
+@tool
 def outline(topic: str) -> str:
     """Sketch an outline for the given topic."""
     return f"outline: {topic}"
 
-@skill
+@tool
 def draft(outline: str) -> str:
     """Expand an outline into prose."""
     return f"draft of {outline}"
 
-@skill
+@tool
 def polish(text: str) -> str:
     """Tighten the prose."""
     return f"{text} (polished)"
@@ -118,7 +116,7 @@ Dune True
 draft of outline: write a haiku about Tainan (polished)
 ```
 
-當這些分支彼此獨立、不是線性接龍時，用 `Parallel` 來扇出再收集；當下一步得先把輸入分類才知道要走哪條路時，用 `Router`。`OrchestratorWorker` 和 `EvaluatorOptimizer` 則涵蓋另外兩種情況：一個 skill 替其他 skill 規劃工作，或是一個產生器和一個評審來回迭代。這五個都共用同一種 `.run(input)` 形狀，所以你可以把它們互相嵌套：`PromptChain` 裡的某一步，本身可以又是另一個 workflow。
+當這些分支彼此獨立、不是線性接龍時，用 `Parallel` 來扇出再收集；當下一步得先把輸入分類才知道要走哪條路時，用 `Router`。`OrchestratorWorker` 和 `EvaluatorOptimizer` 則涵蓋另外兩種情況：一個 tool 替其他 tool 規劃工作，或是一個產生器和一個評審來回迭代。這五個都共用同一種 `.run(input)` 形狀，所以你可以把它們互相嵌套：`PromptChain` 裡的某一步，本身可以又是另一個 workflow。
 
 ## Recipe 4：在三種 Memory 實作之間切換
 
