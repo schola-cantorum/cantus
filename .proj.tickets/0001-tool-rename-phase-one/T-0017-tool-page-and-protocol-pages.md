@@ -216,3 +216,11 @@ adapters 的歷史句改寫成現況（D9）；重寫的 zh-tw 頁一併改成�
   `.scratch/T-0017/stage8/browser.md`. Not covered: the other 9 in-scope pages on the ticket build
   (CI runs them on the PR), Python 3.10–3.12 page execution (CI), the guide link target (404 until
   T-0019), keyboard and screen-reader behaviour, other browsers.
+- **Open items at push (2026-11-19).** The user approved the push without answering the items shown
+  as "not changed"; they stay as they are, for the retrospective or a later ticket: S-11 (commit
+  self-tests for the moved-page checker), S-26/P-14 (`docs/api` relative links and `{#...}`
+  anchors, a generator change), F-01 ("system prompt" for a prompt `ChatModelAsHandle` sends as a
+  user message), F-04, F-13, F-18, F-19, F-21 (statements that predate this ticket on the pages it
+  rewrote; F-13 is a zh-tw sentence whose meaning is the opposite of the English), SEC-T0017-2 and
+  SEC-T0017-3 (two optional hardening sentences), P-05 (the adapters Anthropic sentence follows the
+  executor brief). Python 3.10–3.12 page execution is evidenced by the PR's CI run.
