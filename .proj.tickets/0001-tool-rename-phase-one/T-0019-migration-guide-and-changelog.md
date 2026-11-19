@@ -2,7 +2,7 @@
 id: T-0019
 title: Migration guide v0.6.0 → v0.7.0 and the CHANGELOG entry
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0015]
 ---
 
