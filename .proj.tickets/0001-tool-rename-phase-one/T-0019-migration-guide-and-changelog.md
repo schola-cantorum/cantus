@@ -2,7 +2,7 @@
 id: T-0019
 title: Migration guide v0.6.0 → v0.7.0 and the CHANGELOG entry
 epic: 0001-tool-rename-phase-one
-status: review
+status: done
 blocked_by: [T-0015]
 ---
 
@@ -225,7 +225,7 @@ R6 與 I1～I11 達成。guide 的每個條目以標題結尾的 ID 標示，文
   | CHANGELOG | row 11: 12 checks incl. the exact phrase 別名過渡期／alias period, the guide as the only repository-relative link, and provenance under D5 | in each matrix transcript | AC-38 (TR-139), V2-15 | — |
   | site | row 12: `npm run docs:build` exit 0; both locales' built changelog pages show the entry and one `blob/main` guide link; `npm run docs:api` then `git status --porcelain docs/api` empty | `.scratch/T-0019/site-build-b994485.txt` (CHANGELOG unchanged since) | V2-15 | — |
   | harness | row 13: `.scratch/T-0019/mutate.py` on `ee380ac`: 4 controls pass (one with `PYTHONDEVMODE=1` in the outer environment, one neutral prose edit, one trailing-space fence that is accepted and still runs), 35 of 36 mutations killed, each by the check it names (every kill line read), 1 known survivor (K01) | `.scratch/T-0019/mutations-ee380ac.txt` | evidence quality | earlier runs: on `991fa8e` M05 was killed by a `NameError` instead of its assertion (rewritten); on `b994485` M18 no longer applied after the header case change (re-run alone, `mutations-M18-rerun-b994485.txt`) |
-  | repository | row 14: full pytest, ruff, mypy, `check_no_dev_paths.sh`, `verify-project.py`, porcelain empty before and after | `.scratch/T-0019/repo-checks-final.txt` (its first line names the commit) | AGENTS.md | — |
+  | repository | row 14: full pytest, ruff, mypy, `check_no_dev_paths.sh`, `verify-project.py`, porcelain empty before and after | `.scratch/T-0019/repo-checks-final.txt`, run at `c493116`: `1851 passed, 3 skipped`, ruff, mypy (89 files), dev paths, verify-project all pass | AGENTS.md | — |
 
   Claims the guide makes on earlier tickets' evidence rather than this harness (FA-11, FB-19): keyword
   patterns with `skill_name` (W7), the `@dataclass` Agent subclass attribution (W11, T-0008), writing
