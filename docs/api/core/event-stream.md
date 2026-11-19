@@ -65,7 +65,7 @@ Observation (base, frozen)
 └── MaxIterationsObservation(iterations, last_action_summary, partial_state)  # Loop ran to its bound
 ```
 
-Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, when the model names a tool the agent does not have, the `ValidationErrorObservation.feedback` lists the available tool names so the model can correct its own typo.
+Each Observation carries enough context for the LLM to understand what happened on the next turn of the prompt. For example, when the agent has tools and the model names one it does not have, the `ValidationErrorObservation.feedback` lists the available tool names so the model can correct its own typo.
 
 ## Why frozen
 

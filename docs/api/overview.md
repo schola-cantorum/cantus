@@ -20,7 +20,7 @@
 +-----------------------------------------------------+
 ```
 
-You write the top layer: plain Python functions that decorators turn into protocol objects. The framework supplies the two middle layers, the actual runtime. Underneath sits the environment, a model handle, a Drive mount, and stdout.
+You write the top layer: plain Python functions that `@tool` turns into tools, Memory subclasses, and hook helpers. The framework supplies the two middle layers, the actual runtime. Underneath sits the environment, a model handle, a Drive mount, and stdout.
 
 ## Two Protocol Kinds, Hook Helpers, and Workflow Building Blocks
 
@@ -30,9 +30,9 @@ You write the top layer: plain Python functions that decorators turn into protoc
 | `memory` (protocol kind)  | Conversation state and retrieval memory (ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, plus the AutoMemory wrapper) | The relevant memory interface |
 | `analyzer` (hook helper)  | A tool's `pre_hook`: turns the tool's arguments into a structured value before its body runs | dataclass / dict   |
 | `validator` (hook helper) | A tool's `post_hook`: judges the tool's return value and can send feedback to the model | `Result(ok, ...)`  |
-| `cantus.workflows`        | A namespace of building blocks for composing tools and hooks into a flow          | Any value          |
+| `cantus.workflows`        | A namespace of building blocks for composing tools into a flow                    | Any value          |
 
-cantus has exactly two protocol kinds: `tool` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they are attached to one tool and run around that tool's body when an agent calls it, rather than being dispatched on their own. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from each Tool's `spec_for_llm()`, so the callable protocol kind and the tools the model can call are the same thing.
+cantus has exactly two protocol kinds: `tool` (callable) and `memory` (stateful, defined as a class). `analyzer` and `validator` are hook helpers rather than protocol kinds; they are attached to one tool and run around that tool's body when an agent calls it, rather than being dispatched on their own. Composition lives in the `cantus.workflows` building blocks, which ship five patterns: `PromptChain`, `Router`, `Parallel`, `OrchestratorWorker`, and `EvaluatorOptimizer`. The function-call schema the LLM sees comes from the `spec_for_llm()` of each Tool you pass to an agent with `tools=`.
 
 ## Model Providers
 

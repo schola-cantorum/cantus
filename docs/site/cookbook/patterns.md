@@ -41,14 +41,14 @@ book = parse_book("Dune|9780441013593")
 print(book.title, ensure_isbn(book).ok)
 ```
 
-The point is that each piece has a single job and they do not overlap. The tool does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry.
+The point is that each piece has a single job and they do not overlap. The tool does not parse, the analyzer does not validate, and the validator only ever returns a `Result`. When a validator fails, the agent loop turns that `Result.failure` feedback into an observation and feeds it back so the model can retry. The hooks run when an agent calls `lookup_book`; calling it yourself runs only its body.
 
 ## Recipe 2: class-first shared state
 
 When a tool needs to keep state across calls — a connection pool, a cache, a counter — the decorator form cannot help you, because a free function has no instance state. Switch to the class-first form instead:
 
 ```python
-from cantus import Registry, Tool
+from cantus import Tool
 
 calls = {"count": 0}
 
@@ -70,9 +70,8 @@ class CachedSearch(Tool):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# A class-first tool is an instance you build, then hand to an agent or a Registry.
+# A class-first tool is an instance you build; hand it to an agent with tools=[search].
 search = CachedSearch()
-registry = Registry(tools=[search])
 
 search("space opera")
 search("space opera")
@@ -83,7 +82,7 @@ Reach for this when you need a cross-call cache, an external connection, a count
 
 ## Recipe 3: chaining several tools
 
-A `PromptChain` runs a sequence of tools in order, threading each one's output into the next one's input. The classes in `cantus.workflows` are plain Python: they take tools (or any callable) in the constructor and expose a `.run(input)` method. They call each step directly, never go through a registry, and never show up in the spec the agent sees.
+A `PromptChain` runs a sequence of tools in order, threading each one's output into the next one's input. The classes in `cantus.workflows` are plain Python: they take tools (or any callable) in the constructor and expose a `.run(input)` method. They call each step directly, without argument validation or hooks, never go through a registry, and never show up in the spec the agent sees.
 
 ```python
 from cantus import tool

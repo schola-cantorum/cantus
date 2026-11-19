@@ -23,7 +23,7 @@ model id 由 provider 決定，而且會隨時間變動。這一頁出現的都�
 
 ## 會重複使用的 agent
 
-先定義一個 tool 和一個小工具函式。下面每一節都只是把不同的模型交給同一個 `ask`。
+先定義一個 tool 和一個輔助函式（helper）。下面每一節都只是把不同的模型交給同一個 `ask`。
 
 ```python
 from cantus import Agent, ChatModelAsHandle, load_chat_model, tool

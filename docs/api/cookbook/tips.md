@@ -154,6 +154,7 @@ def my_tool(x: int) -> int:
 reg = Registry(tools=[my_tool])
 agent = Agent(model=ScriptedModel(), tools=reg)
 print(agent.registry.names_for("tool"))
+print(agent.registry is reg)
 ```
 
 You should see, across the runnable tips on this page:
@@ -162,6 +163,9 @@ You should see, across the runnable tips on this page:
 ['topic']
 True
 ['my_tool']
+True
 ```
+
+Because the `Registry` is shared, a tool you add to it later reaches every agent that holds it. Give each test, and each agent that should not see the others' tools, its own list or `Registry`.
 
 Code written for cantus 0.6 kept its tools in one global registry instead; the Tool page's [migration notes](../protocols/tool.md#migrating-from-skill) cover it.

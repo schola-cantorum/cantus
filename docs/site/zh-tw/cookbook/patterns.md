@@ -41,14 +41,14 @@ book = parse_book("Dune|9780441013593")
 print(book.title, ensure_isbn(book).ok)
 ```
 
-重點在於每個零件只做一件事，而且彼此不重疊。tool 不負責解析，analyzer 不負責驗證，validator 永遠只回一個 `Result`。當 validator 失敗時，agent loop 會把那個 `Result.failure` 的回饋轉成一筆 observation 再餵回去，讓模型可以重試。
+重點在於每個零件只做一件事，而且彼此不重疊。tool 不負責解析，analyzer 不負責驗證，validator 永遠只回一個 `Result`。當 validator 失敗時，agent loop 會把那個 `Result.failure` 的回饋轉成一筆 observation 再餵回去，讓模型可以重試。這些 hook 只有在 agent 呼叫 `lookup_book` 時才會執行；自己直接呼叫它，只會跑它的本體。
 
 ## Recipe 2：class-first 的共享狀態
 
 當一個 tool 需要在多次呼叫之間保留狀態——連線池、快取、計數器——decorator 寫法就幫不上忙了，因為一個獨立函式沒有 instance state。這時改用 class-first 寫法：
 
 ```python
-from cantus import Registry, Tool
+from cantus import Tool
 
 calls = {"count": 0}
 
@@ -70,9 +70,8 @@ class CachedSearch(Tool):
             self._cache[topic] = expensive_api_call(topic)
         return self._cache[topic]
 
-# class-first 的 tool 是你自己建立的 instance，再交給 agent 或 Registry。
+# class-first 的 tool 是你自己建立的 instance；用 tools=[search] 把它交給 agent。
 search = CachedSearch()
-registry = Registry(tools=[search])
 
 search("space opera")
 search("space opera")
@@ -83,7 +82,7 @@ print(calls["count"])  # API 只被打了一次
 
 ## Recipe 3：把幾個 tool 串成一條鏈
 
-`PromptChain` 會依序跑過一連串 tool，把每一個的輸出接到下一個的輸入。`cantus.workflows` 裡的這些 class 都是純 Python：它們在建構子裡吃進 tool（或任何 callable），對外只暴露一個 `.run(input)` 方法。它們直接呼叫每一步，不經過任何 registry，也不會出現在 agent 看到的 spec 裡。
+`PromptChain` 會依序跑過一連串 tool，把每一個的輸出接到下一個的輸入。`cantus.workflows` 裡的這些 class 都是純 Python：它們在建構子裡吃進 tool（或任何 callable），對外只暴露一個 `.run(input)` 方法。它們直接呼叫每一步（不做引數驗證，也不跑 hook），不經過任何 registry，也不會出現在 agent 看到的 spec 裡。
 
 ```python
 from cantus import tool

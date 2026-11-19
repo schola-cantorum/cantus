@@ -118,7 +118,7 @@ INFO cantus.serve.channels GoogleChatPubSubChannel connected: projects/.../subsc
 Go to your Google Chat space and say `hello`. cantus should:
 
 1. Pull a `google.workspace.chat.message.v1.created` event from Pub/Sub.
-2. Put the event on an internal queue (your worker can `receive` it for processing).
+2. Put the event on an internal queue (your worker, a loop like the one in the [LINE cookbook](./line.md), can `receive` it for processing).
 3. Assuming your worker calls `channel.send({"data": {"text": "hello back"}})`, the bot replies `hello back` in the same space.
 
 If no events arrive, check in order:

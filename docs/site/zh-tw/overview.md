@@ -20,19 +20,19 @@
 +-----------------------------------------------------+
 ```
 
-你負責寫的是最上層：用 decorator 把一般的 Python function 變成 protocol 物件。框架替你補上中間兩層，也就是真正的 runtime。再往下是環境本身：一個 model handle、一個掛載好的 Drive，還有 stdout。
+你負責寫的是最上層：用 `@tool` 變成 tool 的一般 Python function、Memory 的子類別，以及 hook helper。框架替你補上中間兩層，也就是真正的 runtime。再往下是環境本身：一個 model handle、一個掛載好的 Drive，還有 stdout。
 
 ## 兩個 Protocol Kind、Hook Helper 與 Workflow Building Block
 
 | 類別                       | 角色                                                                              | 回傳型別          |
 | -------------------------- | --------------------------------------------------------------------------------- | ----------------- |
-| `tool`（protocol kind）   | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
+| `tool`（protocol kind）    | 一個原子能力，例如查表或呼叫某個 API                                              | 任意值            |
 | `memory`（protocol kind）  | 對話狀態與檢索記憶（ShortTermMemory、BM25Memory、EmbeddingMemory、MarkdownMemory，加上 AutoMemory 包裝）            | 對應的 memory 介面 |
 | `analyzer`（hook helper）  | 掛在某個 tool 上的 `pre_hook`：在 tool 本體執行前，把引數轉成結構化的值 | dataclass / dict  |
 | `validator`（hook helper） | 掛在某個 tool 上的 `post_hook`：判斷 tool 的回傳值，並可把 feedback 送回給模型 | `Result(ok, ...)` |
-| `cantus.workflows`         | 一個命名空間，裡面放的是把 tool 與 hook 組合成流程的 building block               | 任意值            |
+| `cantus.workflows`         | 一個命名空間，裡面放的是把 tool 組合成流程的 building block                       | 任意值            |
 
-cantus 剛好只有兩個 protocol kind：`tool`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們掛在某一個 tool 上，在 agent 呼叫那個 tool 時於其本體的前後執行，而不是自己被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema 來自每個 Tool 的 `spec_for_llm()`，所以「可呼叫的 protocol kind」與「模型能呼叫的 tool」是同一件事。
+cantus 剛好只有兩個 protocol kind：`tool`（可呼叫）與 `memory`（有狀態，以 class 形式定義）。`analyzer` 和 `validator` 不是 protocol kind，而是 hook helper；它們掛在某一個 tool 上，在 agent 呼叫那個 tool 時於其本體的前後執行，而不是自己被 dispatch。組合的邏輯則住在 `cantus.workflows` 的 building block 裡，內建五種模式：`PromptChain`、`Router`、`Parallel`、`OrchestratorWorker` 與 `EvaluatorOptimizer`。LLM 看到的 function-call schema，來自你用 `tools=` 交給 agent 的每個 Tool 的 `spec_for_llm()`。
 
 ## Model Provider
 

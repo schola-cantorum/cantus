@@ -4,16 +4,20 @@
 
 ## Class signature
 
-<!-- vv:skip: class signature excerpt, shown for its fields only -->
+<!-- vv:skip: class signature excerpt, method bodies omitted -->
 ```python
-@dataclass
+@dataclass(init=False)
 class Agent:
     model: ModelHandle                    # any object with .generate(prompt) -> str
-    tools: Registry                       # the tools it may call: Agent(model, tools=[...])
-    soul: "Soul | None" = field(default=None, kw_only=True)    # optional system-prompt identity
+    soul: "Soul | None"                   # optional system-prompt identity
+
+    def __init__(self, model, tools=None, *, soul=None): ...   # tools: a list of tools or a Registry
+
+    @property
+    def registry(self) -> Registry: ...   # the agent's tools, as a Registry
 ```
 
-The constructor is `Agent(model, tools=None, *, soul=None)`. `tools=` takes a list of tools, which the agent copies into a new `Registry`, or a `Registry`, which it uses as it is; `agent.registry` returns that `Registry`. An agent created without `tools=` falls back to the global registry, which only legacy code fills (see [Migrating from the old names](../protocols/tool.md#migrating-from-skill)).
+The constructor is `Agent(model, tools=None, *, soul=None)`. `tools=` takes a list of tools, which the agent copies into a new `Registry`, or a `Registry`, which it uses as it is, so a tool added to that `Registry` later reaches the agent too; `agent.registry` returns it. An agent created without `tools=` falls back to the global registry, which legacy code fills (possibly inside a library you use), and it also sees tools registered there later; see the Tool page's [migration notes](../protocols/tool.md#migrating-from-skill).
 
 `ModelHandle` is a `Protocol`. Its minimal interface only requires `generate(prompt: str, **kwargs) -> str`. The object returned by the Gemma 4 loader satisfies it out of the box, and tests can pass in a `MockModel` that matches the same protocol.
 

@@ -223,9 +223,9 @@ missing required keys 'thought' or 'action'
 
 常見原因：
 
-- LLM 把 thought 寫成 list / dict（必須是字串）。
-- `tool_name` 不是 schema 允許的 tool 名稱之一。
-- args 寫成 string 而非 object。
+- LLM 把 `thought` 寫成 list / dict（必須是字串）。
+- `tool_name` 不是 registry 裡任何 tool 的名稱（或不在 `build_schema(registry)` 的 enum 裡）。
+- `args` 寫成 string 而非 object。
 
 修法：用 `outlines` / `xgrammar` 套上 `build_schema(registry)` 的 schema 強制約束 decoding；或在 prompt 給 few-shot 範例。
 

@@ -47,7 +47,7 @@ def answer(text):
 
 ## 2. 工具
 
-tool 就是一個有型別標註、有 docstring 的 Python 函式，用 `@tool` 把它變成 tool。`@tool` 只負責建立 tool，不會把它加到任何地方：你要在下一步把 tool 交給 agent，agent 再把每個 tool 的名稱、說明與引數 schema 給模型看。
+寫一個有型別標註、有 docstring 的 Python 函式，再在上面加 `@tool`。`@tool` 會把函式變成 tool，但不會把它加到任何地方：你要在下一步把 tool 交給 agent，agent 再把每個 tool 的名稱、說明與引數 schema 給模型看。
 
 ```python
 from cantus import tool
@@ -172,7 +172,7 @@ print([type(event).__name__ for event in state.stream][1])
 print(state.stream[1].feedback)
 ```
 
-第二個 `def menu_price` 會把你腳本裡的 `menu_price` 這個名稱重新綁定到有防護的 tool，所以這個 agent 和之後建立的每個 agent 用的都是有防護的那一個。
+第二個 `def menu_price` 會把你腳本裡的 `menu_price` 這個名稱重新綁定到有防護的 tool，所以這個 agent 和之後建立的每個 agent 用的都是有防護的那一個。在它之前建立的 agent 仍然用沒有防護的那個；要套用防護，就重新建立那個 agent。
 
 ## 6. 記憶
 

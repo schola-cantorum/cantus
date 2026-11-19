@@ -47,7 +47,7 @@ Those two JSON shapes are the whole contract between a model and the agent loop:
 
 ## 2. Tools
 
-A tool is a typed Python function with a docstring, turned into a tool with `@tool`. `@tool` builds the tool and adds it nowhere: you hand the tools to the agent in the next step, and the agent shows each one's name, description and argument schema to the model.
+Write a typed Python function with a docstring and put `@tool` on it. `@tool` turns the function into a tool and adds it nowhere: you hand the tools to the agent in the next step, and the agent shows each one's name, description and argument schema to the model.
 
 ```python
 from cantus import tool
@@ -172,7 +172,7 @@ print([type(event).__name__ for event in state.stream][1])
 print(state.stream[1].feedback)
 ```
 
-The second `def menu_price` rebinds the name `menu_price` in your script to the guarded tool, so this agent and every agent built after it get the guarded one.
+The second `def menu_price` rebinds the name `menu_price` in your script to the guarded tool, so this agent and every agent built after it get the guarded one. An agent built before it keeps the unguarded tool; build that agent again to get the guard.
 
 ## 6. Memory
 

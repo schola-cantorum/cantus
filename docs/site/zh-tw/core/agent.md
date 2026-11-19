@@ -4,16 +4,20 @@
 
 ## Class signature
 
-<!-- vv:skip: class signature excerpt, shown for its fields only -->
+<!-- vv:skip: class signature excerpt, method bodies omitted -->
 ```python
-@dataclass
+@dataclass(init=False)
 class Agent:
     model: ModelHandle                    # 任何具備 .generate(prompt) -> str 的物件
-    tools: Registry                       # 它可以呼叫的 tool：Agent(model, tools=[...])
-    soul: "Soul | None" = field(default=None, kw_only=True)    # 選用：用 system prompt 表達身分
+    soul: "Soul | None"                   # 選用：用 system prompt 表達身分
+
+    def __init__(self, model, tools=None, *, soul=None): ...   # tools：一個 tool 的 list，或一個 Registry
+
+    @property
+    def registry(self) -> Registry: ...   # agent 的 tool，以 Registry 的形式
 ```
 
-建構式是 `Agent(model, tools=None, *, soul=None)`。`tools=` 可以給一個 tool 的 list，agent 會把它們複製進一個新的 `Registry`；也可以給一個 `Registry`，agent 就直接使用它；`agent.registry` 回傳的就是這個 `Registry`。沒有給 `tools=` 所建立的 agent 會退回使用全域 registry，而那個 registry 只有舊版程式碼才會往裡面放東西（見[從舊名稱遷移](../protocols/tool.md#migrating-from-skill)）。
+建構子是 `Agent(model, tools=None, *, soul=None)`。`tools=` 可以給一個 tool 的 list，agent 會把它們複製進一個新的 `Registry`；也可以給一個 `Registry`，agent 就直接使用它，之後加進那個 `Registry` 的 tool 也會傳到 agent；`agent.registry` 回傳的就是它。建立 agent 時沒有給 `tools=`，它會退回使用全域 registry：舊版程式碼（可能在你用的函式庫裡）會把 tool 放進那裡，之後放進去的 tool 它也看得到；詳見 Tool 頁的[遷移說明](../protocols/tool.md#migrating-from-skill)。
 
 `ModelHandle` 是一個 `Protocol`，最小介面只要求 `generate(prompt: str, **kwargs) -> str`。Gemma 4 loader 回傳的物件天生就符合這個介面；測試時則可以塞一個同樣符合這份 protocol 的 `MockModel` 進來。
 

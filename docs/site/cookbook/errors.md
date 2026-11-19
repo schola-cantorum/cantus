@@ -210,7 +210,7 @@ except GrammarError as e:
 Common causes:
 
 - The LLM wrote `thought` as a list or dict (it must be a string).
-- `tool_name` is not one of the tool names the schema allows.
+- `tool_name` is not the name of a tool in the registry (or in the enum of `build_schema(registry)`).
 - `args` was written as a string instead of an object.
 
 Fix: constrain decoding with `outlines` / `xgrammar` using the schema from `build_schema(registry)`, or supply few-shot examples in the prompt.

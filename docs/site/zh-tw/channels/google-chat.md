@@ -118,7 +118,7 @@ INFO cantus.serve.channels GoogleChatPubSubChannel connected: projects/.../subsc
 到你的 Google Chat space，打一句 `hello`。這時 cantus 應該會：
 
 1. 從 Pub/Sub pull 出一個 `google.workspace.chat.message.v1.created` 事件。
-2. 把這個事件放進內部的 queue（你的 worker 可以用 `receive` 把它拿出來處理）。
+2. 把這個事件放進內部的 queue（你的 worker，也就是像 [LINE cookbook](./line.md) 裡那樣的迴圈，可以用 `receive` 把它拿出來處理）。
 3. 假設你的 worker 呼叫了 `channel.send({"data": {"text": "hello back"}})`，bot 就會在同一個 space 裡回你 `hello back`。
 
 如果遲遲沒有事件進來，照這個順序檢查：

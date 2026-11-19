@@ -71,7 +71,7 @@ def third_party_function(x: int) -> int:
 registry = Registry()
 register_tool(third_party_function, registry=registry)
 
-# (C) Class-first —— 需要 instance state、複雜 init、或子類覆寫。
+# (C) Class-first —— 需要 instance state、複雜 init、或子類別覆寫。
 class MyTool(Tool):
     """記住目前看過的每個 x。"""
     name = "my_tool"
@@ -154,6 +154,7 @@ def my_tool(x: int) -> int:
 reg = Registry(tools=[my_tool])
 agent = Agent(model=ScriptedModel(), tools=reg)
 print(agent.registry.names_for("tool"))
+print(agent.registry is reg)
 ```
 
 你應該看到，本頁可執行的技巧合起來：
@@ -162,6 +163,9 @@ print(agent.registry.names_for("tool"))
 ['topic']
 True
 ['my_tool']
+True
 ```
+
+因為 `Registry` 是共用的，之後加進去的 tool，所有拿著它的 agent 都看得到。每個測試，以及不該看到別人 tool 的 agent，都要給它自己的 list 或 `Registry`。
 
 為 cantus 0.6 寫的程式碼是把 tool 放在同一個全域 registry 裡；Tool 頁面的[遷移說明](../protocols/tool.md#migrating-from-skill)有交代。

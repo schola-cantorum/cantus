@@ -61,12 +61,12 @@ Action (base, thought: str)
 ```
 Observation (base, frozen)
 ├── ToolObservation(tool_name, result)                # 成功
-├── ToolErrorObservation(tool_name, message)          # Tool、hook 或引數驗證失敗
+├── ToolErrorObservation(tool_name, message)          # tool、hook 或引數驗證失敗
 ├── ValidationErrorObservation(validator_name, feedback)  # 給模型下一輪看的 feedback
 └── MaxIterationsObservation(iterations, last_action_summary, partial_state)  # loop 跑到上限了
 ```
 
-每一個 Observation 都帶著足夠的上下文，讓 LLM 在下一輪 prompt 裡看得懂剛剛發生了什麼事。舉個例子，模型點了一個 agent 沒有的 tool 時，`ValidationErrorObservation.feedback` 會把可用的 tool 名稱列出來，這樣模型就能自己修掉打錯的字。
+每一個 Observation 都帶著足夠的上下文，讓 LLM 在下一輪 prompt 裡看得懂剛剛發生了什麼事。舉個例子，agent 有 tool、模型卻點了一個不在其中的名稱時，`ValidationErrorObservation.feedback` 會把可用的 tool 名稱列出來，這樣模型就能自己修掉打錯的字。
 
 ## 為什麼要 frozen
 

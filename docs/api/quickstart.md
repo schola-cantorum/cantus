@@ -49,6 +49,6 @@ Inspector(state.stream).summary()     # print action / observation statistics
 
 - `max_iterations=8`: the loop runs at most 8 steps, so a confused model stops instead of looping indefinitely.
 - `max_retries=3`: accepted, but it does not bound the loop today. When a validator returns `Result(ok=False)`, the feedback goes back to the model, which decides what to try next; each attempt uses one of the `max_iterations`.
-- An exception raised by a tool (including a workflow you call from inside a tool) becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
+- An exception raised by a tool while the agent runs it (including a workflow you call from inside a tool) becomes a `ToolErrorObservation`. The framework feeds it back into the prompt rather than letting it abort the run.
 
 That single cell is the whole loop in miniature. Read it, then the channels, serving, and memory chapters are variations on the same three pieces: a model handle, a tool, and an EventStream you can replay.
