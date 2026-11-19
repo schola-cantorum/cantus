@@ -1,6 +1,6 @@
 # cantus
 
-> A Python framework for writing LLM agent harnesses, designed for teaching on Google Colab and usable from any desktop with an API key. Students compose two protocol kinds (`Skill`, `Memory`), two hook helpers (`Analyzer`, `Validator`) and five `cantus.workflows` building blocks over either a local Gemma 4 model or a cloud `ChatModel`. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
+> A Python framework for writing LLM agent harnesses, designed for teaching on Google Colab and usable from any desktop with an API key. Students compose two protocol kinds (`Tool`, `Memory`), two hook helpers (`Analyzer`, `Validator`) and five `cantus.workflows` building blocks over either a local Gemma 4 model or a cloud `ChatModel`. This file is a single-shot context for *external* LLMs (Claude, GPT, Gemini, NotebookLM) so they can produce framework-style code on request.
 
 ## Versioning
 
@@ -10,28 +10,28 @@
 
 ## When to use this file
 
-Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@skill`, an `@analyzer` / `@validator` hook, a `Memory` subclass, or a `cantus.workflows` composition. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
+Paste this whole file into a fresh chat with an external LLM, then ask it to write a new `@tool`, an `@analyzer` / `@validator` hook, a `Memory` subclass, or a `cantus.workflows` composition. The output should `ast.parse` cleanly, use the right decorator and signature shape, and follow the docstring convention below.
 
 ## Public API surface
 
 ```python
 from cantus import (
     # Decorator entries (most common)
-    skill, debug,
-    # Function-pass entry
-    register_skill,
+    tool, debug,
+    # Function-pass entry (adds to a Registry you build)
+    register_tool,
     # Class-first base classes
-    Skill, Memory,
+    Tool, Memory,
     # Memory implementations (class-only)
     ShortTermMemory, BM25Memory, EmbeddingMemory, MarkdownMemory, AutoMemory,
     # Identity
     Soul, SoulParseError,
     # Runtime
-    Action, CallSkillAction, FinalAnswerAction,
-    Observation, SkillObservation, ToolErrorObservation,
+    Action, CallToolAction, FinalAnswerAction,
+    Observation, ToolObservation, ToolErrorObservation,
     ValidationErrorObservation, MaxIterationsObservation,
     EventStream, JsonLinesPersistence, Agent, AgentState, Inspector,
-    Registry, get_registry, Result,
+    Registry, Result,
     # Tier 2 chat models (cloud / local servers)
     ChatModel, Message, ToolCall, ChatResponse, ChatModelAsHandle, load_chat_model,
     # Environment profiles
@@ -43,14 +43,14 @@ from cantus.hooks import analyzer, validator, Analyzer, Validator   # hook helpe
 from cantus.workflows import PromptChain, Router, Parallel, OrchestratorWorker, EvaluatorOptimizer
 ```
 
-Things that do **not** exist (do not generate them): `@memory`, `register_memory`, `@workflow`, `register_workflow`, `Workflow`, a top-level `analyzer` / `validator` import, and `state.final_answer`. Memory needs state, so it is a class. Analyzer and Validator are hook helpers imported from `cantus.hooks`; they attach to a Skill and are never registered on their own. Workflows are plain classes in `cantus.workflows`.
+Things that do **not** exist (do not generate them): `@memory`, `register_memory`, `@workflow`, `register_workflow`, `Workflow`, a top-level `analyzer` / `validator` import, and `state.final_answer`. Memory needs state, so it is a class. Analyzer and Validator are hook helpers imported from `cantus.hooks`; they attach to a Tool and are never registered on their own. Workflows are plain classes in `cantus.workflows`.
 
-## Skill — a tool the LLM can call
+## Tool — a function the LLM can call
 
 ```python
-from cantus import skill
+from cantus import tool
 
-@skill
+@tool
 def search_book(title: str, lang: str = "zh-TW") -> str:
     """Search the library catalog.
 
@@ -64,25 +64,25 @@ def search_book(title: str, lang: str = "zh-TW") -> str:
     ...
 ```
 
-The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block becomes per-arg descriptions. `@skill` registers the function into the process-wide `Registry` under kind `"skill"`, the only registry kind.
+The signature becomes the Pydantic args schema. The first paragraph of the docstring becomes the LLM-facing description. The `Args:` block is parsed, but it is not part of the args schema yet, so the LLM does not see it. `@tool` registers nothing: give the tool to an agent with `Agent(model, tools=[search_book])`.
 
-Function-pass form: `register_skill(search_book)`.
+Function-pass form: `register_tool(search_book, registry=registry)` adds it to a `Registry` you build (`registry = Registry()`); the registry is required.
 Class-first form:
 
 ```python
-from cantus import Skill
+from cantus import Tool
 
-class SearchBook(Skill):
+class SearchBook(Tool):
     """Search the library catalog."""
     name = "search_book"
     def run(self, title: str, lang: str = "zh-TW") -> str: ...
 ```
 
-## Analyzer and Validator — hooks attached to a Skill
+## Analyzer and Validator — hooks attached to a Tool
 
 ```python
 from pydantic import BaseModel
-from cantus import skill
+from cantus import tool
 from cantus.hooks import analyzer, validator, Result
 
 class Book(BaseModel):
@@ -90,9 +90,9 @@ class Book(BaseModel):
     isbn: str
 
 @analyzer
-def parse_query(text: str) -> dict:
-    """Normalise the raw query before the skill runs."""
-    return {"title": text.strip()}
+def parse_query(title: str) -> dict:
+    """Normalise the raw query before the tool runs."""
+    return {"title": title.strip()}
 
 @validator
 def ensure_isbn_valid(result: str) -> Result:
@@ -101,13 +101,13 @@ def ensure_isbn_valid(result: str) -> Result:
         return Result.success(result)
     return Result.failure(f"ISBN checksum mismatch in {result}")
 
-@skill(pre_hook=parse_query, post_hook=ensure_isbn_valid)
+@tool(pre_hook=parse_query, post_hook=ensure_isbn_valid)
 def search_book(title: str) -> str:
     """Search the library catalog."""
     ...
 ```
 
-The agent runs `pre_hook(**args)` before the skill and `post_hook(result)` after it. A `post_hook` returning `Result(ok=False, ...)` becomes a `ValidationErrorObservation`; the loop shows the feedback to the LLM and retries up to `max_retries` (default 3). A validator must always return `Result.success(...)` or `Result.failure(...)`. The names `non_empty_final_answer` and `action_parse` are reserved for the framework's own validators.
+When an `Agent` calls the tool, it runs `pre_hook(**args)` before it and `post_hook(result)` after it (a direct call or `cantus serve` runs no hook). A `post_hook` returning `Result(ok=False, ...)` becomes a `ValidationErrorObservation`; the LLM sees the feedback and is asked again, until `max_iterations`. A validator must always return `Result.success(...)` or `Result.failure(...)`. The names `non_empty_final_answer` and `action_parse` are reserved for the framework's own validators.
 
 ## Workflows — five plain-Python building blocks
 
@@ -118,7 +118,7 @@ pipeline = PromptChain(steps=[search_book, parse_book_list, pick_top_three])
 books = pipeline.run("sci-fi")
 ```
 
-Each class takes registered `Skill` instances (or any callable) in its constructor and exposes `.run(input) -> output`. `Router(routes, classifier)` picks a branch; `Parallel(branches)` runs every branch (sequentially, in-process) and returns the list; `OrchestratorWorker(orchestrator, workers)` hands sub-tasks to workers round-robin; `EvaluatorOptimizer(generator, evaluator, max_iters=3)` loops until the evaluator accepts. Workflows never register themselves and never appear in the registry's LLM-facing spec.
+Each class takes `Tool` instances (or any callable) in its constructor and exposes `.run(input) -> output`. `Router(routes, classifier)` picks a branch; `Parallel(branches)` runs every branch (sequentially, in-process) and returns the list; `OrchestratorWorker(orchestrator, workers)` hands sub-tasks to workers round-robin; `EvaluatorOptimizer(generator, evaluator, max_iters=3)` loops until the evaluator accepts. Workflows never register themselves and never appear in the registry's LLM-facing spec.
 
 ## Memory — class-only, five built-in implementations
 
@@ -145,7 +145,7 @@ Built-in implementations:
 - `BM25Memory(top_k=5)` — keyword retrieval (requires `cantus-agent[memory]`)
 - `EmbeddingMemory(top_k=5)` — semantic retrieval (requires `cantus-agent[memory]`)
 - `MarkdownMemory(path)` — turns persisted as Markdown chunks on disk
-- `AutoMemory(backend)` — wraps any `Memory` and exposes `view` / `create` / `str_replace` / `delete` Skills so the LLM edits its own memory
+- `AutoMemory(backend)` — wraps any `Memory` and exposes `view` / `create` / `str_replace` / `delete` tools (`auto.tools`) so the LLM edits its own memory
 
 ## Tool-call grammar (for reference)
 
@@ -154,7 +154,7 @@ The agent asks the LLM for exactly one JSON object per turn:
 ```json
 {
   "thought": "<free-form reasoning text>",
-  "action": {"skill_name": "<one-of-registered>", "args": {...}}
+  "action": {"tool_name": "<one-of-the-agent's-tools>", "args": {...}}
 }
 ```
 
@@ -167,7 +167,7 @@ or, to terminate:
 }
 ```
 
-`skill_name` must be a registered skill and `args` must satisfy that skill's Pydantic schema; anything else is recorded as a `ValidationErrorObservation` and retried. `thought` is free text.
+`tool_name` must name one of the agent's tools and `args` must satisfy that tool's Pydantic schema. When the agent has tools, an unknown name becomes a `ValidationErrorObservation` (`error_type: unknown_tool`); arguments that fail the schema become a `ToolErrorObservation`. Either way the LLM is asked again. `thought` is free text.
 
 ## Running an agent
 
@@ -189,14 +189,15 @@ print(getattr(final, "answer", final))
 
 `agent.run(query)` returns an `AgentState` with `.query` and `.stream` (an `EventStream` of `Action` / `Observation` objects). There is no `final_answer` attribute on the state; the answer is `stream[-1].answer` when the last event is a `FinalAnswerAction`. If the loop hits `max_iterations`, the last event is a `MaxIterationsObservation` instead. `Inspector(state.stream).replay()` prints the full trace. Provider prefixes: `openai/`, `anthropic/`, `google/`, `groq/`, `nvidia/`, `ollama/`, `omlx/`, `mlx/` (the last three need no API key).
 
-## Serving skills over HTTP (optional, requires cantus-agent[serve])
+## Serving tools over HTTP (optional, requires cantus-agent[serve])
 
 ```python
+from cantus import Registry
 from cantus.serve import serve
-from cantus import get_registry
 import uvicorn
 
-app = serve(get_registry())          # each skill -> POST /skills/<name>; GET /health, /skills, /introspection
+registry = Registry(tools=[search_book])
+app = serve(registry)                # each tool -> POST /tools/<name>; GET /health, /tools, /introspection
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
 
@@ -205,10 +206,10 @@ Or from the shell: `cantus serve --registry-import my_module:registry`, then `ca
 ## Common patterns
 
 ```python
-# @debug stacking — opt-in trace of a Skill / Analyzer / Validator instance
-from cantus import debug, skill
+# @debug stacking — opt-in trace of a Tool / Analyzer / Validator instance
+from cantus import debug, tool
 @debug
-@skill
+@tool
 def traced_search(title: str) -> str: ...
 # stdout will include: [debug] traced_search args=... result=...
 
@@ -222,8 +223,8 @@ agent = Agent(model=model, soul=Soul.from_file("SOUL.md"))
 - Always use type annotations on every parameter and return.
 - Always include a Google-style docstring with description and `Args:` block.
 - Decorator goes on the line *immediately above* the function definition.
-- Stack `@debug` *above* `@skill`, never below.
-- Hooks attach through `@skill(pre_hook=..., post_hook=...)`; never register an analyzer or validator on its own.
+- Stack `@debug` *above* `@tool`, never below.
+- Hooks attach through `@tool(pre_hook=..., post_hook=...)`; never register an analyzer or validator on its own.
 - For validators, always return `Result.success(...)` or `Result.failure(...)`.
 - Memory subclasses always implement both `recall(query)` and `remember(turn)`.
 - Wrap any `ChatModel` in `ChatModelAsHandle` before giving it to `Agent`.

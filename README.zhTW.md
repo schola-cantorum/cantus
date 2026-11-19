@@ -18,11 +18,11 @@
 
 > 為 Google Colab 教學設計、用來編排 LLM agent harness 的複音（polyphonic）框架。
 
-Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent 框架。兩個 protocol kind（Skill ／ Memory）加上 hook helper（Analyzer ／ Validator）與 `cantus.workflows` building block，讓學員與 operator 能在 Google Colab 上組合 agent，背後由 4-bit 量化的 Gemma 4 模型支撐。
+Cantus（拉丁文：*song*、*chant*）是一個以教學為核心的 LLM agent 框架。兩個 protocol kind（Tool ／ Memory）加上 hook helper（Analyzer ／ Validator）與 `cantus.workflows` building block，讓學員與 operator 能在 Google Colab 上組合 agent，背後由 4-bit 量化的 Gemma 4 模型支撐。
 
 中文 LLM 社群把 prompt engineering 稱作「*詠唱*」。Cantus 把 agent 的組合視為一段複音聖詠 —— 每個協定是一條聲部，合起來就形成一個會回唱的 agent。
 
-在 Cantus 裡，你寫的 code 就是詠唱本身——每一個 `Skill`、`Memory`、`Agent` 都是一段詠唱詞，駕馭著 LLM。套件名 `cantus-agent` 把這層意思點出來：你詠唱，agent 回應。
+在 Cantus 裡，你寫的 code 就是詠唱本身——每一個 `Tool`、`Memory`、`Agent` 都是一段詠唱詞，駕馭著 LLM。套件名 `cantus-agent` 把這層意思點出來：你詠唱，agent 回應。
 
 ## 一鍵在 Colab 開啟 —— 5 分鐘入門路徑
 
@@ -85,15 +85,15 @@ curl http://localhost:8765/health
 ## 30-second Quickstart
 
 ```python
-from cantus import skill, Agent, mount_drive_and_load
+from cantus import tool, Agent, mount_drive_and_load
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
 
 model_handle = mount_drive_and_load(variant="E4B")
-agent = Agent(model=model_handle)
+agent = Agent(model=model_handle, tools=[add])
 
 result = agent.run("What is 17 plus 25?")
 final = result.stream[-1]  # FinalAnswerAction when the loop converged
@@ -167,15 +167,15 @@ print(getattr(final, "answer", final))
 `cantus-agent[providers]` 可一次安裝四家主要 adapter（OpenAI / Anthropic / Google / Groq）。NVIDIA NIM 透過 `cantus-agent[openai]` 一併取得，因為 NIM endpoint 與 OpenAI 相容。cantus 在任何 layer **皆不**相依 LiteLLM；Google 的 extras 只裝 `google-genai`（新版統一 Gemini API SDK），**不裝** `google-generativeai`。
 
 <p align="center">
-  <img src="assets/banner_protocols.jpeg" alt="Cantus 雙 protocol kind（Skill、Memory）加上 Analyzer ／ Validator hook helper 與 cantus.workflows building block">
+  <img src="assets/banner_protocols.jpeg" alt="Cantus 橫幅：框架的各個聲部如五線譜般交織在一起">
 </p>
 
 ## 雙 protocol kind ＋ hook helper ＋ workflows building block
 
 兩個 protocol kind（cantus 正式註冊與 dispatch 的對象）：
 
-- **Skill** —— agent 可以呼叫的函式（tool use）。以 `@skill` 裝飾或繼承 `Skill` 類別。
-- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`、`MarkdownMemory`，以及把任一 backend 以四個 Skill 開放給 LLM 操作的 `AutoMemory` 包裝。
+- **Tool** —— agent 可以呼叫的函式（tool use）。以 `@tool` 裝飾（或繼承 `Tool` 類別），再用 `Agent(model, tools=[...])` 交給 agent。
+- **Memory** —— 對話狀態與檢索記憶；內建 `ShortTermMemory`、`BM25Memory`、`EmbeddingMemory`、`MarkdownMemory`，以及把任一 backend 以四個工具開放給 LLM 操作的 `AutoMemory` 包裝。
 
 Hook helper（pre- ／ post-loop 工具，不屬於 protocol kind）：
 
@@ -184,7 +184,7 @@ Hook helper（pre- ／ post-loop 工具，不屬於 protocol kind）：
 
 Workflows building block：
 
-- **`cantus.workflows`** —— 串接 skills、analyzers、validators 的編排範本。v0.3.0 之後不再是 protocol kind，依場景挑選合適的 building block 即可。
+- **`cantus.workflows`** —— 串接 tools、analyzers、validators 的編排範本。v0.3.0 之後不再是 protocol kind，依場景挑選合適的 building block 即可。
 
 ## Documentation
 
@@ -216,6 +216,7 @@ Workflows building block：
 - [v0.4.6 → v0.4.7](./docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md)
 - [v0.4.7 → v0.5.0](./docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)
 - [v0.5.0 → v0.6.0](./docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)
+- [v0.6.0 → v0.7.0](./docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md)
 
 非 breaking 的所有變動（新增功能、內部變動、安全性 note）都記錄於 [`CHANGELOG.md`](./CHANGELOG.md)。
 

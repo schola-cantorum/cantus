@@ -7,7 +7,8 @@
 #
 # Usage:
 #   bash scripts/smoke_install.sh              # install from the local working tree (uv pip install .)
-#   bash scripts/smoke_install.sh 0.4.3        # install cantus-agent==0.4.3 from PyPI
+#   bash scripts/smoke_install.sh 0.7.0        # install cantus-agent==0.7.0 from PyPI
+#                                              # (0.7.0 or later: earlier releases have no `tool`)
 #
 # Exits non-zero on the first failing sub-step.
 
@@ -28,8 +29,8 @@ fi
 echo "==> Step 1: uv pip install --system ${CORE_SPEC}"
 uv pip install --system "${CORE_SPEC}"
 
-echo "==> Step 2: python -c \"from cantus import skill, Agent, load_chat_model\""
-python -c "from cantus import skill, Agent, load_chat_model"
+echo "==> Step 2: python -c \"from cantus import tool, Agent, load_chat_model\""
+python -c "from cantus import tool, Agent, load_chat_model"
 
 echo "==> Step 3: uv pip install --system ${SERVE_OPENAI_SPEC}"
 uv pip install --system "${SERVE_OPENAI_SPEC}"

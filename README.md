@@ -18,11 +18,11 @@
 
 > A polyphonic framework for composing LLM agent harnesses — designed for teaching on Google Colab.
 
-Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Two protocol kinds (Skill / Memory) plus hook helpers (Analyzer / Validator) and the `cantus.workflows` building blocks let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
+Cantus (Latin: *song*, *chant*) is a teaching-oriented LLM agent framework. Two protocol kinds (Tool / Memory) plus hook helpers (Analyzer / Validator) and the `cantus.workflows` building blocks let learners and operators compose agents on Google Colab, backed by 4-bit-quantised Gemma 4 models.
 
 The Chinese-speaking LLM community refers to prompt engineering as *yǒng chàng* — literally "to chant" or "to incant". Cantus treats agent composition as a polyphonic chant — each protocol is a voice, and together they form an agent that sings back.
 
-In Cantus, your code IS the chant — every `Skill`, `Memory`, and `Agent` is a verse that wields the LLM. The PyPI name `cantus-agent` makes the relationship explicit: you chant, the agent answers.
+In Cantus, your code IS the chant — every `Tool`, `Memory`, and `Agent` is a verse that wields the LLM. The PyPI name `cantus-agent` makes the relationship explicit: you chant, the agent answers.
 
 ## Open in Colab — 5-minute path
 
@@ -85,15 +85,15 @@ Desktop and laptop users — see [`docs/quickstart-desktop.md`](./docs/quickstar
 ## 30-second Quickstart
 
 ```python
-from cantus import skill, Agent, mount_drive_and_load
+from cantus import tool, Agent, mount_drive_and_load
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
 
 model_handle = mount_drive_and_load(variant="E4B")
-agent = Agent(model=model_handle)
+agent = Agent(model=model_handle, tools=[add])
 
 result = agent.run("What is 17 plus 25?")
 final = result.stream[-1]  # FinalAnswerAction when the loop converged
@@ -167,15 +167,15 @@ print(getattr(final, "answer", final))
 `cantus-agent[providers]` installs the four primary adapters (OpenAI / Anthropic / Google / Groq) at once. NVIDIA NIM ships through `cantus-agent[openai]` since the NIM endpoint is OpenAI-compatible. cantus intentionally does **not** depend on LiteLLM at any layer, and the Google extras pulls only `google-genai` (the new unified Gemini API SDK), never `google-generativeai`.
 
 <p align="center">
-  <img src="assets/banner_protocols.jpeg" alt="Cantus protocol kinds (Skill, Memory) plus Analyzer / Validator hook helpers and cantus.workflows building blocks">
+  <img src="assets/banner_protocols.jpeg" alt="Cantus banner: the framework's voices woven together as musical staves">
 </p>
 
 ## Two protocol kinds + hook helpers + workflows building blocks
 
 Two protocol kinds (the things cantus formally registers and dispatches):
 
-- **Skill** — a function the agent can call (tool use). Decorate with `@skill` or subclass `Skill`.
-- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`, `MarkdownMemory`, plus the `AutoMemory` wrapper that exposes any backend to the LLM as four Skills.
+- **Tool** — a function the agent can call (tool use). Decorate it with `@tool` (or subclass `Tool`) and give it to the agent with `Agent(model, tools=[...])`.
+- **Memory** — conversation state and retrieval memory; ships `ShortTermMemory`, `BM25Memory`, `EmbeddingMemory`, `MarkdownMemory`, plus the `AutoMemory` wrapper that exposes any backend to the LLM as four tools.
 
 Hook helpers (pre- / post-loop tooling, not protocol kinds):
 
@@ -184,7 +184,7 @@ Hook helpers (pre- / post-loop tooling, not protocol kinds):
 
 Workflows building block:
 
-- **`cantus.workflows`** — composition templates that chain skills, analyzers, and validators into a fixed flow. No longer a protocol kind in v0.3.0; pick the building block that fits your scenario.
+- **`cantus.workflows`** — composition templates that chain tools, analyzers, and validators into a fixed flow. No longer a protocol kind in v0.3.0; pick the building block that fits your scenario.
 
 ## Documentation
 
@@ -216,6 +216,7 @@ Per-version migration guides for breaking changes between adjacent releases:
 - [v0.4.6 → v0.4.7](./docs/migrations/MIGRATION_v0.4.6_to_v0.4.7.md)
 - [v0.4.7 → v0.5.0](./docs/migrations/MIGRATION_v0.4.7_to_v0.5.0.md)
 - [v0.5.0 → v0.6.0](./docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)
+- [v0.6.0 → v0.7.0](./docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md)
 
 The [`CHANGELOG.md`](./CHANGELOG.md) lists everything else (additive features, internal changes, security notes).
 
