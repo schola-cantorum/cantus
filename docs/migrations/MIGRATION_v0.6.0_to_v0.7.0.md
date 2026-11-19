@@ -1813,6 +1813,7 @@ headless run (`App.run_test()`) shows it.
 | W17 | [`update_skills()` → `update_tools()`](#update_skills--update_tools-w17) |
 | W17b | [A subclass that overrides `update_skills`](#a-subclass-that-overrides-update_skills-w17b) |
 | W18 | [Adapter keywords `skill=` and `skills=`](#adapter-keywords-skill-and-skills-w18) |
+| F1 | [The fallback rule](#the-fallback-rule-f1) |
 | R0 | [The server used by the examples](#the-server-used-by-the-examples-r0) |
 | R1 | [`POST /skills/{name}` → `POST /tools/{name}`](#post-skillsname--post-toolsname-r1) |
 | R2 | [`GET /skills` → `GET /tools`](#get-skills--get-tools-r2) |
