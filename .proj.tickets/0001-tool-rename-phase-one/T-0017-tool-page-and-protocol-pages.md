@@ -2,7 +2,7 @@
 id: T-0017
 title: Documentation site — the Tool page and the protocol pages
 epic: 0001-tool-rename-phase-one
-status: todo
+status: processing
 blocked_by: [T-0015]
 ---
 
