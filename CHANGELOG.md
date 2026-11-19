@@ -4,6 +4,35 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+> Skill 改名為 Tool：`@skill` 改為 `@tool`、`Skill` 改為 `Tool`，Agent 改由 `Agent(model, tools=[...])` 明確拿到工具，不再讀全域 registry。舊名稱在別名過渡期（alias period）內仍可用，使用時發出 `CantusDeprecationWarning`，之後的版本移除。另有少數沒有 alias 的變更。完整升版說明見 [`MIGRATION_v0.6.0_to_v0.7.0.md`](docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md)。
+
+### 💥 Breaking Changes
+
+- **沒有 alias 的變更**：事件類別名稱在 `type(e).__name__`、`repr`、`asdict` 與 `__match_args__` 中改為 `CallToolAction`／`ToolObservation`，欄位改為 `tool_name`；模型看到的 `error_type` 由 `unknown_skill` 改為 `unknown_tool`；`Registry.KINDS` 改為 `("tool",)`，`spec_for_llm()` 序列化後的 key 改為 `"tool"`；introspection 的值改用 `tool`／`tool:<name>`；TUI 分頁改為 `Tools`；`tools` 成為保留的 dashboard 名稱；`Agent._dispatch_skill` 改為 `_dispatch_tool` 且沒有 shim，仍定義 `_dispatch_skill` 的子類別在建立時丟 `TypeError`；`from cantus import *` 不再帶入 `Skill`、`CallSkillAction`、`SkillObservation`；`Agent` 的 dataclass 欄位改為 `model, tools, soul`；模組為了自己使用而匯入的舊名稱（例如 `cantus.protocols.debug.Skill`、`cantus.core.agent.get_registry`）已移除。([#57]–[#65])
+  遷移方式：照遷移指南的 X1–X12、K、I、A 各節逐項修改；寫給 `/skills` 路徑的 proxy、WAF 或 deny-list 規則要擴充到 `/tools`、`/tools/*` 與 `/introspection/tools`。
+
+### ✨ 新增 (Added)
+
+- **Tool API**：`Tool`、`@tool`、`register_tool(fn, registry=...)`、`Registry(tools=[...])`、`Agent(model, tools=[...])`；`@tool` 只建立工具、不註冊到全域 registry。([#57], [#59])
+- **`CantusDeprecationWarning`**（`DeprecationWarning` 的子類別）：每個舊名稱的警告都指名新名稱並連到遷移指南，在 Python 預設的 filter 下也會顯示。([#58])
+- **`cantus serve` 的 `/tools` 路由**：`POST /tools/{name}`、`GET /tools`、`GET /introspection/tools`；introspection snapshot 新增 `tools` 欄位（與 `skills` 內容相同）。([#63])
+- **可執行的文件**：文件站的 Python 區塊在 CI 以 scripted model 逐頁執行並比對 expected-output；新增「模型 API」與「建置 Agent」兩份 quickstart、Changelog 頁，以及 Tool 頁與遷移段落。([#37], [#50], [#68], [#69])
+
+### ⚠️ 棄用 (Deprecated)
+
+- `Skill`、`@skill`、`register_skill()`、`get_registry()`、`Agent(registry=...)`、registry kind `"skill"`、`CallSkillAction`、`SkillObservation`、`skill_name`、`SkillEntry`、`collect_skills`、`SkillsPane`、`active_skill_names`、`update_skills()`、adapter 的 `skill=`／`skills=` 與模型輸出的 `"skill_name"` key（W1–W18）；沒給 `tools=` 的 `Agent` 在全域 registry 已有工具時也會警告。舊的 HTTP 路由 `/skills/{name}`、`/skills`、`/introspection/skills` 仍可用，回應帶 `Deprecation` 與 `Link` header。在之後的版本移除。([#58]–[#64])
+
+### 🔄 變更 (Changed)
+
+- 模型輸出的 action key 改為 `"tool_name"`，解析與 dispatch 的文字、`@debug` 與 hook 標籤、`serve()` 與 adapter 的錯誤訊息改稱 Tool。([#61], [#62], [#63], [#65])
+- 文件站全面改用 Tool API；Skill 頁改為指向 Tool 頁的 moved page。([#68], [#69])
+
+### 🔒 安全性 (Security)
+
+- supply-chain audit：移除 11 筆已比對不到任何套件的 litellm ignore；`openhands` 群組認列 pillow 12.3.0 的 42 筆 advisory，並在上游放寬 pin 後讓 job 失敗以提醒移除。([#44], [#49])
+
 ## ✨ [0.6.0] - 2026-09-06
 
 > Era 3 桌面本機 LLM 里程碑：`mlx`（Apple Silicon in-process）與 `omlx`（本機 OpenAI-compatible MLX 伺服器）兩個 provider、huggingface adapter 移植到 `smolagents.Tool`、channel 層 base-exception 政策、四道 CI 閘門（lint／strict typing／supply-chain／dev-path）、VitePress 雙語文件站，以及 Gate D 稽核硬化。從上一個 PyPI release v0.5.0 單步升級；一處契約層 breaking（詳見下方）。完整升版說明見 [`MIGRATION_v0.5.0_to_v0.6.0.md`](docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)。
