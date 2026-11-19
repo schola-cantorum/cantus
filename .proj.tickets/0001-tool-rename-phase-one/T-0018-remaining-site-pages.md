@@ -2,7 +2,7 @@
 id: T-0018
 title: Documentation site — core, cookbook, channels, quickstart and TUI pages
 epic: 0001-tool-rename-phase-one
-status: processing
+status: review
 blocked_by: [T-0017]
 ---
 
@@ -137,3 +137,54 @@ TUI 分頁叫 Tools、路由寫 `/tools`（R15）；channel 頁版本下限改 `
   16. G mutation check of H1–H10 with controls; re-run after review fixes.
   17. P prose: "skill" meaning a Tool rewritten (google-chat:124-125 mean the worker), no sentence
       says `@tool` registers, facts consistent with the Tool page, TUI and route names, Taiwan usage.
+- **Stage 5 result (2026-11-19, pages at `5fc435d`).** The main session wrote the 17 English
+  pages with one patch script (`.scratch/T-0018/en_patch.py`, every replacement count-asserted);
+  `harness-executor` wrote the zh-tw mirrors in two runs (`executor-brief-A.md`, 10 pages;
+  `executor-brief-B.md`, 7 pages). Each executor reported its red check output before editing; the
+  main session re-ran every check itself, read both diffs, and fixed three wordings in part A
+  (`tui.md` still said 「已註冊」; 「用手直接呼叫」 → 「自己直接呼叫」 in three code comments). Executor A
+  first ran a blanket skill → tool replacement across its pages and then corrected passages by
+  hand; the diff was read passage by passage. Red runs were captured at base `567dcb0` before any
+  page changed (`scan-baseline-567dcb0.txt`, `pagewarn-baseline-567dcb0.txt`, `h2-base-*.txt`).
+  Rows 6, 7, 10, 12, 14 and 15 were guards (green on arrival). Two harness bugs of the main
+  session were found by their controls: H8 first compared VitePress's relative hrefs as absolute
+  paths (all four zh-tw/en links "failed"), and the first `H8:cross-locale` mutation edited a nav
+  link instead of the page's href (it "survived"); both were fixed and re-run.
+- **Coverage report.** No package code changed, so line coverage does not apply; the measure is
+  which rows have evidence. Evidence files in `.scratch/T-0018/stage5/` unless stated.
+
+  | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
+  |---|---|---|---|---|
+  | 4.2 patterns over the site | H1 `scan2.py`, row 1 | `FILES FAILING: 0` over the 74 files of `git ls-files docs/site docs/api` (base: 42) (`H1-scan2.txt`); 3 H1 mutations killed | self-check | its 10 `supp` lines are the `#migrating-from-skill` anchors (tips, core/agent in en, zh-tw, `docs/api`; serve.md from T-0017) |
+  | `Agent(` calls | H6 `agentcalls`, rows 2–3 | 58 calls parsed, 0 with `registry=`, 9 without `tools=` all on the allow list (4 identity, T-0017 D12; 5 R3) (`H-agentcalls.txt`; base: 40 failing); 7 mutations killed | self-check | prose `Agent(` mentions are read at stage 6 |
+  | leftover "skill" | H7 `supp`, row 4 | 0 lines over the 42 T-0018 files (base: 440) (`H-supp.txt`); 4 mutations killed | traceability 4.4 | meaning of each rewritten sentence: stage 6 |
+  | executed pages, warnings | H2 `pagewarn2.py`, row 5 | 9 pages: runner passes, 0 cantus deprecation warnings (base: 8 pages, 49) (`H2-pagewarn.txt`); 2 mutations killed | Deliverable | — |
+  | executed pages, runner and parity | `tests/docs`, row 6 | full suite 1851 passed, 3 skipped (`pytest-full.txt`) | "passes the page runner and parity" | the install-pin test passes vacuously on pages without a shell fence |
+  | non-executed pages, parity and shape | H5 `parity`, row 7 | 40 checks pass: 5 page pairs by `compare_pair_files`, 17 pairs by heading levels and table rows, index frontmatter (`H-parity.txt`); 6 mutations killed, 1 neutral case passes | parity | — |
+  | channel pages | H4 `channels`, row 8 | 64 checks pass over 8 pages (base: 16 failures) (`H-channels.txt`); 7 mutations killed | Deliverable (`mytools`) | the worker loop's behaviour (OQ-011) and the platforms themselves; no `cantus serve` run (R13) |
+  | quoted error texts | H3 `errquotes`, row 9 | 12 checks: 6 texts in en and zh-tw (base: 4 failing) (`H-errquotes.txt`); 2 mutations killed | T-0010, T-0014 hand-overs | other `# ->` comments on the page are checked by the runner's expected output or read at stage 6 |
+  | non-executed code | H9 `parse`, row 10 | 122 blocks parse or are marked sketches (`H-parse.txt`); 2 mutations killed | — | — |
+  | Colab quickstart | H10 `quickstart`, row 11 | en and zh-tw: the agent reaches `add`, 0 cantus warnings (base: 2 warnings each) (`H-quickstart.txt`); 2 mutations killed | Deliverable | the real `mount_drive_and_load` (needs Colab) |
+  | `docs/api` | `npm run docs:api`, row 12 | 8 files regenerated and committed; `git status --porcelain` empty after the commits (`docs-api.txt`) | Deliverable | `{#...}` anchors and relative links do not resolve outside VitePress (T-0017 S-26/P-14) |
+  | built site, legacy links | `npm run docs:build`, H8 `dist`, row 13 | build exit 0 (`docs-build.txt`); 40 checks: exactly the 4 R9 links, each resolving to its locale's `/protocols/tool` page, which has `id="migrating-from-skill"` (`H8-dist.txt`; base build: 4 missing, `../h2-base-dist.txt`); 4 mutations killed | Deliverable | — |
+  | repository | row 14 (`repo-checks.txt`) | ruff, mypy, `check_no_dev_paths.sh`, `verify-project.py` pass; skip ratchet 13 (in the full suite) | ticket-rules §3 | — |
+  | Python 3.10–3.14 | row 15 (`matrix-3.1x.txt`, `matrix-diff-3.1x.txt`) | 3.13, 3.14: 181 passed. 3.10–3.12: 15 failed, the same 15 tests by name as at base (diff empty) | — | page execution on 3.10–3.12 is left to the PR's CI |
+  | harnesses | row 16 (`mutations.txt`) | 51 lines: 39 mutations killed, 10 controls pass, 1 neutral case passes, none surviving | — | re-run after review fixes |
+  | prose | row 17 | stage 6 | traceability 4.4 | — |
+- **Self-check (ticket-rules §3).** H1 finds no 4.2 match outside the exemptions over
+  `docs/site/**` and `docs/api/**`. Left on purpose: the five `Agent(` calls R3 allows
+  (`core/agent.md` run example en, zh-tw, `docs/api`; `model-providers.md` en, zh-tw) and the four
+  T-0017 D12 calls on the identity page.
+- **For T-0020.** `docs/quickstart-desktop.md` (root, not the site page) still names
+  `myskills.app:registry` and the `Skills` tab (line 98); `docs/README.md:31` links the moved page;
+  `model-providers.md:51` keeps `Agent(model=...)` (R3).
+- **Known, not changed (R7, R14).** `cookbook/errors.md` section 8: the replay comment's format
+  (`[i] Kind :: Class :: repr` in reality) and order (a call is always followed by its dispatch
+  observation), the "same `validator_name` at the grammar layer" sentence, the assumption that the
+  agent decodes under a grammar; `:71` schema comment; `:254` E4B. `core/agent.md:68` ("none of them
+  escapes": `model.generate` errors do), `:64-65` (an unknown name with an empty registry gives a
+  `ToolErrorObservation`). `quickstart-desktop.md:104` (the summary carries no exception type),
+  `:180` (`serve` takes a Registry). `overview.md:54`, `:62` ("serve an agent"), `:71` ("under 800
+  lines"). `index.md:29`. `tips.md:28` ("raises"). `event-stream.md:39`, `:73`. zh-tw: `line.md:3`,
+  `:9`, `:150` extra clauses, `:155` link text; `google-chat.md:128`.
+
