@@ -4,6 +4,41 @@ All notable changes to `cantus` will be documented in this file. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+> Skill 改名為 Tool：`@skill` 改為 `@tool`、`Skill` 改為 `Tool`，建議以 `Agent(model, tools=[...])` 明確把工具交給 agent。舊名稱在別名過渡期（alias period）內仍可用：Python 的舊名稱會發出 `CantusDeprecationWarning`，舊的 HTTP 路由則以 `Deprecation`／`Link` header 與 server log 提示，之後的版本移除。沒給 `tools=` 的 agent 在過渡期內仍會退回全域 registry。另有一批沒有 alias 的變更，完整清單與修改前後的程式碼見 [`MIGRATION_v0.6.0_to_v0.7.0.md`](docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md)。
+
+### 💥 Breaking Changes
+
+以下變更沒有 alias，主要包括（完整清單見遷移指南的 X、K、I、A 各節）：
+
+- **事件與 registry 的值**：事件類別名稱在 `type(e).__name__`、`repr`、`asdict` 與 `__match_args__` 中改為 `CallToolAction`／`ToolObservation`，欄位改為 `tool_name`；`Registry.KINDS` 改為 `("tool",)`，`spec_for_llm()` 序列化後的 key 改為 `"tool"`；v0.6 pickle 的事件不再支援還原。([#58], [#60])
+- **模型與錯誤文字**：模型看到的 `error_type` 由 `unknown_skill` 改為 `unknown_tool`，解析與 dispatch 的文字、`@debug` 與 hook 標籤、registry 的錯誤訊息都改稱 Tool；比對這些文字的程式要更新。([#58], [#60], [#61], [#65])
+- **`cantus serve` 與 TUI**：introspection 的值改用 `tool`／`tool:<name>`，snapshot 新增 `tools` 欄位；`tools` 成為保留的 dashboard 名稱；TUI 分頁改為 `Tools`，Textual CSS 寫 `SkillsPane` 的規則不再套用。寫給 `/skills` 路徑的 proxy、WAF 或 deny-list 規則要擴充到 `/tools`、`/tools/*` 與 `/introspection/tools`，過渡期內寫給 `/tools` 的規則也要涵蓋舊路徑。([#63], [#64])
+- **覆寫與名稱**：`Agent._dispatch_skill` 改為 `_dispatch_tool` 且沒有 shim，仍定義 `_dispatch_skill` 的子類別在定義時就丟出 `TypeError`；`Agent` 的 dataclass 欄位改為 `model, tools, soul`；`from cantus import *` 不再帶入 `Skill`、`CallSkillAction`、`SkillObservation`；模組為了自己使用而匯入的舊名稱（例如 `cantus.protocols.debug.Skill`、`cantus.core.agent.get_registry`）已移除；`cantus.adapters.huggingface.Tool` 現在是 cantus 的 `Tool`，不再是 smolagents 的類別。([#57]–[#62])
+- **警告升級為錯誤**：在 `-W error::DeprecationWarning` 或 pytest `filterwarnings = error` 下，使用舊名稱會丟出例外；v0.6 的舊名稱不會警告。([#58])
+
+### ✨ 新增 (Added)
+
+- **Tool API**：`Tool`、`@tool`、`register_tool(fn, registry=...)`、`Registry(tools=[...])`、`Agent(model, tools=[...])`；`@tool` 只建立工具、不註冊到全域 registry。([#57], [#59])
+- **新名稱**：`CallToolAction`、`ToolObservation`、`cantus.serve.ToolEntry`、`collect_tools`、`ToolsPane`、`active_tool_names`、`update_tools()`、`cantus.core.registry.ToolSpecMapping`、adapter 的 `tool=`／`tools=`。([#58]–[#64])
+- **`CantusDeprecationWarning`**（`DeprecationWarning` 的子類別）：每個舊名稱的警告都指名新名稱並連到遷移指南，在 Python 預設的 filter 下也會顯示。([#58])
+- **`cantus serve` 的 `/tools` 路由**：`POST /tools/{name}`、`GET /tools`、`GET /introspection/tools`。([#63])
+- **可執行的文件**：文件站 14 個英文頁的 Python 區塊在 CI 以 scripted model 逐頁執行並比對 expected-output；新增「模型 API」與「建置 Agent」兩份 quickstart、Changelog 頁，以及 Tool 頁與遷移段落。([#37], [#50], [#68])
+
+### 🔄 變更 (Changed)
+
+- 模型輸出的 action key 改為 `"tool_name"`；`serve()` 與 adapter 的錯誤訊息改稱 Tool。([#61], [#62], [#63])
+- 文件站全面改用 Tool API；Skill 頁改為指向 Tool 頁的 moved page。([#68], [#69])
+
+### ⚠️ 棄用 (Deprecated)
+
+- `Skill`、`@skill`、`register_skill()`、`get_registry()`、`Agent(registry=...)`、registry kind `"skill"`、`CallSkillAction`、`SkillObservation`、`skill_name`、`SkillEntry`、`collect_skills`、`SkillsPane`、`active_skill_names`、`update_skills()`、adapter 的 `skill=`／`skills=` 與模型輸出的 `"skill_name"` key；沒給 `tools=` 的 `Agent`，以及沒給 `registry=` 的 `build_schema()`／`parse_tool_call()`，在全域 registry 已有工具時也會警告（W1–W18）。舊的 HTTP 路由 `/skills/{name}`、`/skills`、`/introspection/skills` 仍可用，回應帶 `Deprecation` 與 `Link` header，第一次使用時記一筆 server log。在之後的版本移除。([#58]–[#64])
+
+### 🔒 安全性 (Security)
+
+- 安裝 `openhands` extra 會連帶裝到 pillow 12.3.0，它有 42 筆已知 advisory（13.0.0 修正），原因是上游 openhands 經 browser-use 鎖定這個版本；CI 的 supply-chain audit 暫時將它們列為已知，上游放寬後 job 會失敗以提醒移除。另移除 11 筆已比對不到任何套件的 litellm 豁免，對使用者沒有影響。([#44], [#49])
+
 ## ✨ [0.6.0] - 2026-09-06
 
 > Era 3 桌面本機 LLM 里程碑：`mlx`（Apple Silicon in-process）與 `omlx`（本機 OpenAI-compatible MLX 伺服器）兩個 provider、huggingface adapter 移植到 `smolagents.Tool`、channel 層 base-exception 政策、四道 CI 閘門（lint／strict typing／supply-chain／dev-path）、VitePress 雙語文件站，以及 Gate D 稽核硬化。從上一個 PyPI release v0.5.0 單步升級；一處契約層 breaking（詳見下方）。完整升版說明見 [`MIGRATION_v0.5.0_to_v0.6.0.md`](docs/migrations/MIGRATION_v0.5.0_to_v0.6.0.md)。
