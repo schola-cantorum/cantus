@@ -140,7 +140,7 @@ traceability 定義的「branch build」，stage 8 在這裡重跑 `cantus serve
 命令，不只看 CI 綠燈。notebook：Setup 與模板改新 API、Cell 4 用 `tools=[]`、改正「grammar-constrained」的錯誤
 說法、`cantus_version` 底下加一行 0.7.0 的說明，版本與 Colab 連結維持 v0.6.0。README、llms.txt、根目錄
 quickstart 只改名、不加版本說明；banner 的 alt text 不寫 protocol 名稱；Tier-2 範例維持不帶 `tools=`；llms.txt
-的 hooks 範例改成能執行。AC-40 用 T4（先做載入 smoke；沒有 T4 或載入失敗就記為 unverified，不用 L4 代替），
+的 hooks 範例改成能執行。AC-40 用 T4（先做載入 smoke；沒有 T4 或載入失敗時，計數那一半記為 unverified、不用 L4 代替，W2 那一半照跑），
 判讀在跑之前定好：branch 的 parse error 比 v0.6.0 多就是不成立；兩邊都是 60 且 error_type 分布相同才算
 vacuous；其餘依不等式判定，並另列碰到名稱 key 的輪數、兩種情況都做交叉 replay；不做補充診斷；由你依我產生的
 notebook 手動執行；不釘套件版本、記錄和 T-0010 的差異；AC-40 若驗不到，epic 能不能關由你在 close-out 決定。
@@ -203,14 +203,97 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   the post-hook binding overwrite the pre-hook binding; the matrix loop ran no tests (zsh did not split
   the file list). Each was fixed and re-run. Readings re-checked mechanically
   (`readings-check-12cc4c8.txt`, 17 checks pass; 7 fail on the base as expected).
-- **Coverage report** (evidence files in `.scratch/T-0020/`, numbers recounted from them):
+- **Implementation notes against the readings (stage 6, S-03, P-05, W-01, W-02, W-08, P-10, S-05).**
+  The sweep lists files with `git ls-files -z` (no `--eol`: that flag only served the prototype's binary
+  skip, which D10(a) removed). `MODULE_PATH` is derived from `REPO_ROOT = Path(__file__).parents[1]`; the
+  top-level check guarantees it equals the reading's toplevel-relative path (a moved module fails closed).
+  Pairing: a start whose next end is on the start's own line exempts nothing (fixed in `5791a62`, red first:
+  `.scratch/T-0020/w02-red.txt`). D17's allowed calls are exactly those of the approved v2 table: README
+  Tier-2 ×5 per locale and llms.txt :179 (Tier 1), :183 (Tier 2), :217 (the Soul example), each with its
+  reason in the harness. Row 6's physical-line tests were green on arrival (not red first as approved);
+  a `splitlines` mutation shows they discriminate (`row6-lines-mutation.txt`). Sweep subprocesses do not
+  inherit `GIT_*`; throwaway repositories ignore global and system Git configuration (`5791a62`).
+- **Coverage report** (final evidence on `fdf6359`, the last commit that changes shipped files; files in
+  `.scratch/T-0020/`, numbers recounted from them):
 
-  | Seam | Tests | Measured coverage | AC | Uncovered, and why |
+  | Seam | Tests | Measured coverage | Acceptance criterion | Uncovered, and why |
   |---|---|---|---|---|
-  | `tests/test_rename_sweep.py` (rows 1–6) | 96 tests | line+branch 99% (216 statements, 38 branches; the miss is `format_violations`, which runs only on failure and is exercised in `row1-red-after-partA.txt`) — `coverage-sweep-2d18e62.txt`; mutations 42/42 killed by the claimed test, controls 2/2 — `mutations-sweep-2d18e62.txt`; Python 3.10–3.14 pass — `matrix-2d18e62/summary.txt` | AC-36, TR-130 | UTF-16 files; identifiers glued to CJK text (`\b` is Unicode-aware); symlinks are read through to their target; the index is not read (working-tree files only); a missing `git` is not exercised |
-  | rows 7–9 (`test_parity.py`, `test_guardrail_config.py`, `test_check_no_dev_paths.py`) | existing tests, samples rewritten | pass on 3.10–3.14 (pre-existing skips: tomllib on 3.10, a PEP 701 case on 3.10/3.11) | Deliverable | — |
-  | row 10 (TR-131, TR-132) | `tests/docs` | full suite 1947 passed, 3 skipped (`repo-checks-12cc4c8.txt`); `tests/docs` on 3.10–3.14 (`matrix-12cc4c8/`) | AC-36 | executed pages on 3.10–3.12 were green locally this time; the PR's CI is the record |
-  | H1–H9 (`doccheck20.py`) | 36 rows | base 18 rows fail (`doccheck-red-13ddcbc.txt`); head 36/36 (`doccheck-green-12cc4c8.txt`); mutations 19/19, controls 2/2 (`mutations-docs-12cc4c8.txt`) | Deliverable, TR-133 (H8) | three Ollama/MLX fences of the root quickstart are not run (unchanged; need local servers); prose is stage 6's |
-  | N1–N5 (`nbrun20.py`) | 8 rows | base 5 rows fail (`nbrun-red-13ddcbc.txt`); head 8/8 (`nbrun-green-12cc4c8.txt`; the strengthened N1b passes in the mutation control NC0); mutations 8/8, control 1/1 (`mutations-nb-12cc4c8.txt`) | R2-13, C2-F20, Deliverable | real providers (N5 uses stand-in chat models); Colab (stage 8); the notebook's E2B/E4B claims |
-  | repository checks | ruff, mypy (89 files), dev paths, verify-project, `docs:api` no diff, `docs:build` | all pass (`repo-checks-12cc4c8.txt`) | — | — |
+  | `tests/test_rename_sweep.py` (rows 1–6) | 110 tests | line+branch 99% (237 statements, 40 branches; the miss is the failure-message formatter, exercised in `row1-red-13ddcbc.txt`) — `coverage-sweep-fdf6359.txt`; mutations 52/52 killed by the claimed test, controls 2/2 — `mutations-sweep-fdf6359.txt`; base: 69 cell hits = 65 (line, pattern) pairs on 61 lines in 14 files — `row1-red-13ddcbc.txt` | AC-36 (TR-130) | UTF-16 files; identifiers glued to CJK text (`\b` is Unicode-aware); tracked symlinks are read through to their target and gitlinks, directory symlinks and dangling links are skipped; marker variants (no spaces, split across lines) neither exempt nor fail; a missing `git` is not exercised |
+  | rows 7–9 (`test_parity.py`, `test_guardrail_config.py`, `test_check_no_dev_paths.py`) | existing tests, samples rewritten | pass on 3.11–3.14; on 3.10 `test_guardrail_config.py` is skipped as a module (tomllib) and one parity case is skipped on 3.10/3.11 (PEP 701), as on the base — `matrix-fdf6359/` | Deliverable | row 8 on 3.10 (pre-existing skip) |
+  | row 10 (TR-131, TR-132) | `tests/docs` | full suite 1961 passed, 3 skipped (`repo-checks-fdf6359.txt`); `tests/docs` with the rows 1–9 modules on 3.10–3.14: 309/374/375/375/375 passed (`matrix-fdf6359/summary.txt`, file list in each line) | AC-36 | — |
+  | H1–H9 (`doccheck20.py`) | 36 rows | base 18 rows fail (`doccheck-red-13ddcbc-harness-fdf6359.txt`); head 36/36 (`doccheck-green-fdf6359.txt`); mutations 19/19, controls 2/2 (`mutations-docs-fdf6359.txt`) | Deliverable, AC-36 TR-133 (H8) | three Ollama/MLX fences of the root quickstart are not run (unchanged; need local servers); prose is stage 6's |
+  | N1–N5 (`nbrun20.py`) | 8 rows | base 5 rows fail (`nbrun-red-13ddcbc-harness-fdf6359.txt`; N1b's base failure is a harness precondition: the template text differs); head 8/8 (`nbrun-green-fdf6359.txt`), any warning other than IPython's own `%pip` forkpty warning fails; N1b counts both hook calls; mutations 9/9, control 1/1 (`mutations-nb-fdf6359.txt`) | R2-13, C2-F20, Deliverable | real providers (N5 uses stand-in chat models); Colab (stage 8) |
+  | repository checks | ruff, mypy (89 files), dev paths, verify-project (rc 0), `docs:api` no diff, `docs:build` | all pass (`repo-checks-fdf6359.txt`) | — | — |
+  | readings | `readings_check.py` | 17/17 on `fdf6359` (`readings-check-fdf6359.txt`); 7 fail on the base | — | prose readings are stage 6's |
   | TR-133 in CI | the `cross-platform-install` workflow | pending: runs on the PR | AC-36 | recorded after the push |
+- **Stage 6 (2026-11-19), reviewed range `13ddcbc...dccb737`.** Five `harness-reviewer` axes in one
+  Workflow: Standards 26 findings (2 medium), Spec requirements with a per-row mapping 14 (2 medium), sweep
+  exactness against traceability 4.1–4.3 13 (1 medium), llms.txt facts 10 (1 medium), facts of the other
+  documents and notebooks 14 (2 medium); no high. Findings and dispositions:
+  `.scratch/T-0020/stage6-findings.md` (full text `stage6-details.txt`, raw `stage6-7-raw.json`). Fixed in
+  `5791a62` (sweep: same-line pairing, exact 16 cells and rule ids, line marker on its own line only, two
+  blocks, prefix and suffix look-alikes, all planted lines in unscanned paths, Git environment isolation),
+  `fc3be11` (documents and notebook: CONTRIBUTING's `Workflow`, the pyproject comment, AutoMemory's
+  `auto.tools`, the root quickstart's provider function-calling sentence, llms.txt's registry hand-off, hook
+  rules and AutoMemory, the notebook's E2B/E4B sentences, the `cantus_version` note, Cell 5's re-run advice)
+  and `fdf6359` (an explanatory comment added in `5791a62` itself matched P10: the sweep caught it). The
+  fixes were not sent back to the reviewers; every harness, mutation and matrix run was repeated on
+  `fdf6359`. FB-02 was measured before fixing: pip keeps an installed `cantus-agent 0.6.0` when asked for a
+  `main` commit that also reports 0.6.0, even in a fresh process (`.scratch/T-0020/probe-pip-switch.txt`),
+  so the note now says to set `main` before the first run or to start from a fresh runtime.
+- **Stage 7 (2026-11-19).** Report: `.proj.specs/0001-tool-rename-phase-one/review/security-T-0020.md`.
+  Nine low candidates; each independent false-positive check found it not a defect this change introduces
+  (confidence 0.85–0.95; all read the upstream criteria). Adopted as fixes: SEC-T0020-2 (Git environment),
+  -5 (in part), -9.
+- **Known, not changed** (pre-existing, on lines this ticket did not need to touch, or decided): llms.txt
+  `:7-9` (v0.5.0 lines, D12), `:123` ("five built-in implementations" counts AutoMemory), `:152` ("asks the
+  LLM for exactly one JSON object"; the prompt gives no format), `:214` (the `@debug` output lacks
+  `thought=`); `cantus/protocols/debug.py:47` prints "registered" for a tool no registry holds (T-0018 FA-05);
+  `cantus/core/agent.py:408-409` (decode-time grammar comment); README `:175` (Memory "registers and
+  dispatches") and `:182-183` (Analyzer/Validator descriptions), README.zhTW `:180` ("工具" for tooling);
+  `notebooks/README.md:17,22,27` and `admin_setup.ipynb:13` (grammar claim); the task_template note's item 2
+  ("spec-defined", `agent-runtime` Requirement); `multi_provider_smoke.ipynb` installs from PyPI (0.6.0) and
+  its last cell needs `tool` (D11); the root `docs/quickstart-desktop.md:18`, `:64` (hedged as on the site,
+  not verified with a real model), `:72` (`--host 0.0.0.0` without auth; SEC-T0020-6), `:129`, `:149`,
+  `:168` and its missing `PYTHONPATH=.` for `--registry-import` (also on the site page);
+  CONTRIBUTING.zhTW's older drift (no pre-commit section, `:29`); the banner image shows "Skill"; the install
+  smoke's `python -c` runs from the checkout root and imports the source tree (SEC-T0020-8); the D1 lines.
+- **Stage 8, local surfaces (2026-11-19, ADR-0018), branch build = `fdf6359`** (the last commit that
+  changes shipped files; later commits change only this ticket and the security report). Wheel from
+  `git archive fdf6359` with `uv build --wheel`, sha256 `bf6795cb7f4f8a512a6b5da9be00ba9144e61d9cdaa5eb7dba523cb09a460517`,
+  `cantus/` tree `c5015026` (identical to the base's; wheel members other than METADATA and RECORD equal to
+  the base wheel's), installed with `[serve,tui]` into a fresh Python 3.13.11 venv; macOS 26 arm64; every run
+  with cwd and `PYTHONPATH` outside the checkout and `cantus.__file__` in the venv. Drivers and transcripts:
+  `.scratch/T-0020/stage8/` (`stage8-fdf6359.log`).
+  - **AC-41** (a real `cantus serve` under uvicorn, auth none and bearer, driven by httpx, `ac41.py`; token
+    `<redacted>`): 0 of 45 clause checks fail (`ac41-fdf6359.txt`). Per mode: the listener on the free port is
+    the started server; `POST /tools/add` 200 `{"result":7}` with no alias header; `POST /skills/add` and
+    `/skills/multiply` 200 with `Deprecation: @1794441600` and the 2.3 `Link`; in bearer mode both families
+    401 without a token; `GET /tools`, `/introspection/tools` without headers and `/skills`,
+    `/introspection/skills` with both; the snapshot's `tools` equals `skills`; dataflow `tool:add`,
+    `tool:multiply` of kind `tool`; session sources `tool:<name>` for both families; trace summaries per 2.3;
+    `gated_routes` empty (none) and listing both families (bearer); OpenAPI's deprecated set over all paths
+    is exactly the four alias operations, primary summaries per 2.3; exactly three `Legacy route` records,
+    one per alias template used (`/skills/{name}` twice, `/skills` twice); no listener left; no token in the
+    output. The same driver on cantus-agent 0.6.0 from PyPI fails 36 checks (`ac41-red-v06.txt`).
+  - **AC-42** (the real `cantus tui` in a pseudo-terminal rendered with pyte, `ac42.py` with T-0013's
+    `tui_pty.py`): rounds A (none; a running session left by a malformed request) and B (bearer, token from
+    the environment) show the Tools tab with rows `add  Add two integers.  a, b` and
+    `multiply  Multiply two integers.  a, b` (A: `active`), `q` exits 0, no token on screen, no legacy route
+    used (`ac42-fdf6359.txt`). The same rounds with the 0.6.0 TUI and server fail 8 checks
+    (`ac42-red-v06.txt`). This clean run replaces T-0013's AC-42 record, whose servers could not bind (D19).
+  - **AC-43** (T-0016's `stage8.py build`/`e1`: fresh venv, ludus cloned to a temporary directory at
+    `341769d` with no remote, only the two `"SkillObservation"` comparisons changed): stdout ends with
+    `ALL GATE CHECKS PASSED`, stderr holds W3, W7, W11 and W13 (`ac43-e1-fdf6359.txt`). Control: the
+    unchanged clone with the same build ends `[gate] 2 GATE CHECK(S) FAILED` (`ac43-u0-control-fdf6359.txt`).
+    T-0016's builder made its own wheel of `fdf6359`; its members and CRCs equal the stage-8 wheel's. Nothing
+    was committed or pushed in ludus.
+  - **Notebooks in Jupyter** (`nbrun20.py` on `fdf6359`, N1/N1b/N5 above): `task_template.ipynb` with
+    `cantus_version` set to the commit for the run (the GitHub URL replaced by the local repository, not
+    committed) installs through its own `%pip` cell and runs; its templates run uncommented with both hooks
+    called; `multi_provider_smoke.ipynb` runs with stand-in chat models.
+  - **Install smoke script** (`s8_smoke.sh`, throwaway venvs through `UV_PYTHON`): local mode from the archive
+    root passes all five steps; PyPI mode `0.6.0` from outside the tree fails at step 2 with
+    `ImportError: cannot import name 'tool'`, as the usage text says (`smoke-fdf6359.txt`).
+  - **Rendered Markdown** (markdown-it in agent-browser): `stage8/browser/browser.md`.
+  - Not covered here: Colab (AC-40, by hand, below), CI (after the push), real provider APIs, Windows.
