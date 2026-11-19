@@ -1,6 +1,6 @@
 # `cantus.serve` core
 
-`cantus.serve` 是 cantus 的 HTTP 入口。它接手你先前已經組好的 Skill registry，把它原封不動地用 HTTP/JSON expose 出去。你只要呼叫 `serve(registry)`，就會拿回一個配置好的 FastAPI app，可以直接交給 uvicorn（或任何 ASGI server）跑起來。
+`cantus.serve` 是 cantus 的 HTTP 入口。它接手你先前已經組好的 tool registry，把它原封不動地用 HTTP/JSON expose 出去。你只要呼叫 `serve(registry)`，就會拿回一個配置好的 FastAPI app，可以直接交給 uvicorn（或任何 ASGI server）跑起來。
 
 本頁涵蓋四個對外的面向：Quick start、`cantus.config.Settings` 這套 12-factor 設定、唯讀的 dashboard endpoint，以及 Channel Protocol 抽象層搭配 `LocalMockReceiver`。
 
@@ -14,15 +14,14 @@
 pip install "cantus-agent[serve]"
 ```
 
-下面是一個最精簡的範例。註冊一個 Skill、呼叫 `serve(registry)`，再用 uvicorn 把 server 起起來：
+下面是一個最精簡的範例。把一個 tool 放進 `Registry`、呼叫 `serve(registry)`，再用 uvicorn 把 server 起起來：
 
 ```python
 import uvicorn
 from cantus.core.registry import Registry
 from cantus.serve import serve
 
-registry = Registry()
-registry.register("skill", my_skill)             # my_skill 是任一個 Skill 實例
+registry = Registry(tools=[my_tool])  # my_tool 是任一個 Tool
 app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
@@ -39,7 +38,9 @@ curl http://localhost:8765/health
 {"status":"ok","cantus_version":"0.6.0"}
 ```
 
-每個註冊到 registry 的 Skill 都會自動掛在 `POST /skills/{spec_for_llm.name}`。引數放在 JSON body 裡，回傳的形狀是 `{"result": <jsonable>}`。Swagger UI 預設掛在 `/docs`、OpenAPI JSON 在 `/openapi.json`、ReDoc 在 `/redoc`。每個 Skill 的 `args_schema` 會直接投影到該 endpoint 的 `requestBody.application/json.schema`，所以學生只要打開 Swagger UI，就能一眼看出每個 Skill 該怎麼呼叫。
+registry 裡的每個 tool 都會自動掛在 `POST /tools/{spec_for_llm.name}`。引數放在 JSON body 裡，回傳的形狀是 `{"result": <jsonable>}`。Swagger UI 預設掛在 `/docs`、OpenAPI JSON 在 `/openapi.json`、ReDoc 在 `/redoc`。每個 tool 的 `args_schema` 會直接投影到該 endpoint 的 `requestBody.application/json.schema`，所以學生只要打開 Swagger UI，就能一眼看出每個 tool 該怎麼呼叫。
+
+別名過渡期內，v0.6 的路由名稱仍然可以呼叫，並會帶上 deprecation header；請見 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)。
 
 ## Configuration
 
@@ -49,7 +50,7 @@ curl http://localhost:8765/health
 | --- | --- | --- | --- |
 | `host` | `str` | `"127.0.0.1"` | uvicorn 綁定的 host；預設只開 localhost |
 | `port` | `int` | `8765` | uvicorn 綁定的 port |
-| `dashboard` | `bool` | `True` | 是否啟用 `/skills`、`/health`、`/events` 三個 dashboard endpoint |
+| `dashboard` | `bool` | `True` | 是否啟用 `/tools`、`/health`、`/events` 三個 dashboard endpoint |
 | `docs_url` | `str \| None` | `"/docs"` | Swagger UI 的掛載路徑；設成 `None` 就關閉 |
 | `openapi_url` | `str \| None` | `"/openapi.json"` | OpenAPI JSON 的路徑；設成 `None` 就關閉 |
 | `redoc_url` | `str \| None` | `"/redoc"` | ReDoc 的路徑；設成 `None` 就關閉 |
@@ -58,7 +59,7 @@ curl http://localhost:8765/health
 | `bearer_token` | `SecretStr \| None` | `None` | bearer 模式用的 token；`SecretStr` 行為同上 |
 | `introspection` | `bool` | `True` | 是否掛上唯讀的 `/introspection/*` endpoint |
 | `introspection_requires_auth` | `bool` | `True` | 當 `auth_mode != NONE` 時，`/introspection/*` 是否也要套 auth |
-| `dashboard_requires_auth` | `bool` | `True` | 當 `auth_mode != NONE` 時，`/skills`、`/health`、`/events` 三個 dashboard endpoint 是否也要套 auth。設成 `False` 可以讓 monitoring 系統匿名 poll 它們 |
+| `dashboard_requires_auth` | `bool` | `True` | 當 `auth_mode != NONE` 時，`/tools`、`/health`、`/events` 三個 dashboard endpoint 是否也要套 auth。設成 `False` 可以讓 monitoring 系統匿名 poll 它們 |
 
 `Settings` 另外還有每個平台憑證各一個的 `channel_*` 欄位（LINE、Telegram、Discord、Google Chat）；各 channel 頁面會列出它讀哪幾個。
 
@@ -121,8 +122,7 @@ import uvicorn
 from cantus.core.registry import Registry
 from cantus.serve import serve
 
-registry = Registry()
-registry.register("skill", my_skill)
+registry = Registry(tools=[my_tool])
 app = serve(registry)
 uvicorn.run(app, host="127.0.0.1", port=8765)
 ```
@@ -131,11 +131,11 @@ uvicorn.run(app, host="127.0.0.1", port=8765)
 
 ```bash
 # 沒帶 token：401
-curl http://localhost:8765/skills/my_skill -d '{"value":"hi"}'
+curl http://localhost:8765/tools/my_tool -d '{"value":"hi"}'
 # {"detail":"Authentication required"}
 
 # 帶對的 token：200
-curl http://localhost:8765/skills/my_skill \
+curl http://localhost:8765/tools/my_tool \
   -H "Authorization: Bearer $CANTUS_SERVE_BEARER_TOKEN" \
   -d '{"value":"hi"}'
 # {"result":"hi"}
@@ -151,14 +151,14 @@ export CANTUS_SERVE_API_KEY=$(openssl rand -hex 32)
 呼叫時改帶 `X-API-Key` header：
 
 ```bash
-curl http://localhost:8765/skills/my_skill \
+curl http://localhost:8765/tools/my_tool \
   -H "X-API-Key: $CANTUS_SERVE_API_KEY" \
   -d '{"value":"hi"}'
 ```
 
 ### dashboard 要不要套 auth
 
-預設是 `dashboard_requires_auth = True`：當 `auth_mode != NONE` 時，`/skills`、`/health`、`/events` 這三個 dashboard endpoint 也會要求認證。理由是，dashboard 暴露出來的 Skill 清單跟健康狀態，本身就是值得攻擊者偵察的資訊。
+預設是 `dashboard_requires_auth = True`：當 `auth_mode != NONE` 時，`/tools`、`/health`、`/events` 這三個 dashboard endpoint 也會要求認證。理由是，dashboard 暴露出來的 tool 清單跟健康狀態，本身就是值得攻擊者偵察的資訊。
 
 如果你想讓 Prometheus、Grafana 這類 monitoring 系統匿名 poll `/health`，就明確把它關掉：
 
@@ -166,7 +166,7 @@ curl http://localhost:8765/skills/my_skill \
 export CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH=false
 ```
 
-關掉之後，`/skills`、`/health`、`/events` 對匿名請求會回 200，但 `POST /skills/<name>` 仍然需要 token。
+關掉之後，`/tools`、`/health`、`/events` 對匿名請求會回 200，但 `POST /tools/<name>` 仍然需要 token。
 
 ### token 漏設時 fail-fast
 
@@ -185,12 +185,12 @@ export CANTUS_SERVE_DASHBOARD_REQUIRES_AUTH=false
 
 當 `Settings.dashboard is True`（也就是預設值），`serve()` 會額外掛上三個唯讀 endpoint：
 
-### `GET /skills`
+### `GET /tools`
 
-回傳 registry 裡每個 Skill 的 `spec_for_llm()` 輸出，型別是 `list[dict]`。每一筆都是三鍵的形狀 `{"name", "description", "args_schema"}`：
+回傳 registry 裡每個 tool 的 `spec_for_llm()` 輸出，型別是 `list[dict]`。每一筆都是三鍵的形狀 `{"name", "description", "args_schema"}`：
 
 ```bash
-curl http://localhost:8765/skills
+curl http://localhost:8765/tools
 ```
 
 ```json
@@ -237,26 +237,25 @@ app.state.event_persistence = JsonLinesPersistence("events.jsonl")
 
 ### 關掉 dashboard
 
-傳 `Settings(dashboard=False)` 進去，上面三個 endpoint 全部變成 `404`，而每個 Skill 的 invoke endpoint（`POST /skills/<name>`）**完全不受影響**：
+傳 `Settings(dashboard=False)` 進去，上面三個 endpoint 全部變成 `404`，而每個 tool 的 invoke endpoint（`POST /tools/<name>`）**完全不受影響**：
 
 ```python
 from cantus.config import Settings
 
 app = serve(registry, settings=Settings(dashboard=False))
-# GET /skills  -> 404
+# GET /tools  -> 404
 # GET /health  -> 404
 # GET /events  -> 404
-# POST /skills/search_book -> 200（照常）
+# POST /tools/search_book -> 200（照常）
 ```
 
-### 保留路徑：Skill 名稱不能撞名
+### 保留路徑：tool 名稱不能撞名
 
-`skills`、`health`、`events` 這三個名字保留給 dashboard。如果 registry 裡有哪個 Skill 的 `spec_for_llm()["name"]` 剛好等於這三個之一，`serve(...)` 會在建構 app 的階段丟出 `ValueError`，訊息裡帶著字面的 `"reserved dashboard path"`。另外還有兩個名字用同樣的方式保留：`channels`（`"reserved channel path"`）與 `introspection`（`"reserved introspection path"`）。
+`tools`、`health`、`events` 這幾個名字保留給 dashboard（別名過渡期的路由名稱也一併保留，列在 [Tool 頁的遷移一節](./tool.md#migrating-from-skill)）。如果 registry 裡有哪個 tool 的 `spec_for_llm()["name"]` 剛好等於這些保留名稱之一，`serve(...)` 會在建構 app 的階段丟出 `ValueError`，訊息裡帶著字面的 `"reserved dashboard path"`。另外還有兩個名字用同樣的方式保留：`channels`（`"reserved channel path"`）與 `introspection`（`"reserved introspection path"`）。
 
 ```python
-# 假設 bad_skill.spec_for_llm()["name"] == "health"
-registry = Registry()
-registry.register("skill", bad_skill)
+# 假設 bad_tool.spec_for_llm()["name"] == "health"
+registry = Registry(tools=[bad_tool])
 
 serve(registry)
 # ValueError: ... reserved dashboard path ...
@@ -266,11 +265,11 @@ serve(registry)
 
 ## Introspection endpoints
 
-當 `Settings.introspection is True`（也就是預設值），`serve()` 會額外掛上一組唯讀的 `/introspection/*` endpoint，把 cantus 既有的執行期狀態（Skill registry、auth 設定、attached channels，以及 EventStream）投影成一個穩定的 JSON read-model。它**只觀測、不改動**任何 registry、settings、session、channel 或 event-stream 的狀態。它跟 dashboard 平行運作，而且兩者各自**獨立** toggle。
+當 `Settings.introspection is True`（也就是預設值），`serve()` 會額外掛上一組唯讀的 `/introspection/*` endpoint，把 cantus 既有的執行期狀態（tool registry、auth 設定、attached channels，以及 EventStream）投影成一個穩定的 JSON read-model。它**只觀測、不改動**任何 registry、settings、session、channel 或 event-stream 的狀態。它跟 dashboard 平行運作，而且兩者各自**獨立** toggle。
 
 | Endpoint | 內容 |
 | --- | --- |
-| `GET /introspection/skills` | 每個已註冊 Skill 的 `spec_for_llm()` 投影 |
+| `GET /introspection/tools` | registry 裡每個 tool 的 `spec_for_llm()` 投影 |
 | `GET /introspection/sessions` | 最近被 dispatch 的那些 run（一個有界、唯讀的 `SessionTracker`） |
 | `GET /introspection/permissions` | 生效中的 auth 設定（`auth_mode`，加上兩個 `*_requires_auth` flag，加上被 gate 的路徑清單；**絕不**包含 token 值） |
 | `GET /introspection/queues` | 每個 channel 的 queue 深度（沒有這個能力的 channel 會以 `depth=null` 列出） |
@@ -282,7 +281,7 @@ serve(registry)
 
 `/introspection` 由兩個 flag 控制，兩者都跟 dashboard 各自獨立：
 
-- `introspection`（預設 `True`）：要不要掛載整組 endpoint。設成 `Settings(introspection=False)` 後它們全部回 `404`，而 dashboard 跟 Skill invoke endpoint 不受影響。
+- `introspection`（預設 `True`）：要不要掛載整組 endpoint。設成 `Settings(introspection=False)` 後它們全部回 `404`，而 dashboard 跟 tool invoke endpoint 不受影響。
 - `introspection_requires_auth`（預設 `True`）：當 `auth_mode != NONE` 時，整組 `/introspection/*`（**包含** `/introspection/workflows/{run_id}`）是否用 `require_auth` 包起來。設成 `False` 可以開放匿名讀取，行為跟 `dashboard_requires_auth` 一致。
 
 > ⚠️ **`auth_mode=none` 的 config cliff**：當 `auth_mode` 是 `none`（預設）時，根本沒有認證可套，所以 `introspection_requires_auth`（以及 `dashboard_requires_auth`）**會被忽略**，`/introspection` 對任何連得到 server 的人都是可讀的。在這個情況下（`auth_mode=none` 且 `introspection` 有啟用），`serve()` 會在建構 app 時 emit 一則 `UserWarning`，明說 `/introspection` 目前不用認證就能存取（這則訊息**不含**任何 token）。一旦你把 server 暴露到 loopback 之外（綁 `0.0.0.0`、接上 tunnel），就把 `auth_mode` 改成 `bearer` 或 `api-key`，introspection 會跟其他東西一起被保護起來。
@@ -291,9 +290,9 @@ serve(registry)
 
 `GET /introspection/workflows/{run_id}` 把那個 run 的 EventStream 投影成有序的步驟，每一步有四個欄位：`index`、`kind`、`type`、`summary`。其中 `summary` 是一個**只帶結構、不帶任何值**的投影：
 
-- `CallSkillAction` → skill 名稱，加上一份排序過的引數**鍵名**清單（不含引數值）
-- `SkillObservation` → skill 名稱，加上結果的**型別名稱**（不含結果值）
-- `ToolErrorObservation` → 只有 skill 名稱（不含例外型別，也不含例外訊息）
+- `CallToolAction` → tool 名稱，加上一份排序過的引數**鍵名**清單（不含引數值）
+- `ToolObservation` → tool 名稱，加上結果的**型別名稱**（不含結果值）
+- `ToolErrorObservation` → 只有 tool 名稱（不含例外型別，也不含例外訊息）
 - 其他型別 → event 的型別名稱（不含欄位值）
 
 引數值、結果值、原始例外訊息都可能夾帶 secret 或 PII，所以一個都不投影；步驟的 `kind`、`type` 跟順序則維持原樣。未知的 `run_id` 回 `404`。TUI Inspector（`cantus tui`，見 [`../tui.md`](../tui.md)）是這份 server 資料的純 render 端，所以它同樣只顯示去敏感後的 summary。

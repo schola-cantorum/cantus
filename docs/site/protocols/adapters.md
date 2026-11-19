@@ -2,19 +2,19 @@
 
 ## Package overview
 
-`cantus.adapters` is the bridge layer introduced in v0.3.2. It exposes cantus Skill and Memory objects to existing agent ecosystems (MCP, the Anthropic Memory tool), and in the other direction pulls external tools into cantus. This first section covers the three callables that arrived in v0.3.2; the cross-framework adapters (LangChain, DSPy, HuggingFace smolagents, OpenHands) are covered in the batch2 and batch3a sections below.
+`cantus.adapters` is the bridge layer introduced in v0.3.2. It exposes cantus Tool and Memory objects to existing agent ecosystems (MCP, the Anthropic Memory tool), and in the other direction pulls external tools into cantus. This first section covers the three callables that arrived in v0.3.2; the cross-framework adapters (LangChain, DSPy, HuggingFace smolagents, OpenHands) are covered in the batch2 and batch3a sections below.
 
 | Function | Direction | Dependency |
 | --- | --- | --- |
 | `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install (no external SDK) |
-| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
+| `export_as_mcp_server(tools, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
 | `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus-agent[mcp]` |
 
 Design principles:
 
-- **Pure wrapper layer** — an adapter does **not** change the runtime behavior of a Skill or Memory; it only translates schemas.
-- **No new protocol kind** — `Registry.KINDS` stays `("skill",)`.
-- **`Skill.spec_for_llm()` shape is unchanged** — any schema conversion happens on the adapter side, so the existing v0.3.0 contract still passes.
+- **Pure wrapper layer** — an adapter does **not** change the runtime behavior of a Tool or Memory; it only translates schemas.
+- **No new protocol kind** — `Registry.KINDS` stays `("tool",)`.
+- **`Tool.spec_for_llm()` shape is unchanged** — any schema conversion happens on the adapter side, so the existing v0.3.0 contract still passes.
 
 ## `expose_as_anthropic_memory_tool` five-line example
 
@@ -34,15 +34,15 @@ resp = anthropic.Anthropic().messages.create(
 )
 ```
 
-**LLM-driven CRUD foot-gun warning (carried over from the v0.3.1 AutoMemory Trap-10)**: inside this tool_use loop, Claude has full CRUD access to the cantus Memory — it can `view`, `create`, `str_replace`, or `delete` any record. Before you ship to production, add filtering in the host-code dispatch layer (the part where you receive a `tool_use` and dispatch back to `memory.recall` / `memory.remember`), or gate the underlying Skill with `@skill(post_hook=...)`. See the "`AutoMemory`: LLM-driven CRUD and the production warning" section in `docs/protocols/memory.md`.
+**LLM-driven CRUD foot-gun warning (carried over from the v0.3.1 AutoMemory Trap-10)**: inside this tool_use loop, Claude has full CRUD access to the cantus Memory — it can `view`, `create`, `str_replace`, or `delete` any record. Before you ship to production, add filtering in the host-code dispatch layer (the part where you receive a `tool_use` and dispatch back to `memory.recall` / `memory.remember`). On this path Claude's `tool_use` goes to your host code, not through cantus's dispatcher, so cantus hooks do not run: the filter belongs in that dispatch layer. See the "`AutoMemory`: LLM-driven CRUD and the production warning" section in `docs/protocols/memory.md`.
 
 ## `export_as_mcp_server` five-line example (stdio)
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import export_as_mcp_server
 
-@skill
+@tool
 def search_book(title: str) -> str:
     """Search the library catalog by title."""
     return f"found: {title}"
@@ -76,12 +76,11 @@ With `port=0` the actual port is chosen by the SDK. If you need to read back the
 ## `import_mcp_server` five-line example (stdio)
 
 ```python
-from cantus import Agent, get_registry
+from cantus import Agent
 from cantus.adapters import import_mcp_server
 
-skills = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
-for s in skills:
-    get_registry().register("skill", s)  # make these remote tools visible to the Agent
+remote_tools = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
+agent = Agent(model, tools=remote_tools)  # the agent sees exactly these remote tools
 ```
 
 ### Trust boundary (important)
@@ -92,11 +91,11 @@ The `http` transport uses `urllib.parse.urlparse` to check that the scheme is in
 
 ## Schema compatibility (audit Trap-7 fix)
 
-cantus `Skill.spec_for_llm()["args_schema"]` is a JSON Schema produced by Pydantic, so it may carry Pydantic-specific keys (`title`, `additionalProperties: false`, `examples`). Both `export_as_mcp_server` and `expose_as_anthropic_memory_tool` pass that schema through **without conversion**, straight into the MCP `inputSchema` and Anthropic `args_schema` respectively.
+cantus `Tool.spec_for_llm()["args_schema"]` is a JSON Schema produced by Pydantic, so it may carry Pydantic-specific keys (`title`, `additionalProperties: false`, `examples`). Both `export_as_mcp_server` and `expose_as_anthropic_memory_tool` pass that schema through **without conversion**, straight into the MCP `inputSchema` and Anthropic `args_schema` respectively.
 
 What students need to know about the consequences:
 
-- If you set `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")` inside a Skill, the generated schema carries `additionalProperties: false`. The MCP SDK and the Claude API both accept that key, but some stricter clients validate the whole schema and reject any field they do not recognize. If you hit that, switch back to `extra="ignore"` (the Pydantic default).
+- If you set `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")` inside a Tool, the generated schema carries `additionalProperties: false`. The MCP SDK and the Claude API both accept that key, but some stricter clients validate the whole schema and reject any field they do not recognize. If you hit that, switch back to `extra="ignore"` (the Pydantic default).
 - The `title` field is metadata Pydantic adds by default. It will not break downstream, but the display name may show an auto-generated value (something like `SearchBookArgs`). If you do not like it, override it with `model_config = ConfigDict(title="...")` inside the model.
 
 The cantus framework does **not** normalize schemas (normalization conflicts with the "pass through unchanged" decision), so this compatibility concern is explicit on the student's side.
@@ -134,7 +133,7 @@ From the student's point of view:
 import re
 
 try:
-    skills = import_mcp_server(transport="stdio", command_or_url="bad-server")
+    remote_tools = import_mcp_server(transport="stdio", command_or_url="bad-server")
 except RuntimeError as exc:
     if "mcp_handshake_failed" in str(exc):
         print("Could not connect to the MCP server; check that the command is correct")
@@ -161,22 +160,22 @@ On top of the three v0.3.2 MVP pieces (MCP server, MCP client, Anthropic Memory)
 
 | Function | Direction | Dependency |
 | --- | --- | --- |
-| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
+| `expose_as_langchain_tool(tool)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
 | `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus-agent[langchain]` |
-| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
+| `expose_as_dspy_tool(tool)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
 | `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus-agent[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool` (export only in v0.3.3; import added in v0.3.4) | `pip install cantus-agent[huggingface]` |
-| `expose_as_openhands_action(skill)` | cantus → OpenHands (export only) | `pip install cantus-agent[openhands]` (Python 3.12 only) |
+| `expose_as_hf_tool(tool)` | cantus → HuggingFace `smolagents.Tool` (export only in v0.3.3; import added in v0.3.4) | `pip install cantus-agent[huggingface]` |
+| `expose_as_openhands_action(tool)` | cantus → OpenHands (export only) | `pip install cantus-agent[openhands]` (Python 3.12 only) |
 
-The design principles carry over from the v0.3.2 `adapters.md`: pure wrapper layer, `Skill.spec_for_llm()` shape unchanged, `Registry.KINDS` unchanged, and no `Adapter` ABC. Error naming reuses the `<framework>_handshake_failed` / `<framework>_remote_error` convention.
+The design principles carry over from the v0.3.2 `adapters.md`: pure wrapper layer, `Tool.spec_for_llm()` shape unchanged, `Registry.KINDS` unchanged, and no `Adapter` ABC. Error naming reuses the `<framework>_handshake_failed` / `<framework>_remote_error` convention.
 
 ## `expose_as_langchain_tool` + `import_langchain_tool` five-line example
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_langchain_tool, import_langchain_tool
 
-@skill
+@tool
 def search_book(title: str) -> str:
     """Search the catalog by exact title."""
     return f"hit:{title}"
@@ -186,15 +185,15 @@ lc_tool = expose_as_langchain_tool(search_book)  # hand to any LangChain agent
 # back_to_cantus = import_langchain_tool(lc_tool)
 ```
 
-**Schema conversion note**: `expose_*` builds a Pydantic v2 model dynamically from `skill.spec_for_llm()["args_schema"]` and feeds it to LangChain's `args_schema`. `import_*` goes the other way and calls `tool.args_schema.model_json_schema()` directly (Pydantic v2 required). If `args_schema is None`, it falls back to an empty JSON Schema.
+**Schema conversion note**: `expose_*` builds a Pydantic v2 model dynamically from the tool's `spec_for_llm()["args_schema"]` and feeds it to LangChain's `args_schema`. `import_*` goes the other way and calls `tool.args_schema.model_json_schema()` directly (Pydantic v2 required). If `args_schema is None`, it falls back to an empty JSON Schema.
 
 ## `expose_as_dspy_tool` + `import_dspy_tool` five-line example
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_dspy_tool, import_dspy_tool
 
-@skill
+@tool
 def lookup_word(word: str) -> str:
     """Look up a word."""
     return word
@@ -213,15 +212,15 @@ dspy_tool = expose_as_dspy_tool(lookup_word)  # hand to a DSPy Module / ChainOfT
 | `"boolean"` | `bool` |
 | other | `str` (fallback) |
 
-Complex generics (`list[str]`, `Optional[X]`, unions) all currently fall back to `str` / `"string"`. If your Skill genuinely needs compound input, spell it out in the docstring.
+Complex generics (`list[str]`, `Optional[X]`, unions) all currently fall back to `str` / `"string"`. If your Tool genuinely needs compound input, spell it out in the docstring.
 
 ## `expose_as_hf_tool` five-line example
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_hf_tool
 
-@skill
+@tool
 def translate(text: str, target: str) -> str:
     """Translate text into target language."""
     return text
@@ -229,17 +228,17 @@ def translate(text: str, target: str) -> str:
 hf_tool = expose_as_hf_tool(translate)  # feed to smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**smolagents, not transformers.** `transformers.Tool` was removed in transformers 4.53, so `cantus-agent[huggingface]` now installs [`smolagents`](https://github.com/huggingface/smolagents) (HuggingFace's successor package for agents) and `expose_as_hf_tool` returns a `smolagents.Tool` instance: a dynamically created subclass whose `forward` names each Skill argument explicitly and whose `output_type` is `"any"`. JSON Schema types outside `string / integer / number / boolean / array / object` are exported as `any`. **Known limitation:** the exported tool has no source code, so `tool.to_dict()`, `tool.save()` and `tool.push_to_hub()` raise; `CodeAgent` / `ToolCallingAgent` `run()` paths do not need them.
+**smolagents, not transformers.** `transformers.Tool` was removed in transformers 4.53, so `cantus-agent[huggingface]` now installs [`smolagents`](https://github.com/huggingface/smolagents) (HuggingFace's successor package for agents) and `expose_as_hf_tool` returns a `smolagents.Tool` instance: a dynamically created subclass whose `forward` names each Tool argument explicitly and whose `output_type` is `"any"`. JSON Schema types outside `string / integer / number / boolean / array / object` are exported as `any`. **Known limitation:** the exported tool has no source code, so `tool.to_dict()`, `tool.save()` and `tool.push_to_hub()` raise; `CodeAgent` / `ToolCallingAgent` `run()` paths do not need them.
 
-**HF import direction deferred to v0.3.4** (v0.3.3-era note, written against the transformers interface): a HuggingFace `Tool` leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Skill for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
+**HF import direction deferred to v0.3.4** (v0.3.3-era note, written against the transformers interface): a HuggingFace `Tool` leans toward a stateless callable plus a JSON schema dict, with no execution unit equivalent to a LangChain `BaseTool`. The common case is cantus → HF (exporting a Tool for an `HfAgent` to call), so the reverse import was left for the v0.3.4 batch3 evaluation.
 
 ## `expose_as_openhands_action` five-line example
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_openhands_action
 
-@skill
+@tool
 def run_lint(path: str) -> str:
     """Run lint on path."""
     return f"linted {path}"
@@ -249,20 +248,20 @@ oh_action = expose_as_openhands_action(run_lint)  # dispatched on the OpenHands 
 
 **OpenHands action subclass note**: `expose_as_openhands_action` returns a generic `openhands.events.Action` base instance. If your host code requires a specific subclass (`CmdRunAction`, `IPythonRunCellAction`, `FileEditAction`), cast it manually in your dispatch layer. cantus does not try to cover every subclass, which keeps it from getting glued to the internal API of OpenHands 1.16.x.
 
-## `_RemoteSkillBase` shared design (for batch3 authors)
+## `_RemoteToolBase` shared design (for adapter authors)
 
-v0.3.3 lifts the three core patterns of the v0.3.2 `mcp_client._RemoteSkill` into a private shared base, `cantus.adapters._remote_skill._RemoteSkillBase`:
+The three core patterns of a remote tool live in a private shared base, `cantus.adapters._remote_tool._RemoteToolBase`:
 
-1. **Bypass the signature introspection in `Skill.__init__`** — the remote framework's schema is authoritative, so cantus should not reflect over `run()`.
+1. **Bypass the signature introspection in `Tool.__init__`** — the remote framework's schema is authoritative, so cantus should not reflect over `run()`.
 2. **`spec_for_llm()` returns `{"name", "description", "args_schema"}` directly** — `is_remote = True` does not leak into that dict.
 3. **`validate_args()` accepts a dict and dict-casts it** — trust the remote framework's schema to validate itself.
 
-To add a new `import_*` adapter in v0.3.4 batch3 (for example `import_hf_tool`, `import_openhands_action`, or `mcp_memory_server`), you only need:
+To add a new `import_*` adapter (for example `import_hf_tool`, `import_openhands_action`, or `mcp_memory_server`), you only need:
 
 ```python
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._remote_tool import _RemoteToolBase
 
-class _MyRemoteSkill(_RemoteSkillBase):
+class _MyRemoteTool(_RemoteToolBase):
     def __init__(self, *, tool):
         super().__init__(
             name=tool.name,
@@ -280,7 +279,7 @@ class _MyRemoteSkill(_RemoteSkillBase):
             ) from exc
 ```
 
-`_RemoteSkillBase` is framework-internal and not public (note the leading underscore in the module name), which honors the v0.3.2 "no `Adapter` ABC" intent.
+`_RemoteToolBase` is framework-internal and not public (note the leading underscore in the module name), which honors the v0.3.2 "no `Adapter` ABC" intent.
 
 
 <!-- merged: adapters-batch3 -->
@@ -291,8 +290,8 @@ class _MyRemoteSkill(_RemoteSkillBase):
 
 v0.3.3 batch2 shipped six cross-framework callables at once, but HuggingFace and OpenHands each had only the export direction, marked in the spec as "deferred to v0.3.4 batch3 evaluation." v0.3.4 cleans up that deferral:
 
-- **HuggingFace** import direction is **done**: the new `import_hf_tool(tool) -> Skill` aligns with the existing `_RemoteSkillBase` plus lazy SDK gate pattern from v0.3.2 / v0.3.3.
-- **OpenHands** import direction is **permanently dropped** (the spec wording changes from deferred to not applicable): `openhands.events.Action` is a declarative event record that the host runtime dispatches; it has no `__call__`, so cantus `Skill.run(**kwargs)` has no callable to delegate to. Wrapping an Action as a Skill would mean re-implementing the OpenHands runtime inside cantus, which falls outside the scope of an adapter.
+- **HuggingFace** import direction is **done**: the new `import_hf_tool(tool) -> Tool` aligns with the existing `_RemoteToolBase` plus lazy SDK gate pattern from v0.3.2 / v0.3.3.
+- **OpenHands** import direction is **permanently dropped** (the spec wording changes from deferred to not applicable): `openhands.events.Action` is a declarative event record that the host runtime dispatches; it has no `__call__`, so cantus `Tool.run(**kwargs)` has no callable to delegate to. Wrapping an Action as a Tool would mean re-implementing the OpenHands runtime inside cantus, which falls outside the scope of an adapter.
 
 After the v0.3.4 close-out, the cross-framework bidirectional matrix for `cantus.adapters` stands at:
 
@@ -312,11 +311,11 @@ Aligned with `import_langchain_tool` / `import_dspy_tool`:
 ```python
 from cantus.adapters import import_hf_tool
 
-skill = import_hf_tool(hf_tool)
-result = skill(q="cantus")  # equivalent to calling hf_tool(q="cantus")
+imported = import_hf_tool(hf_tool)
+result = imported(q="cantus")  # equivalent to calling hf_tool(q="cantus")
 ```
 
-The returned `Skill` is a `_HuggingFaceRemoteSkill(_RemoteSkillBase)` instance. It follows the v0.3.0 three-key `spec_for_llm()` shape; `is_remote = True`, but that does not leak into the `spec_for_llm()` output.
+The returned `Tool` is a `_HuggingFaceRemoteTool(_RemoteToolBase)` instance. It follows the v0.3.0 three-key `spec_for_llm()` shape; `is_remote = True`, but that does not leak into the `spec_for_llm()` output.
 
 ### Schema extraction rule
 
@@ -344,7 +343,7 @@ Build the v0.3.0 JSON Schema dict directly, without routing through an intermedi
 
 ### Dispatch and error wrapping
 
-`_HuggingFaceRemoteSkill.run(**kwargs)` calls `self._tool(**kwargs)` directly (a HF Tool is callable). When the underlying call raises, it is wrapped as `RuntimeError("huggingface_remote_error: ...")`, which the cantus Agent dispatcher then turns into a `ToolErrorObservation` (reusing the "cantus.adapters error naming convention" Requirement from the v0.3.2 `agent-protocols`).
+`_HuggingFaceRemoteTool.run(**kwargs)` calls `self._tool(**kwargs)` directly (a HF Tool is callable). When the underlying call raises, it is wrapped as `RuntimeError("huggingface_remote_error: ...")`, which the cantus Agent dispatcher then turns into a `ToolErrorObservation` (reusing the "cantus.adapters error naming convention" Requirement from the v0.3.2 `agent-protocols`).
 
 A handshake failure (`inputs` is not a dict, or an entry is not dict-shaped) raises `RuntimeError("huggingface_handshake_failed: ...")`; a type mismatch raises `TypeError("import_hf_tool expects smolagents.Tool")`. Both align with the batch2 naming convention.
 
@@ -352,17 +351,17 @@ A handshake failure (`inputs` is not a dict, or an entry is not dict-shaped) rai
 
 | Observation | Consequence |
 | --- | --- |
-| `openhands.events.Action` has no `__call__` | `Skill.run(**kwargs)` has no execution body to delegate to |
+| `openhands.events.Action` has no `__call__` | `Tool.run(**kwargs)` has no execution body to delegate to |
 | Action subclasses (`CmdRunAction`, `IPythonRunCellAction`, ...) are dispatched by the host-side runtime | for cantus to call an Action, it would have to re-implement the OpenHands runtime |
 | The OpenHands runtime and the cantus Agent are two independent dispatchers | the two notions of "executing an Action" do not align |
 | The adapter layer is defined in the v0.3.2 spec as "pure conversion utilities" | re-implementing a runtime is not an adapter's job |
 
-If you genuinely want to feed a cantus Skill into the OpenHands runtime, go through the export direction:
+If you genuinely want to feed a cantus Tool into the OpenHands runtime, go through the export direction:
 
 ```python
 from cantus.adapters import expose_as_openhands_action
 
-action = expose_as_openhands_action(my_cantus_skill)
+action = expose_as_openhands_action(my_cantus_tool)
 # Register action in the OpenHands AgentController's Action repo; the OpenHands runtime dispatches it
 ```
 

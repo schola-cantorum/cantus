@@ -1,16 +1,16 @@
-# `Soul` 身份 Protocol
+# `Soul` 身分 Protocol
 
 ## 這是什麼、什麼時候用
 
-從 v0.3.1 開始，cantus 用 `cantus.identity.Soul` 來描述一個 agent 的「身份」：這是一份從 `SOUL.md` 檔案載入的六區塊紀錄。六個區塊分別是 name and role（名稱與角色）、personality（個性）、rules（規則）、tools（工具）、output format（輸出格式）以及 handoffs（交接）。你把解析好的 `Soul` 丟給 `Agent(soul=...)`，cantus 就會幫你把它接在 system prompt 的最前面。
+從 v0.3.1 開始，cantus 用 `cantus.identity.Soul` 來描述一個 agent 的「身分」：這是一份從 `SOUL.md` 檔案載入的六區塊紀錄。六個區塊分別是 name and role（名稱與角色）、personality（個性）、rules（規則）、tools（工具）、output format（輸出格式）以及 handoffs（交接）。你把解析好的 `Soul` 丟給 `Agent(soul=...)`，cantus 就會幫你把它接在 system prompt 的最前面。
 
 它和框架裡另外兩個教學用的抽象並排存在：
 
 | 抽象 | 角色 |
 | --- | --- |
-| `Skill` | 能力——這個 agent 能做什麼 |
+| `Tool` | 能力——這個 agent 能做什麼 |
 | `Memory` | 記憶——這個 agent 記得過什麼 |
-| `Soul` | 身份——這個 agent 是誰 |
+| `Soul` | 身分——這個 agent 是誰 |
 
 ## 六區塊的 `SOUL.md` 格式
 
@@ -79,10 +79,10 @@ except SoulParseError as exc:
 `Agent.__init__` 收一個 keyword-only 的參數 `soul: Soul | None = None`。注入的順序是：
 
 ```
-<soul.to_system_prompt()>\n\n<v0.3.0 baseline system prompt>
+<soul.to_system_prompt()>\n\n<the system prompt cantus builds>
 ```
 
-換句話說，`soul.to_system_prompt()` 這個字串擺在最前面，後面接兩個換行，再接上原本 v0.3.0 的 system prompt。當 `soul=None`（也就是預設值）時，system prompt 會跟 v0.3.0 **byte-identical**（逐 byte 完全相同），所以既有的 agent 行為完全不會被動到。
+換句話說，`soul.to_system_prompt()` 這個字串擺在最前面，後面接兩個換行，再接上 cantus 本來就會建出的 system prompt。當 `soul=None`（也就是預設值）時，cantus 什麼都不加，所以 system prompt 就是不帶 soul 時建出來的那一份。
 
 ```python
 from cantus import Agent
@@ -94,7 +94,7 @@ agent = Agent(model=m, soul=soul)
 # 都會把 soul 內容當成 system-prompt 前綴帶進去。
 ```
 
-`soul` **不會**被註冊成 `Skill`，也**不會**出現在 `registry.spec_for_llm()` 裡，所以 model 看到的工具清單不會被 `SOUL.md` 的內容污染。
+`soul` **不是** `Tool`，也**不會**出現在 `registry.spec_for_llm()` 裡，所以 model 看到的工具清單不會被 `SOUL.md` 的內容污染。
 
 ## Override pattern：自己把 system prompt 組起來
 

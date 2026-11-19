@@ -2,19 +2,19 @@
 
 ## 套件總覽
 
-`cantus.adapters` 是 v0.3.2 引入的 bridge 層。它的工作很單純：把 cantus 的 Skill 和 Memory 物件「翻譯」給業界既有的 agent 生態（MCP、Anthropic Memory tool）看得懂，也反過來把外部的 tool 拉進 cantus 來用。這一節先講 v0.3.2 加入的三個 callable；跨框架的 adapter（LangChain、DSPy、HuggingFace smolagents、OpenHands）在下面的 batch2 與 batch3a 兩節。
+`cantus.adapters` 是 v0.3.2 引入的 bridge 層。它的工作很單純：把 cantus 的 Tool 和 Memory 物件「翻譯」給業界既有的 agent 生態（MCP、Anthropic Memory tool）看得懂，也反過來把外部的 tool 拉進 cantus 來用。這一節先講 v0.3.2 加入的三個 callable；跨框架的 adapter（LangChain、DSPy、HuggingFace smolagents、OpenHands）在下面的 batch2 與 batch3a 兩節。
 
 | 函式 | 方向 | 依賴 |
 | --- | --- | --- |
 | `expose_as_anthropic_memory_tool(memory)` | cantus → Anthropic API | core install（不需外部 SDK） |
-| `export_as_mcp_server(skills, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
+| `export_as_mcp_server(tools, *, name, version)` | cantus → MCP server | `pip install cantus-agent[mcp]` |
 | `import_mcp_server(*, transport, command_or_url)` | MCP server → cantus | `pip install cantus-agent[mcp]` |
 
 設計原則：
 
-- **純包裝層** —— adapter **不會**改動 Skill 或 Memory 的 runtime 行為，它只負責翻譯 schema。
-- **不引入新的 protocol kind** —— `Registry.KINDS` 維持 `("skill",)` 不變。
-- **`Skill.spec_for_llm()` 的形狀不變** —— 任何 schema 轉換都發生在 adapter 這一側，所以既有的 v0.3.0 contract 仍然全部通過。
+- **純包裝層** —— adapter **不會**改動 Tool 或 Memory 的 runtime 行為，它只負責翻譯 schema。
+- **不引入新的 protocol kind** —— `Registry.KINDS` 維持 `("tool",)` 不變。
+- **`Tool.spec_for_llm()` 的形狀不變** —— 任何 schema 轉換都發生在 adapter 這一側，所以既有的 v0.3.0 contract 仍然全部通過。
 
 ## `expose_as_anthropic_memory_tool` 五行範例
 
@@ -34,15 +34,15 @@ resp = anthropic.Anthropic().messages.create(
 )
 ```
 
-**LLM 自主 CRUD 的 foot-gun 警告（沿用 v0.3.1 AutoMemory Trap-10）**：在這個 tool_use 迴圈裡，Claude 對 cantus Memory 有完整的 CRUD 權限——它可以對任何一筆記錄做 `view`、`create`、`str_replace` 或 `delete`。在你把東西推上正式環境之前，請先在 host code 的 dispatch 層（也就是你收到 `tool_use`、再 dispatch 回 `memory.recall` / `memory.remember` 的那一段）加上過濾，或是在底層的 Skill 用 `@skill(post_hook=...)` 把關。細節請看 `docs/protocols/memory.md` 裡的「`AutoMemory`：LLM 自主 CRUD 與正式環境警告」一節。
+**LLM 自主 CRUD 的 foot-gun 警告（沿用 v0.3.1 AutoMemory Trap-10）**：在這個 tool_use 迴圈裡，Claude 對 cantus Memory 有完整的 CRUD 權限——它可以對任何一筆記錄做 `view`、`create`、`str_replace` 或 `delete`。在你把東西推上正式環境之前，請先在 host code 的 dispatch 層（也就是你收到 `tool_use`、再 dispatch 回 `memory.recall` / `memory.remember` 的那一段）加上過濾。在這條路徑上，Claude 的 `tool_use` 是交給你的 host code，不會經過 cantus 的 dispatcher，所以 cantus 的 hook 不會執行：過濾要做在那個 dispatch 層。細節請看 `docs/protocols/memory.md` 裡的「`AutoMemory`：LLM 自主 CRUD 與正式環境警告」一節。
 
 ## `export_as_mcp_server` 五行範例（stdio）
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import export_as_mcp_server
 
-@skill
+@tool
 def search_book(title: str) -> str:
     """Search the library catalog by title."""
     return f"found: {title}"
@@ -76,27 +76,26 @@ t.start()
 ## `import_mcp_server` 五行範例（stdio）
 
 ```python
-from cantus import Agent, get_registry
+from cantus import Agent
 from cantus.adapters import import_mcp_server
 
-skills = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
-for s in skills:
-    get_registry().register("skill", s)  # 讓 Agent 看得到這些遠端 tool
+remote_tools = import_mcp_server(transport="stdio", command_or_url="echo-mcp-server")
+agent = Agent(model, tools=remote_tools)  # agent 看到的就是這些遠端 tool，不多不少
 ```
 
 ### 信任邊界（重要）
 
-在 stdio transport 之下，`command_or_url` 會被當成**子程序**啟動。cantus 會拒絕含有 shell metacharacter（`|` `>` `<` `&` `;` `$`、反引號、換行、carriage return）的輸入，再把指令字串交給 mcp SDK，由 SDK 啟動子程序。但這只能擋住不小心造成的注入；**千萬不要餵給它一個來路不明的 `command_or_url`**——這麼做等於授權它執行任意程式。
+在 stdio transport 之下，`command_or_url` 會被當成**子行程**啟動。cantus 會拒絕含有 shell metacharacter（`|` `>` `<` `&` `;` `$`、反引號、換行、carriage return）的輸入，再把指令字串交給 mcp SDK，由 SDK 啟動子行程。但這只能擋住不小心造成的注入；**千萬不要餵給它一個來路不明的 `command_or_url`**——這麼做等於授權它執行任意程式。
 
 `http` transport 則是用 `urllib.parse.urlparse` 檢查 scheme 屬於 `{"http", "https"}`、netloc 不為空；其他 scheme（`file://`、`ftp://`、`javascript:`）一律拒絕。但它**不會**驗證遠端 server 內容是否可信——server 回傳什麼 schema，cantus 就照單全包。正式環境請對 `command_or_url` 的來源做白名單管控。
 
 ## Schema 相容性（audit Trap-7 fix）
 
-cantus 的 `Skill.spec_for_llm()["args_schema"]` 是 Pydantic 產生的 JSON Schema，所以它可能帶有 Pydantic 特有的鍵（`title`、`additionalProperties: false`、`examples`）。`export_as_mcp_server` 和 `expose_as_anthropic_memory_tool` 兩者都**不做轉換**，直接把這份 schema 分別塞進 MCP 的 `inputSchema` 與 Anthropic 的 `args_schema`。
+cantus 的 `Tool.spec_for_llm()["args_schema"]` 是 Pydantic 產生的 JSON Schema，所以它可能帶有 Pydantic 特有的鍵（`title`、`additionalProperties: false`、`examples`）。`export_as_mcp_server` 和 `expose_as_anthropic_memory_tool` 兩者都**不做轉換**，直接把這份 schema 分別塞進 MCP 的 `inputSchema` 與 Anthropic 的 `args_schema`。
 
 學生需要知道這會帶來什麼後果：
 
-- 如果你在 Skill 裡設了 `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")`，產生的 schema 就會帶 `additionalProperties: false`。MCP SDK 和 Claude API 兩邊都接受這個鍵，但有些比較嚴格的 client 會驗證整份 schema，遇到不認識的欄位就拒絕。真的踩到這個的話，把它改回 `extra="ignore"`（Pydantic 預設）即可。
+- 如果你在 Tool 裡設了 `pydantic.BaseModel.model_config = ConfigDict(extra="forbid")`，產生的 schema 就會帶 `additionalProperties: false`。MCP SDK 和 Claude API 兩邊都接受這個鍵，但有些比較嚴格的 client 會驗證整份 schema，遇到不認識的欄位就拒絕。真的踩到這個的話，把它改回 `extra="ignore"`（Pydantic 預設）即可。
 - `title` 這個欄位是 Pydantic 預設加進去的 metadata。它不會弄壞下游，但顯示出來的名字可能是自動產生的（類似 `SearchBookArgs`）。如果你看不順眼，在 model 裡用 `model_config = ConfigDict(title="...")` 蓋掉它。
 
 cantus framework **不會**對 schema 做 normalization（normalization 跟「原封不動帶過去」這個決定互相衝突），所以這條相容性的責任落在學生這一側，是顯式的。
@@ -134,7 +133,7 @@ cantus v0.3.1 的 audit 早就標出這條 trap。由於 v0.3.2 的 adapter 沒�
 import re
 
 try:
-    skills = import_mcp_server(transport="stdio", command_or_url="bad-server")
+    remote_tools = import_mcp_server(transport="stdio", command_or_url="bad-server")
 except RuntimeError as exc:
     if "mcp_handshake_failed" in str(exc):
         print("無法連上 MCP server，請檢查指令是否正確")
@@ -161,22 +160,22 @@ LangChain、DSPy、HuggingFace（`smolagents`）與 OpenHands 的 adapter 都已
 
 | 函式 | 方向 | 依賴 |
 | --- | --- | --- |
-| `expose_as_langchain_tool(skill)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
+| `expose_as_langchain_tool(tool)` | cantus → LangChain | `pip install cantus-agent[langchain]` |
 | `import_langchain_tool(tool)` | LangChain → cantus | `pip install cantus-agent[langchain]` |
-| `expose_as_dspy_tool(skill)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
+| `expose_as_dspy_tool(tool)` | cantus → DSPy | `pip install cantus-agent[dspy]` |
 | `import_dspy_tool(tool)` | DSPy → cantus | `pip install cantus-agent[dspy]` |
-| `expose_as_hf_tool(skill)` | cantus → HuggingFace `smolagents.Tool`（v0.3.3 僅 export；v0.3.4 補上 import） | `pip install cantus-agent[huggingface]` |
-| `expose_as_openhands_action(skill)` | cantus → OpenHands（僅 export） | `pip install cantus-agent[openhands]`（僅 Python 3.12） |
+| `expose_as_hf_tool(tool)` | cantus → HuggingFace `smolagents.Tool`（v0.3.3 僅 export；v0.3.4 補上 import） | `pip install cantus-agent[huggingface]` |
+| `expose_as_openhands_action(tool)` | cantus → OpenHands（僅 export） | `pip install cantus-agent[openhands]`（僅 Python 3.12） |
 
-設計原則延續 v0.3.2 的 `adapters.md`：純包裝層、`Skill.spec_for_llm()` 形狀不變、`Registry.KINDS` 不變、不引入 `Adapter` ABC。錯誤命名沿用 `<framework>_handshake_failed` / `<framework>_remote_error` 的慣例。
+設計原則延續 v0.3.2 的 `adapters.md`：純包裝層、`Tool.spec_for_llm()` 形狀不變、`Registry.KINDS` 不變、不引入 `Adapter` ABC。錯誤命名沿用 `<framework>_handshake_failed` / `<framework>_remote_error` 的慣例。
 
 ## `expose_as_langchain_tool` + `import_langchain_tool` 五行範例
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_langchain_tool, import_langchain_tool
 
-@skill
+@tool
 def search_book(title: str) -> str:
     """Search the catalog by exact title."""
     return f"hit:{title}"
@@ -186,15 +185,15 @@ lc_tool = expose_as_langchain_tool(search_book)  # 交給任何 LangChain agent
 # back_to_cantus = import_langchain_tool(lc_tool)
 ```
 
-**Schema 轉換說明**：`expose_*` 會從 `skill.spec_for_llm()["args_schema"]` 動態建出一個 Pydantic v2 model，餵給 LangChain 的 `args_schema`。`import_*` 則走反方向，直接呼叫 `tool.args_schema.model_json_schema()`（需要 Pydantic v2）。如果 `args_schema is None`，就退回一個空的 JSON Schema。
+**Schema 轉換說明**：`expose_*` 會從 tool 的 `spec_for_llm()["args_schema"]` 動態建出一個 Pydantic v2 model，餵給 LangChain 的 `args_schema`。`import_*` 則走反方向，直接呼叫 `tool.args_schema.model_json_schema()`（需要 Pydantic v2）。如果 `args_schema is None`，就退回一個空的 JSON Schema。
 
 ## `expose_as_dspy_tool` + `import_dspy_tool` 五行範例
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_dspy_tool, import_dspy_tool
 
-@skill
+@tool
 def lookup_word(word: str) -> str:
     """Look up a word."""
     return word
@@ -213,15 +212,15 @@ dspy_tool = expose_as_dspy_tool(lookup_word)  # 交給 DSPy Module / ChainOfThou
 | `"boolean"` | `bool` |
 | 其他 | `str`（fallback） |
 
-複雜的泛型（`list[str]`、`Optional[X]`、union）目前一律 fallback 成 `str` / `"string"`。如果你的 Skill 真的需要複合輸入，請在 docstring 裡把它講清楚。
+複雜的泛型（`list[str]`、`Optional[X]`、union）目前一律 fallback 成 `str` / `"string"`。如果你的 Tool 真的需要複合輸入，請在 docstring 裡把它講清楚。
 
 ## `expose_as_hf_tool` 五行範例
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_hf_tool
 
-@skill
+@tool
 def translate(text: str, target: str) -> str:
     """Translate text into target language."""
     return text
@@ -229,17 +228,17 @@ def translate(text: str, target: str) -> str:
 hf_tool = expose_as_hf_tool(translate)  # 餵給 smolagents.CodeAgent(tools=[hf_tool], model=...)
 ```
 
-**是 smolagents，不是 transformers。** `transformers.Tool` 在 transformers 4.53 已被移除，所以 `cantus-agent[huggingface]` 現在安裝的是 [`smolagents`](https://github.com/huggingface/smolagents)（HuggingFace 官方接手 agents 的套件），`expose_as_hf_tool` 回傳的是 `smolagents.Tool` 實例：一個動態建立的子類，`forward` 逐一具名列出 Skill 的每個參數，`output_type` 固定為 `"any"`。JSON Schema 型別不在 `string / integer / number / boolean / array / object` 之內的一律匯出成 `any`。**已知限制：**匯出的工具沒有原始碼，所以 `tool.to_dict()`、`tool.save()`、`tool.push_to_hub()` 會拋例外；`CodeAgent`／`ToolCallingAgent` 的 `run()` 路徑用不到它們。
+**是 smolagents，不是 transformers。** `transformers.Tool` 在 transformers 4.53 已被移除，所以 `cantus-agent[huggingface]` 現在安裝的是 [`smolagents`](https://github.com/huggingface/smolagents)（HuggingFace 官方接手 agents 的套件），`expose_as_hf_tool` 回傳的是 `smolagents.Tool` 實例：一個動態建立的子類，`forward` 逐一具名列出 Tool 的每個參數，`output_type` 固定為 `"any"`。JSON Schema 型別不在 `string / integer / number / boolean / array / object` 之內的一律匯出成 `any`。**已知限制：**匯出的工具沒有原始碼，所以 `tool.to_dict()`、`tool.save()`、`tool.push_to_hub()` 會拋例外；`CodeAgent`／`ToolCallingAgent` 的 `run()` 路徑用不到它們。
 
-**HF 的 import 方向延到 v0.3.4**（v0.3.3 時期的說明，當時對準的是 transformers 介面）：在 transformers 介面裡，一個 HuggingFace `Tool` 比較偏向「一個 stateless callable 加一份 JSON schema dict」，並沒有對等於 LangChain `BaseTool` 的執行單元。常見的情境是 cantus → HF（把一個 Skill export 出去給 `HfAgent` 呼叫），所以反向的 import 就留給 v0.3.4 batch3 評估時再說。
+**HF 的 import 方向延到 v0.3.4**（v0.3.3 時期的說明，當時對準的是 transformers 介面）：在 transformers 介面裡，一個 HuggingFace `Tool` 比較偏向「一個 stateless callable 加一份 JSON schema dict」，並沒有對等於 LangChain `BaseTool` 的執行單元。常見的情境是 cantus → HF（把一個 Tool export 出去給 `HfAgent` 呼叫），所以反向的 import 就留給 v0.3.4 batch3 評估時再說。
 
 ## `expose_as_openhands_action` 五行範例
 
 ```python
-from cantus import skill
+from cantus import tool
 from cantus.adapters import expose_as_openhands_action
 
-@skill
+@tool
 def run_lint(path: str) -> str:
     """Run lint on path."""
     return f"linted {path}"
@@ -249,20 +248,20 @@ oh_action = expose_as_openhands_action(run_lint)  # 在 OpenHands runtime 端 di
 
 **OpenHands action 子類別說明**：`expose_as_openhands_action` 回傳的是一個通用的 `openhands.events.Action` base 實例。如果你的 host code 需要某個特定子類別（`CmdRunAction`、`IPythonRunCellAction`、`FileEditAction`），請在你自己的 dispatch 層手動 cast。cantus 不打算涵蓋每一個子類別，這樣才不會被黏死在 OpenHands 1.16.x 的內部 API 上。
 
-## `_RemoteSkillBase` 共用設計（給 batch3 作者）
+## `_RemoteToolBase` 共用設計（給 adapter 作者）
 
-v0.3.3 把 v0.3.2 `mcp_client._RemoteSkill` 的三個核心模式，提升成一個私有的共用基底 `cantus.adapters._remote_skill._RemoteSkillBase`：
+遠端 tool 的三個核心模式放在一個私有的共用基底 `cantus.adapters._remote_tool._RemoteToolBase` 裡：
 
-1. **繞過 `Skill.__init__` 的 signature introspection** —— 遠端框架的 schema 才是權威，所以 cantus 不應該對 `run()` 做反射。
+1. **繞過 `Tool.__init__` 的 signature introspection** —— 遠端框架的 schema 才是權威，所以 cantus 不應該對 `run()` 做反射。
 2. **`spec_for_llm()` 直接回傳 `{"name", "description", "args_schema"}`** —— `is_remote = True` 不會洩漏進這個 dict。
 3. **`validate_args()` 收一個 dict 就直接 dict-cast** —— 相信遠端框架的 schema 自己會驗。
 
-要在 v0.3.4 batch3 新增一個 `import_*` adapter（例如 `import_hf_tool`、`import_openhands_action` 或 `mcp_memory_server`），你只需要：
+要新增一個 `import_*` adapter（例如 `import_hf_tool`、`import_openhands_action` 或 `mcp_memory_server`），你只需要：
 
 ```python
-from cantus.adapters._remote_skill import _RemoteSkillBase
+from cantus.adapters._remote_tool import _RemoteToolBase
 
-class _MyRemoteSkill(_RemoteSkillBase):
+class _MyRemoteTool(_RemoteToolBase):
     def __init__(self, *, tool):
         super().__init__(
             name=tool.name,
@@ -280,7 +279,7 @@ class _MyRemoteSkill(_RemoteSkillBase):
             ) from exc
 ```
 
-`_RemoteSkillBase` 是 framework 內部、不對外公開的（注意模組名稱前面那條底線），這呼應了 v0.3.2 「不引入 `Adapter` ABC」的初衷。
+`_RemoteToolBase` 是 framework 內部、不對外公開的（注意模組名稱前面那條底線），這呼應了 v0.3.2 「不引入 `Adapter` ABC」的初衷。
 
 
 <!-- merged: adapters-batch3 -->
@@ -291,8 +290,8 @@ class _MyRemoteSkill(_RemoteSkillBase):
 
 v0.3.3 batch2 一次出貨了六個跨框架 callable，但 HuggingFace 和 OpenHands 都只有 export 方向，spec 裡標記為「deferred to v0.3.4 batch3 evaluation」。v0.3.4 把這個 deferred 收乾淨：
 
-- **HuggingFace** 的 import 方向**完成了**：新增的 `import_hf_tool(tool) -> Skill` 對齊了 v0.3.2 / v0.3.3 既有的 `_RemoteSkillBase` 加上 lazy SDK gate 模式。
-- **OpenHands** 的 import 方向**永久放棄**（spec 措辭從 deferred 改成 not applicable）：`openhands.events.Action` 是一筆 declarative 的 event record，由 host runtime 來 dispatch；它本身沒有 `__call__`，所以 cantus 的 `Skill.run(**kwargs)` 根本找不到可以委派的 callable。把一個 Action 包成 Skill，等於要在 cantus 內部 re-implement 整套 OpenHands runtime，那已經超出 adapter 的範疇了。
+- **HuggingFace** 的 import 方向**完成了**：新增的 `import_hf_tool(tool) -> Tool` 對齊了 v0.3.2 / v0.3.3 既有的 `_RemoteToolBase` 加上 lazy SDK gate 模式。
+- **OpenHands** 的 import 方向**永久放棄**（spec 措辭從 deferred 改成 not applicable）：`openhands.events.Action` 是一筆 declarative 的 event record，由 host runtime 來 dispatch；它本身沒有 `__call__`，所以 cantus 的 `Tool.run(**kwargs)` 根本找不到可以委派的 callable。把一個 Action 包成 Tool，等於要在 cantus 內部 re-implement 整套 OpenHands runtime，那已經超出 adapter 的範疇了。
 
 v0.3.4 收完之後，`cantus.adapters` 的跨框架雙向矩陣長這樣：
 
@@ -312,11 +311,11 @@ v0.3.4 收完之後，`cantus.adapters` 的跨框架雙向矩陣長這樣：
 ```python
 from cantus.adapters import import_hf_tool
 
-skill = import_hf_tool(hf_tool)
-result = skill(q="cantus")  # 等價於呼叫 hf_tool(q="cantus")
+imported = import_hf_tool(hf_tool)
+result = imported(q="cantus")  # 等價於呼叫 hf_tool(q="cantus")
 ```
 
-回傳的 `Skill` 是一個 `_HuggingFaceRemoteSkill(_RemoteSkillBase)` 實例。它遵守 v0.3.0 那套三鍵的 `spec_for_llm()` 形狀；`is_remote = True`，但這個值不會洩漏到 `spec_for_llm()` 的輸出裡。
+回傳的 `Tool` 是一個 `_HuggingFaceRemoteTool(_RemoteToolBase)` 實例。它遵守 v0.3.0 那套三鍵的 `spec_for_llm()` 形狀；`is_remote = True`，但這個值不會洩漏到 `spec_for_llm()` 的輸出裡。
 
 ### schema 抽取規則
 
@@ -344,7 +343,7 @@ hf_tool.inputs = {
 
 ### dispatch 與錯誤包裝
 
-`_HuggingFaceRemoteSkill.run(**kwargs)` 直接呼叫 `self._tool(**kwargs)`（HF Tool 本身是 callable）。當底層的呼叫丟出例外時，它會被包成 `RuntimeError("huggingface_remote_error: ...")`，接著由 cantus Agent dispatcher 轉成 `ToolErrorObservation`（沿用 v0.3.2 `agent-protocols` 裡那條「cantus.adapters error naming convention」Requirement）。
+`_HuggingFaceRemoteTool.run(**kwargs)` 直接呼叫 `self._tool(**kwargs)`（HF Tool 本身是 callable）。當底層的呼叫丟出例外時，它會被包成 `RuntimeError("huggingface_remote_error: ...")`，接著由 cantus Agent dispatcher 轉成 `ToolErrorObservation`（沿用 v0.3.2 `agent-protocols` 裡那條「cantus.adapters error naming convention」Requirement）。
 
 handshake 失敗（`inputs` 不是 dict，或某個 entry 不是 dict 形狀）會丟 `RuntimeError("huggingface_handshake_failed: ...")`；型別不符則丟 `TypeError("import_hf_tool expects smolagents.Tool")`。兩者都對齊 batch2 的命名慣例。
 
@@ -352,17 +351,17 @@ handshake 失敗（`inputs` 不是 dict，或某個 entry 不是 dict 形狀）�
 
 | 觀察 | 後果 |
 | --- | --- |
-| `openhands.events.Action` 沒有 `__call__` | `Skill.run(**kwargs)` 沒有可委派的執行體 |
-| Action 子類別（`CmdRunAction`、`IPythonRunCellAction`⋯⋯）是 host 端 runtime 的 dispatch 對象 | cantus 想呼叫一個 Action，就得 re-implement 整套 OpenHands runtime |
+| `openhands.events.Action` 沒有 `__call__` | `Tool.run(**kwargs)` 沒有可委派的執行體 |
+| Action 子類別（`CmdRunAction`、`IPythonRunCellAction`⋯⋯）是 host 端 runtime 的 dispatch 物件 | cantus 想呼叫一個 Action，就得 re-implement 整套 OpenHands runtime |
 | OpenHands runtime 和 cantus Agent 是兩個獨立的 dispatcher | 兩邊對「執行一個 Action」的理解並不對齊 |
 | adapter 層在 v0.3.2 spec 裡被定義為「pure conversion utilities」 | re-implement 一套 runtime 不是 adapter 該做的事 |
 
-如果你真的想把一個 cantus Skill 餵給 OpenHands runtime，請走 export 方向：
+如果你真的想把一個 cantus Tool 餵給 OpenHands runtime，請走 export 方向：
 
 ```python
 from cantus.adapters import expose_as_openhands_action
 
-action = expose_as_openhands_action(my_cantus_skill)
+action = expose_as_openhands_action(my_cantus_tool)
 # 把 action 註冊到 OpenHands AgentController 的 Action repo，由 OpenHands runtime 來 dispatch
 ```
 
