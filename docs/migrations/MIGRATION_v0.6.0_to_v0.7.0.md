@@ -1131,25 +1131,34 @@ column header is `tool`, and the footer reads `2 Tools`. The table keeps the wid
 - `query_one("SkillsPane")`, the selector `#skills` and the action `show_tab('skills')` fail loudly;
 - a query by the class object, `query_one(SkillsPane)`, still works, with W14.
 
+The example below styles the pane with a type selector, then queries it by name. Run on v0.7.0,
+the before block prints `tools 100h` (the rule no longer applies) and then fails on the query.
+
 ```python before
 import asyncio
 
 from cantus.tui.app import CantusTUI
 
 
+class MyTUI(CantusTUI):
+    CSS = CantusTUI.CSS + "\nSkillsPane { max-height: 5; }\n"
+
+
 async def main():
-    app = CantusTUI()
+    app = MyTUI()
     async with app.run_test() as pilot:
         await pilot.press("2")
-        pane = app.query_one("SkillsPane")
-        print(type(pane).__name__, app.query_one("TabbedContent").active)
+        table = app.query_one("#skills-table")
+        print(app.query_one("TabbedContent").active, table.styles.max_height)
+        print(type(app.query_one("SkillsPane")).__name__)
 
 
 asyncio.run(main())
 ```
 
 ```text output
-SkillsPane skills
+skills 5
+SkillsPane
 ```
 
 ```python after
@@ -1158,19 +1167,25 @@ import asyncio
 from cantus.tui.app import CantusTUI
 
 
+class MyTUI(CantusTUI):
+    CSS = CantusTUI.CSS + "\nToolsPane { max-height: 5; }\n"
+
+
 async def main():
-    app = CantusTUI()
+    app = MyTUI()
     async with app.run_test() as pilot:
         await pilot.press("2")
-        pane = app.query_one("ToolsPane")
-        print(type(pane).__name__, app.query_one("TabbedContent").active)
+        table = app.query_one("#skills-table")
+        print(app.query_one("TabbedContent").active, table.styles.max_height)
+        print(type(app.query_one("ToolsPane")).__name__)
 
 
 asyncio.run(main())
 ```
 
 ```text output
-ToolsPane tools
+tools 5
+ToolsPane
 ```
 
 ### The reserved name `tools` and the new routes (X7)
