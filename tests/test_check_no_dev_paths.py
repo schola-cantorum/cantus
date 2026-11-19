@@ -105,7 +105,7 @@ def test_the_commit_sanitizer_examples_are_exempt(tmp_path: Path, runtime: str) 
         ("tw-emoji-pr-note", "sanitize_pr_note.py"),
         ("tw-emoji-release-note", "sanitize_release_note.py"),
     ):
-        _add(tmp_path, f"{runtime}/skills/{skill}/scripts/{script}", sample)
+        _add(tmp_path, "/".join((runtime, "skills", skill, "scripts", script)), sample)
     result = _run(tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
 

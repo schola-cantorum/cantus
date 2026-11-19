@@ -37,9 +37,9 @@ EN = _page(
     ```
 
     ```python
-    from cantus import skill
+    from cantus import tool
 
-    @skill
+    @tool
     def greet(name: str) -> str:
         \"\"\"Say hello.\"\"\"
         return f"hello {name}"  # a comment
@@ -65,9 +65,9 @@ ZH = _page(
     ```
 
     ```python
-    from cantus import skill
+    from cantus import tool
 
-    @skill
+    @tool
     def greet(name: str) -> str:
         \"\"\"打招呼。\"\"\"
         return f"hello {name}"  # 註解
