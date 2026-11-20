@@ -509,3 +509,52 @@ made async there, and the same silent skip can return before the permission seam
 **Revisit when.** The async-core epic reaches stage 1: decide what happens to an override of
 `_dispatch_tool` (and of `_dispatch_skill`, while the guard exists) when the loop is split, and
 update or replace the guard's message in the same change.
+
+---
+
+## OQ-014 — Should cantus ship a codemod that rewrites v0.6 code to the Tool API, and in what form?
+
+**Deferred on:** 2026-11-20
+**Status:** open
+
+**Reason.** Epic 1 gives users warnings and a migration guide, and nothing that edits their code.
+The user raised a codemod on 2026-11-20 and wants it considered before the async-core epic. It
+cannot be decided inside epic 1: T-0020 is the epic's last ticket and its evidence is frozen, and
+the form decides the pipeline. A `cantus migrate` subcommand is contract surface (Charter item 2)
+and needs a spec; a script or an agent prompt may fit the lightweight path (ADR-0012).
+
+**Evidence.**
+- Verified: the CLI has two subcommands, `serve` and `tui` (`cantus/cli.py:46`, `:115`). `scripts/`
+  holds no rewriting tool, and `docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md` gives before-and-after
+  code for a person to apply, with no command to run.
+- Verified: the only automated aid is the agent prompt in this epic's ludus migration document
+  (spec user story 14, AC-39), written for one repository.
+- Verified: the legacy names keep working in v0.7 with `CantusDeprecationWarning` (W1–W18); the
+  changes without an alias (the guide's "Changes without an alias" section, X1 onwards) give no
+  warning. ADR-0017 removes the aliases in the seventh epic, at least one release after epic 1.
+- Verified: the wheel is pure Python (`cantus_agent-0.6.0-py3-none-any.whl`, T-0020 stage 8).
+- Inferred, not measured: most of W1–W18 are identifier renames a syntax-tree rewrite can do;
+  W8, W10–W12 (a registry the user builds, `Agent(tools=...)`) and the X items need judgement
+  about the surrounding code, so a codemod can at best flag them.
+- Not verified: how much student and teacher code exists outside this repository and ludus.
+
+**Blocks.** Nothing yet. Choices still open:
+- Whether to build it at all, given the alias period and the guide.
+- Form: a `cantus migrate` subcommand; a standalone script; a rule file for an existing rewriting
+  tool; or a general agent prompt like the ludus one.
+- Scope: mechanical renames only, or also a report of the sites it cannot rewrite safely.
+- Notebooks: whether `.ipynb` cells are rewritten (students work in Colab).
+- Implementation language. The user asked on 2026-11-20 whether a Rust extension through PyO3 would
+  be faster. Advice given, not a decision: stay in Python (the standard library's `ast` and
+  `tokenize`, or LibCST), because student projects are small and a compiled extension would end the
+  pure-Python wheel and add per-platform builds for Windows, macOS, Linux and Colab.
+- Timing: before the async-core epic (the user's preference), with the v0.7.0 release, or with
+  alias removal in the seventh epic, when unmigrated code stops working.
+- Whether later epics that rename public names add their own rules to the same tool.
+
+**Not blocked.** Epic 1 and its close-out; the v0.7.0 release (the guide and the warnings are
+complete without a codemod); the async-core epic's stage 1, unless the user decides the codemod
+goes first.
+
+**Revisit when.** Epic 1 closes: decide at the retrospective, before the async-core epic reaches
+stage 1, whether the codemod is built, in which form, and on which path.
