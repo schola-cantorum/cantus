@@ -533,21 +533,71 @@ and needs a spec; a script or an agent prompt may fit the lightweight path (ADR-
   changes without an alias (the guide's "Changes without an alias" section, X1 onwards) give no
   warning. ADR-0017 removes the aliases in the seventh epic, at least one release after epic 1.
 - Verified: the wheel is pure Python (`cantus_agent-0.6.0-py3-none-any.whl`, T-0020 stage 8).
-- Inferred, not measured: most of W1–W18 are identifier renames a syntax-tree rewrite can do;
-  W8, W10–W12 (a registry the user builds, `Agent(tools=...)`) and the X items need judgement
-  about the surrounding code, so a codemod can at best flag them.
+- Researched on 2026-11-20 (five researchers on primary sources, each checked by a second agent; LibCST
+  behaviour was read from its source and not executed; raw output in the local, untracked
+  `.scratch/codemod-research/`):
+  - Classification of the guide's 70 index rows (`docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md:2120-2189`):
+    13 can be rewritten safely once the name resolves to cantus, 11 can be rewritten but need a choice,
+    22 can only be reported, 10 are not Python source (HTTP clients, proxies, pickles), 14 describe
+    behaviour only. This replaces the earlier guess that most of W1–W18 are plain renames.
+  - `@skill` to `@tool` alone does not preserve behaviour: `@skill` registers globally
+    (`cantus/protocols/skill.py:80-91`), `@tool` does not (`cantus/protocols/tool.py:176-182`), and
+    `Agent(model)` warns only when the global registry is not empty (`cantus/core/agent.py:97-104`). A
+    half-migrated program has an agent with no tools and no warning (the guide, `:866-871`), usually
+    across files. W2, W3, W8, W11 and W12 move together or not at all.
+  - A W17b override that calls `super().update_skills(...)` recurses forever if only the `def` is
+    renamed (inferred from the code, not run).
+  - W13 (a `"skill_name"` key in a string) stays invisible even with warnings raised to errors, so a
+    static report is the only signal before the run.
+  - LibCST 1.9.0 (2026-07-29) is itself a Rust extension built with PyO3. Its wheels cover macOS arm64,
+    Linux x86_64/aarch64 and Windows amd64/arm64 for CPython 3.9–3.15; 1.9.0 dropped the Intel macOS
+    wheels that 1.8.6 had, and there is no 32-bit Windows wheel, so those machines build the sdist with
+    a Rust toolchain (https://pypi.org/pypi/libcst/1.9.0/json, https://pypi.org/pypi/libcst/1.8.6/json).
+    On Python 3.13 it depends on `pyyaml-ft` instead of `pyyaml`; the test matrix and pip-audit stop at
+    3.12 (`.github/workflows/test.yml`, `supply-chain.yml:42-45`).
+  - `python -m libcst.tool` looks upwards from the working directory for `.libcst.codemod.yaml`, imports
+    the modules listed there and runs the formatter command it names; LibCST's own file handling follows
+    symlinks, does not skip `.venv` and overwrites in place with no backup (LibCST `libcst/tool.py`,
+    `libcst/codemod/_cli.py`, read on `main`). Parsing itself does not import or run the target code.
+    LibCST has no published security advisory (https://github.com/Instagram/LibCST/security/advisories).
+  - Built-in `RenameCommand` takes one name pair per run, emits no warning and can drop an `as` alias
+    (LibCST `libcst/codemod/commands/rename.py`).
+  - The repository already ships one subcommand whose dependency is an extra: `cantus tui` with `[tui]`,
+    probing the import and printing the install hint (`cantus/cli.py:321-330`).
+  - Prior art: pydantic shipped a separate LibCST package (bump-pydantic, archived after the migration
+    period); LangChain v1 ships no codemod and embeds instructions for a coding agent in its migration
+    page; Ruff has no third-party rule plugins.
+  - The name `cantus` on PyPI belongs to another project (https://pypi.org/pypi/cantus/json); see OQ-012
+    for the install hints that still say `pip install cantus[...]`.
 - Not verified: how much student and teacher code exists outside this repository and ludus.
 
 **Blocks.** Nothing yet. Choices still open:
 - Whether to build it at all, given the alias period and the guide.
-- Form: a `cantus migrate` subcommand; a standalone script; a rule file for an existing rewriting
-  tool; or a general agent prompt like the ludus one.
-- Scope: mechanical renames only, or also a report of the sites it cannot rewrite safely.
-- Notebooks: whether `.ipynb` cells are rewritten (students work in Colab).
-- Library: the standard library's `ast` and `tokenize`, or LibCST as an optional dependency.
-  Ruled out by the user on 2026-11-20: a Rust extension through PyO3. Student projects are small, and
-  a compiled extension would end the pure-Python wheel and add per-platform builds for Windows,
-  macOS, Linux and Colab.
+- Form: a `cantus migrate` subcommand with its dependency in an extra (contract surface, full pipeline,
+  usable only after the release that carries it); a standalone script in the repository that pins its
+  own dependency (may fit the lightweight path and can precede the async-core epic); a separate PyPI
+  package; or a general agent prompt like the ludus one. The prompt is useful whatever is chosen: a
+  codemod cannot reach the HTTP, string and behaviour items.
+- Scope. The research supports "rewrite and report" as one tool: rewrite only names resolved to cantus
+  through imports, leave strings and comments alone, and report the rest with `file:line` and the guide
+  section. Open: whether the global-registry group (W2, W3, W8, W11, W12) is ever rewritten or only
+  reported in a first version.
+- Notebooks: whether `.ipynb` cells are rewritten. A Colab notebook lives in Drive or the browser, and
+  cells with `!pip` or `%magic` lines are not valid Python, so the value is lower than it looks; without
+  notebook support, Colab's install experience stops mattering for the packaging choice.
+- Library: LibCST, or the standard library's `ast` and `tokenize` (no dependency; keeping the layout and
+  resolving aliases is then our code; not prototyped). Ruled out by the user on 2026-11-20: a Rust
+  extension of our own through PyO3, because it would end the pure-Python wheel and add per-platform
+  builds. LibCST moves that cost to its maintainers without removing it (the Intel macOS wheel above).
+- If LibCST: it is not a core dependency (core is `pydantic` only, `pyproject.toml:28-30`); the range
+  follows the repository's habit, for example `>=1.8.6,<2`; Intel macOS is documented as unsupported for
+  the codemod; and someone decides who covers Python 3.13's `pyyaml-ft` in CI and in pip-audit.
+- Requirements a spec would have to state, whatever the form: preview by default and write only on
+  request; call the library API and never `libcst.tool`; read no configuration from the target tree; run
+  no subprocess (Git included) on the target; do not follow symlinks; a fixed exclusion list; keep
+  encoding, BOM and newlines; write through a temporary file; skip and report a file that fails to parse;
+  rules as a static table that imports neither the user's code nor cantus's legacy names, so a later
+  cantus without the aliases can still carry the 0.6 rules; install hints that name `cantus-agent`.
 - Timing: before the async-core epic (the user's preference), with the v0.7.0 release, or with
   alias removal in the seventh epic, when unmigrated code stops working.
 - Whether later epics that rename public names add their own rules to the same tool.
