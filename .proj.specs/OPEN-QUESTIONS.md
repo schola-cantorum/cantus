@@ -608,3 +608,81 @@ goes first.
 
 **Revisit when.** Epic 1 closes: decide at the retrospective, before the async-core epic reaches
 stage 1, whether the codemod is built, in which form, and on which path.
+
+---
+
+## OQ-015 — How does the default prompt path make 4-bit Gemma E2B on Colab answer at all?
+
+**Deferred on:** 2026-11-20
+**Status:** open
+
+**Reason.** The Charter requires each seam's default to run the full agent loop with 4-bit Gemma
+E2B on a Colab T4 (ADR-0015, still `proposed`, says the same). Two Colab runs in epic 1, one on an
+L4 and one on a T4, show the loop producing nothing, on v0.6.0 and on the Tool-rename build alike;
+inferred from that: the rename did not cause it. Where the fix belongs is not settled: likely the
+prompt-assembly seam, which ADR-0015 assigns to the async-core epic and describes as having no open
+question, or the model handle. It cannot be decided in epic 1: the epic's last ticket has landed,
+and the fix changes what the model receives, which is runtime behaviour and needs a spec.
+
+**Evidence.**
+- Verified, T4 (2026-11-20, the user by hand, E2B): 60 turns on `cantus-agent==0.6.0` and 60 on the
+  build of `fdf6359`, five queries of twelve turns each. Every one of the 120 model outputs is the
+  empty string, every turn is an `action_parse` error of type `json_syntax`, with no tool call and no
+  final answer, and every query ends in `MaxIterationsObservation`
+  (`.proj.specs/0001-tool-rename-phase-one/reports/T-0020-colab/`; T-0020, "Stage 8, Colab").
+- Verified, L4 (2026-11-18, E2B): 60 turns on `cantus-agent==0.6.0` and 60 on the build of `c7a4888`,
+  all 120 outputs empty in the same way (T-0010, "Stage 8, part B"; `reports/T-0010-colab/`).
+- Verified, same T4 run: the model and the loader work outside the agent loop. The load-and-generate
+  smoke and the noise probe both returned text. The probe's prompt is a bare string, without the
+  chat template, that states the output wanted (`reports/T-0020-colab/t0020_colab.py:27`).
+- Verified, L4 only, one prompt (query 0 of the `c7a4888` build), transcribed by the agent from the
+  cell output (`reports/T-0010-colab/diagnostic-empty-output.json` and that folder's README):
+  - With cantus's prompt as it is, the first token is the end-of-turn token with probability 0.94,
+    so greedy decoding returns nothing; five generations with the model's default sampling settings
+    returned nothing either.
+  - Wrapped in the tokenizer's chat template, the same prompt gets an answer: a JSON object with a
+    `tool_calls` list whose items use `tool_name` and `parameters`, which is not the shape cantus
+    parses.
+  - With one instruction line appended to the bare prompt and no chat template, greedy decoding
+    produced a JSON object beginning with a `thought` key. The line and the full output were not
+    transcribed.
+- Verified in the code: `Agent._build_prompt` returns one bare string holding the tool catalog, the
+  query and the events as JSON, with no instruction about the output format unless a `Soul` supplies
+  one; its comment says real implementations will call the chat template
+  (`cantus/core/agent.py:312-328`). `ModelHandle.generate` tokenizes that string as it is and decodes
+  with special tokens skipped (`cantus/model/loader.py:51-59`). In `cantus/`, only the MLX provider
+  calls `apply_chat_template` (`cantus/model/providers/mlx.py:69`).
+- Verified: `notebooks/task_template.ipynb`, the notebook students start from, loads the model with
+  `mount_drive_and_load` and defaults to the **E4B** variant; `notebooks/README.md:17` calls E2B
+  experimental. It installs `transformers` unpinned.
+- Not verified: the notebook's default path. Every run above used E2B; E4B was never run, so what a
+  student sees with the defaults is unknown.
+- Not verified: the cause on a T4. No diagnostic was made there (T-0020, D6); the T4 result is
+  consistent with the L4 diagnostic and nothing more. The T4 run forced greedy decoding; default
+  sampling was not tried on a T4.
+- Not verified: whether the student notebook ever produced a tool call on Colab with an earlier
+  package set. Both runs used transformers 5.22.1 and torch 2.14.1; no older set was tried.
+- Inferred, not verified: Ollama and OpenAI-compatible servers apply the model's template on the
+  server side. They were not run for this question.
+
+**Blocks.** Epic 1's AC-40 stays unverified for this reason: with no output, the comparison cannot
+see the rename (T-0020, D5b leaves closing the epic to the user). Choices still open:
+- Whether the v0.7.0 release waits for a fix or ships with this stated as a known limitation. The
+  defect is in v0.6.0 too, and ADR-0013's gate does not ask for a Colab run. The user decides.
+- The fix. Candidates: add an output-format instruction to the bare prompt and keep the text-JSON
+  path (the L4 diagnostic got a JSON object with a `thought` key this way); apply the chat template,
+  in `ModelHandle.generate` or in the prompt-assembly seam; or both.
+- Order. With the chat template alone the model answers in its own tool-call shape, which the
+  parser rejects, and that shape is OQ-004's subject, for the tool-calling epic (third in ADR-0017's
+  order, after async core). An async-core criterion "runs the full loop on a T4" may therefore not
+  be reachable inside that epic unless the instruction route is taken.
+- Whether "runs the full agent loop on Colab" becomes an acceptance criterion with a recorded Colab
+  run, for which variant (E2B, E4B or both), and what counts as passing.
+- Whether ADR-0015's sentence that prompt assembly has no open question is amended.
+
+**Not blocked.** The Tool rename itself: both builds behave alike on empty output, and the W2 warning
+was shown on Colab. Work on local providers is not held up by this question, which is not a claim
+that they were verified. The codemod question (OQ-014).
+
+**Revisit when.** The async-core epic reaches stage 1, or a ticket for a fix before the v0.7.0
+release is opened, whichever comes first.
