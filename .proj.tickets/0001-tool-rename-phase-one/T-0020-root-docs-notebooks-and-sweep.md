@@ -374,5 +374,9 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   - `pip-audit (openhands)`: not caused by this change. The audit itself finds nothing; the job fails
     its own staleness guard because the `openhands` extra now resolves `pillow 13.0.0` while the
     group's acknowledgements are for `pillow==12.3.0` (T-0021). The guard asks for the two matrix
-    fields to be deleted in `.github/workflows/supply-chain.yml`. That is a workflow change with its
-    own stage 7, so it is left for a `0000-maintenance` ticket and the user's decision.
+    fields to be deleted in `.github/workflows/supply-chain.yml`. The user turned Auto-fix on for
+    this PR, so the two fields and their comment were deleted here in the next commit: the change only
+    removes ignore entries, so the audit of this group is stricter than before, and no other line of
+    the step changes. It is outside the range stage 6 and stage 7 reviewed (`13ddcbc...dccb737`), and
+    T-0021's ticket still describes the acknowledgement it added; both are for the user to weigh at
+    landing.
