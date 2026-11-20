@@ -245,6 +245,32 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   Nine low candidates; each independent false-positive check found it not a defect this change introduces
   (confidence 0.85–0.95; all read the upstream criteria). Adopted as fixes: SEC-T0020-2 (Git environment),
   -5 (in part), -9.
+- **Open stage 6 and stage 7 suggestions, decided by the user (2026-11-20).** Each was re-checked against
+  the repository by one investigator and one challenger before the decision. Nothing in this ticket's
+  shipped files changes, so the evidence on `fdf6359` stands.
+  - **S-14** (carry Git's stderr in the sweep's failure): not adopted. The approved reading only requires
+    that the test fails when Git fails, and it does; the failure already names the Git command and its exit
+    code. The change would add a branch no approved test-plan row covers.
+  - **S-15** (`%` formatting to f-strings, `tests/test_rename_sweep.py:126`, `:139`): not adopted. The file
+    has no f-string; ruff as configured does not flag the two lines.
+  - **S-16** (`_repo(readme=False)`): not adopted. The sweep reads only the index, so removing the README
+    after `_repo` proves the same thing; 2 of 23 callers would use the parameter.
+  - **FA-09** (llms.txt `:7-9`, the v0.5.0 lines): D12 stands. No value is both true and useful before the
+    release (0.6.0 lacks `tool`; 0.7.0 is not published). The lines are updated in the v0.7.0 release step;
+    the v0.6.0 release missed them and neither ADR-0013 nor `docs/DOCS_RELEASE_SIGNOFF.md` checks them, so a
+    `0000-maintenance` ticket will hold the reminder.
+  - **FB-11** (a usage sentence about running PyPI mode outside the checkout): not added. It would cover
+    only PyPI mode and contradict the usage examples, which run from the root; local mode and the
+    workflow's import step read the source tree too (SEC-T0020-8). A `0000-maintenance` ticket will make
+    the script and the workflow import the installed package, before the v0.7.0 release (ADR-0013 item 4
+    relies on this smoke).
+  - **SEC-T0020-3** (`persist-credentials: false`): a low-priority `0000-maintenance` ticket for the six
+    checkout steps of the five workflows other than `test.yml`; stage 7 still runs for it.
+  - **SEC-T0020-6** (`--host 0.0.0.0` without auth): a `0000-maintenance` documentation ticket for the three
+    quickstart pages (root, site, site zh-tw), which also records in `OPEN-QUESTIONS.md` whether
+    `cantus serve` should warn or refuse on a non-loopback host with auth none.
+  - The maintenance tickets are opened from `main` after this ticket lands; opening each one is the user's
+    call at that time.
 - **Known, not changed** (pre-existing, on lines this ticket did not need to touch, or decided): llms.txt
   `:7-9` (v0.5.0 lines, D12), `:123` ("five built-in implementations" counts AutoMemory), `:152` ("asks the
   LLM for exactly one JSON object"; the prompt gives no format), `:214` (the `@debug` output lacks
@@ -275,7 +301,7 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
     `gated_routes` empty (none) and listing both families (bearer); OpenAPI's deprecated set over all paths
     is exactly the four alias operations, primary summaries per 2.3; exactly three `Legacy route` records,
     one per alias template used (`/skills/{name}` twice, `/skills` twice); no listener left; no token in the
-    output. The same driver on cantus-agent 0.6.0 from PyPI fails 36 checks (`ac41-red-v06.txt`).
+    output. The same driver on cantus-agent 0.6.0 from PyPI fails 35 of 45 checks (`ac41-red-v06.txt`).
   - **AC-42** (the real `cantus tui` in a pseudo-terminal rendered with pyte, `ac42.py` with T-0013's
     `tui_pty.py`): rounds A (none; a running session left by a malformed request) and B (bearer, token from
     the environment) show the Tools tab with rows `add  Add two integers.  a, b` and
