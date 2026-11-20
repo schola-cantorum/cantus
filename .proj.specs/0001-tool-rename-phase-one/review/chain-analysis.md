@@ -1,0 +1,306 @@
+# Epic 0001 — vulnerability chain analysis
+
+Close-out step 1 for epic 0001 (Tool rename, phase one), run on 2026-11-20 against `main` at `61ed932`
+(tickets T-0006 to T-0020, PRs #57 to #71). The rule is in `docs/agents/review.md`, "Epic close-out:
+chain analysis": take every finding of every grade from the epic's tickets and the trust boundaries,
+and ask whether defects that are individually low-severity compose into a chain that crosses a trust
+boundary. A chain that does opens a ticket before the epic is called done.
+
+## Result
+
+- **127 findings and candidates** were collected from the fifteen per-ticket reports
+  (`security-T-0006.md` to `security-T-0020.md`) and the tickets' Comments. None was graded above low
+  by its own review; most were judged "not a defect" for the diff they were raised on.
+- **13 chains were proposed** from three lenses (network client, model and in-process code, supply
+  chain and documentation). Each was then handed to a separate agent whose task was to break it.
+- **3 hold and cross a trust boundary** (C1, C2, C5 below). All three exist in v0.6.0; epic 0001
+  neither introduced them nor made the code worse. Two are P1, one is P2.
+- **2 hold at P2 without crossing a boundary** (M1, M2). **8 are not chains**; three of those still
+  carry a hardening note.
+- No chain was introduced by the Tool rename. The one condition the rename created (M1) rests on a
+  precondition nobody has shown to exist.
+
+Under `review.md` the three crossing chains need tickets before the epic is called done. Opening them
+is the user's decision; the proposals are under "Tickets this analysis asks for".
+
+## Method and limits
+
+- Inputs: the fifteen security reports, each ticket's Comments, `review/round-1.md` and `round-2.md`,
+  the spec, and the code on `main`. The spec names no trust boundaries of its own, so the ten below
+  were derived from the code and the spec's behaviour sections for this analysis.
+- One workflow of 22 agents: three collected findings and re-read each cited line on `main`; one
+  described the boundaries; three proposed chains; thirteen each tried to break one chain. Raw output
+  is in the local, untracked `.scratch/epic-0001-close-out/workflow-raw.json`.
+- Server-side links of C1, C2 and C5 were reproduced in process with FastAPI's `TestClient`. No real
+  browser, tunnel or second machine was used: the browser leg of C2 and the network reach of C1 are
+  inferred from how browsers and tunnels work.
+- Channel webhook routes (`cantus/serve/` gateways) were not re-read; their signature checks are not
+  covered here.
+- "Pre-existing" means the same code shape is in the `v0.6.0` tag.
+
+## Trust boundaries
+
+| Boundary | Known gaps on `main` |
+|---|---|
+| B1. Network client -> cantus serve (HTTP) | (1) Auth none is the default, so out of the box every tool body is callable by anyone who can reach the port (config.py:76); the CLI warning does not look at the host, so --host 0.0.0.0 gets no extra warning (cli.py:307-313). (2) POST /tools/{name} calls tool_instance.run(**body) directly: no validate_args, no pre_hook/post_hook (app.py:245-249; spec.en.md:150 says this is intended, as in v0.6). Observed: {"a":"x","b":"y"} to an int tool returned 200 {"result":"xy"}; the pre_hook was never called. A permission or self-check gate placed in a hook or in _dispatch_tool is therefore bypassed over HTTP (round-2 R2-5; documented in MIGRATION V6, docs/migrations/MIGRATION_v0.6.0_to_v0.7.0.md:2105-… |
+| B2. Legacy client -> alias routes (/skills/{name}, /skills, /introspection/skills) | (1) The surface is doubled during the alias window: a proxy/WAF rule written only for /skills leaves /tools open after upgrade, and a rule written only for /tools leaves /skills open; the only control is documentation (X11). (2) An unauthenticated request (401/405) consumes the once-per-template log record, so the operator signal can be spent by a stranger; accepted as reading D3 (security-T-0012.md:21). (3) The Link header and warning text point at the tag v0.7.0, which does not exist until release (_deprecation.py:10-13; spec.en.md:271-273). (4) A response produced before routing by host middleware is not marked (_aliases.py:8). |
+| B3. Model output -> parser / dispatcher | (1) No permission seam: any registered tool the model names is run; OQ-008 is open (.proj.specs/OPEN-QUESTIONS.md:307). (2) Prompt injection path is open by design: tool results and the raw-output preview are fed back as repr(event) in the next prompt (agent.py:317-325, 466-473), and the unknown-tool feedback embeds the model-controlled name (agent.py:438; noted as pre-existing in security-T-0010.md:24). (3) With an empty registry any name parses (agent.py:432) and fails only at dispatch. (4) Under an error filter W13 is swallowed without a trace, so legacy-key output is undetectable there (approved reading D10, security-T-0010.md:21). (5) No grammar-constrained decoding is wired in, and th… |
+| B4. Student or third-party code -> global registry / Agent tool set | (1) Fail-open fallback: Agent(model) built while the global registry is empty holds that same object and silently gains any tool a library registers later; W11 is emitted only at construction (agent.py:98-101; AC-11, spec.en.md:84; round-2 R2-4 not adopted; security-T-0008.md:20 accepted as specified). tools=[] is the only way to state 'no tools'. (2) Registry.register replaces by name with no warning and no type check beyond a name attribute (registry.py:157-175), and a Registry passed to Agent is shared by reference, so later register_tool on it can replace a hooked tool (security-T-0017.md:24, R2-15 family). (3) The dispatch guard does not see a method assigned after class creation, an i… |
+| B5. Tool arguments -> tool body (three entry paths) | (1) Tool.run / __call__ and the HTTP endpoint do not validate or run hooks (tool.py:82-87; app.py:249); documented as V6 and in ludus-migration.md:26. So the same tool has different guarantees per entry path. (2) Remote adapter tools trust the remote schema: validate_args only checks that args is a dict (adapters/_remote_tool.py:58-63), so model-supplied arguments reach the remote framework unvalidated. (3) pydantic validation is type coercion, not authorization: no path/command allow-listing exists in cantus; that is left to the tool body. (4) hooks are developer-set and not checked for callability at construction (security-T-0006.md:24, accepted). |
+| B6. Remote frameworks / MCP servers -> cantus (adapters) | (1) The MCP adapters do not work against MCP SDK 1.x; behaviour is deferred to epic 2 (spec.en.md:226-227, 266), so the controls above are untested against a real server. (2) Remote descriptions enter the prompt verbatim (prompt-injection vector) and nothing consumes is_remote to gate or label them (inferred: no reader of is_remote found in agent.py). (3) A re-exported remote tool loses is_remote (security-T-0011.md:20). (4) Remote tool names are not constrained before they become a registry key or, if served, a URL path segment /tools/{name} (app.py:277; inferred, not exercised). (5) export_as_mcp_server exposes tool bodies without hooks or validate_args, same as B5 (security-T-0017.md:25). |
+| B7. Documentation / notebooks / scripts -> student machine | (1) quickstart-desktop teaches cantus serve --host 0.0.0.0 with no --auth-mode (docs/site/quickstart-desktop.md:78; same in zh-tw and docs/quickstart-desktop.md:72); flagged as SEC-T0020-6, not changed, a follow-up docs ticket was suggested (security-T-0020.md:23). (2) The channel cookbooks start cantus serve without --auth-mode and then tunnel the whole port publicly (docs/site/channels/line.md:55-59, 69; telegram.md:61; discord.md:72), which publishes every /tools/{name} and /skills/{name} route unauthenticated and hook-free on the internet; flagged as SEC-T0018-5, not changed (security-T-0018.md:18). No ticket for either was found in this pass (inferred; tickets not searched). (3) Docs o… |
+| B8. CI / PR author -> repository credentials and PyPI release | (1) cross-platform-install.yml, docs.yml, repo-hygiene.yml and supply-chain.yml check out without persist-credentials: false while running PR-controlled code (cross-platform-install.yml:27, 39; docs.yml:18, 24; repo-hygiene.yml:18, 31; supply-chain.yml:66, 84); the token is read-only, so impact is low; accepted as SEC-T0020-3 with a suggested maintenance ticket (security-T-0020.md:20). (2) Actions are pinned to mutable tags, including pypa/gh-action-pypi-publish@release/v1 in the job that holds id-token: write (release.yml:47, 51) and actions/checkout@v6, setup-python@v6, setup-uv@v8.1.0. (3) workflow_dispatch with target pypi publishes from whatever ref is dispatched (release.yml:6-15, 46)… |
+| B9. Pickled / persisted events -> cantus process | (1) A v0.6 pickle still loads through the legacy module __getattr__ (W4/W5) into half-formed objects: CallToolAction with tool_name silently '', ToolObservation / ToolErrorObservation raising AttributeError on .tool_name or repr (MIGRATION:1583-1588; round-1 R-23) - a robustness and integrity gap, not code execution added by cantus. (2) Any user code that unpickles event files from an untrusted source has the usual pickle code-execution risk; cantus neither does this nor warns about it beyond X10. (3) GET /events returns whatever dicts the persistence file holds, including argument and result values if the host wrote them, and with auth none it is open (dashboard.py:122-152; inferred from c… |
+| B10. Deprecation machinery -> process-global warning state | (1) Under -W error or pytest filterwarnings=error every legacy use except W13 raises, including inside cantus serve start-up paths (MIGRATION V9, :2086-2091; security-T-0007.md:22). (2) A first import inside warnings.catch_warnings() loses the filter (spec.en.md:201-202; MIGRATION V2). (3) _insert_locked relies on CPython-private names (_deprecation.py:196-222). (4) Silencing the whole category hides nothing security-relevant from serve (the open-introspection notice is a UserWarning, app.py:199-206), but a blanket -W ignore would hide that UserWarning too (security-T-0019.md:16). |
+
+## Chains that cross a trust boundary
+
+### C1 — Documented exposure, no auth, and a tool body any reachable client can run (P1, pre-existing)
+
+1. `cantus serve` defaults to `auth_mode` none (`cantus/config.py:76`); in that mode no route carries
+   an auth dependency (`cantus/serve/app.py:153-156`).
+2. The CLI's only warning is for auth none together with the dashboard; it never looks at the host
+   (`cantus/cli.py:307-313`), so a non-loopback bind gets no warning of its own and is not refused.
+3. The quickstart teaches `cantus serve --host 0.0.0.0` with no `--auth-mode`
+   (`docs/site/quickstart-desktop.md:78`, the zh-tw page, `docs/quickstart-desktop.md:72`). The LINE,
+   Telegram and Discord cookbooks start `cantus serve` without auth and then tunnel the whole port to
+   the internet (`docs/site/channels/line.md:55-59`, `:69` and siblings).
+4. `POST /tools/{name}` and its alias call `tool_instance.run(**body)` (`cantus/serve/app.py:249`):
+   neither `validate_args` nor a hook runs, which the spec states is intended, as in v0.6.
+
+Boundary crossed: network client to `cantus serve` (B1), then tool arguments to tool body (B5).
+Attacker: anyone on the same network, or anyone on the internet once the port is tunnelled.
+Impact: every registered tool body runs with attacker-chosen, unvalidated arguments; a check a
+student wrote as a `pre_hook` is skipped. The crossing does not depend on link 4: an unauthenticated
+call of the body is already across B1; link 4 makes it worse. The project has recorded that hooks are
+not access control (`security-T-0020.md:22`, the guide's V6).
+
+Epic 0001: unchanged in code. It added the written warnings (V6, X11) and recorded the quickstart line
+as SEC-T0020-6; the follow-up ticket T-0020 promised is not open yet.
+
+### C2 — A web page the user visits can run tools on the default loopback server (P1, pre-existing)
+
+1. Defaults: host `127.0.0.1`, auth none (`cantus/config.py:59`, `:76`).
+2. The tool endpoint reads the body with `await request.json()` and never looks at `Content-Type`
+   (`cantus/serve/app.py:245`), nor at `Origin` or `Host`; the app installs no CORS, trusted-host or
+   CSRF control.
+3. Reproduced on `main`: `POST /tools/add` with `Content-Type: text/plain`,
+   `Origin: https://evil.example` and `Host: attacker.example:8765` returns 200 `{"result":3}` and the
+   tool body runs. A CORS preflight returns 405, so a request that needs one is stopped by the browser.
+4. Inferred, not run in a browser: a `text/plain` POST is a "simple request" that a browser sends
+   cross-site without a preflight. The page cannot read the response, but the tool body has run.
+   With DNS rebinding the page could also read responses, since `Host` is not checked.
+
+Boundary crossed: a third-party web origin to the user's local server (B1), then B5 as in C1.
+Attacker: any web page open in a browser on the machine that runs `cantus serve`, with the server in
+its default, documented configuration. No network position is needed.
+Impact: blind invocation of any registered tool with chosen arguments. For the calculator tools of
+the tutorials this is harmless; for a student's file, shell or channel-sending tool it is not.
+
+Epic 0001: unchanged; it only added a second path per tool. This chain was not raised in the two
+adversarial rounds or in any of the fifteen reports; it is new in this analysis.
+
+### C5 — With bearer auth on, the tool catalogue is still public (P2, pre-existing)
+
+1. `/docs`, `/openapi.json` and `/redoc` are created by FastAPI from settings, outside the per-route
+   auth dependencies (`cantus/serve/app.py:137-143`; defaults at `cantus/config.py:71-73`).
+2. Reproduced on `main`: in bearer mode, without a token, the tool routes return 401 and
+   `/openapi.json` returns 200 with every tool's name, description and argument schema.
+3. The three URLs can be switched off by setting them empty (`docs/site/protocols/serve.md:56-58`),
+   but nothing tells an operator who turns auth on that they stay public.
+
+Boundary crossed: unauthenticated client to the authenticated server (B1). Impact: disclosure of the
+tool inventory and schemas, no invocation. It is one defect, not a composition, but it crosses the
+boundary by itself and it combines with C1's tunnel instructions.
+
+Epic 0001: unchanged, apart from doubling the listed operations with the alias routes.
+
+## Chains that hold without crossing a boundary
+
+### M1 — A dispatch override assigned under the old name is skipped silently (P2, introduced by the epic)
+
+The rename of `Agent._dispatch_skill` to `_dispatch_tool` has no shim (X8). T-0009's guard is
+`Agent.__init_subclass__` (`cantus/core/agent.py:136-155`): it catches a subclass that defines the old
+method, not a method assigned to the class or instance afterwards, and the loop calls only
+`_dispatch_tool` (`agent.py:282`). An override that carried a student's permission check would then
+never run. The verifier lowered it from P1: no v0.6 code is known to assign the method, the v0.6 docs
+never taught it, and the gap is already OQ-013. Smallest hardening, if wanted: one `hasattr` check at
+the top of `Agent.run`.
+
+### M2 — A fallback agent silently gains tools a library registers later (P2, pre-existing, narrowed)
+
+`Agent(model)` built while the global registry is empty keeps that live registry and warns (W11) only
+if it is non-empty at construction (`cantus/core/agent.py:97-104`). A later `register_skill()` from any
+imported module adds a tool the model can call, with only W3 at the registration site. Reproduced in
+memory. It does not cross a boundary: registering needs code already running in the process, and the
+model can only pick names that exist. Same family as R2-4, T0008-SEC-01 and SEC-T0019-3; changing it
+means changing AC-11, which is for a later epic to decide.
+
+## Proposed chains that are not chains
+
+| Proposal | Why it fails | Carry-over |
+|---|---|---|
+| C3 — a proxy rule that covers one route family leaves the other open | The "control" is a rule cantus neither ships nor documents as a control; both families are identical by design and documented (X11) | Optional: one sentence on the serve page |
+| C4 — an unauthenticated client spoils the operator's session view and spends the once-only log line | The parts do not depend on each other; the bounded history evicts by design and stale records age out | Hardening, runtime: parse the body before `tracker.start`, and answer 400 rather than 500 for a body that is not JSON (`cantus/serve/app.py:244-248`) |
+| Both action keys in one model reply | The filter said to be bypassed is hypothetical; every control cantus owns acts on the parsed name; documented as A5 | Optional: emit W13 when both keys are present and differ |
+| A remote tool's description steers the model to a hookless tool | Unreachable on `main`: the MCP adapters do not work against MCP SDK 1.x | Input for the async-core epic's spec, which makes the MCP path live |
+| The wrong PyPI name `cantus` reached through runtime hints and documents | The documents do not lead to the hint; the hint appears only when an optional SDK is missing | Already OQ-012 |
+| Documents lead the release, so students install from `main` | `@main` is the same trusted repository as the tag; a release-hygiene matter | The v0.7.0 release step |
+| The release job builds with an unpinned toolchain inside the job that holds the PyPI identity | No finding of this epic is a link, and the exploitable step is unconfirmed | Optional P2 hardening: split build and publish jobs |
+| The artefact that reaches PyPI is not the thing the gate tests | Not a boundary of this epic's spec; the facts hold | The install-smoke ticket T-0020 promised, before v0.7.0 |
+
+## Tickets this analysis asks for
+
+`review.md` requires a ticket for each crossing chain before the epic is called done. Proposed, for the
+user to open or decline:
+
+1. **Documentation, lightweight path (C1, C5).** Quickstart pages: bind `127.0.0.1`, or keep
+   `0.0.0.0` only together with `--auth-mode bearer`; channel pages: say that a tunnel publishes the
+   whole port, tools included, and pair it with bearer auth; serve page: say that `/docs`,
+   `/openapi.json` and `/redoc` stay public under auth and how to switch them off. This is the ticket
+   T-0020 already promised for SEC-T0020-6, widened by the channel pages and C5.
+2. **Runtime, needs a spec (C2).** Refuse cross-site browser requests on the tool routes (an `Origin`
+   check, and a `Host` check for the loopback default); optionally require `application/json`. It
+   changes HTTP behaviour, so it is contract surface: full pipeline, CHANGELOG, migration note.
+3. **Open questions to record with ticket 1.** Whether `cantus serve` warns or refuses on a non-loopback
+   host with auth none; whether the three documentation routes come under auth when auth is on; whether
+   HTTP dispatch runs `validate_args` and hooks (R2-5 family, beside OQ-010).
+
+Until the user decides, the epic is not called done.
+
+## Finding inventory
+
+Every finding and candidate read for this analysis. The text of each is in the per-ticket report named
+by its ticket; "on main" is the collecting agent's re-read of the cited line at `61ed932`.
+
+Families, by count: deprecation-signal 15, docs-example 12, dual-route-rules 10, test-hygiene 9, ci-credentials 7, model-output-key 7, registry-fallback 6, untested-surface 5, http-skips-hooks 4, serve-no-auth 4, supply-chain 3, frame-check 3, log-injection 3, availability 3, registry-replace-drops-hook 2, hook-gating-gap 2, remote-tool-name 2, route-misidentification 2, install-smoke 2, shared-registry 2, type-gate-rebind 1, error-message-exposure 1, validation-bypass 1, dos-local 1, dispatch-override-skip 1, string-match-migration 1, pickle 1, introspection-redaction 1, provenance-loss 1, input-validation 1, information-disclosure 1, alias-auth-parity 1, middleware-composition 1, tool-name-path-syntax 1, stale-session-state 1, tui-markup-injection 1, tui-malformed-snapshot 1, debug-prints-args 1, http-skips-hooks / serve-no-auth 1, model-output-key / remote-tool-prompt-injection 1, registry-fallback / shared-registry 1, serve-no-auth / http-skips-hooks 1, memory-untrusted 1, http-skips-hooks / install-smoke 1.
+
+| Id | Ticket | Family | Grade and disposition | On main |
+|---|---|---|---|---|
+| SEC-1 | T-0006 | ci-credentials | candidate medium/medium; filter: not a defect (0.1); not a defect; taken as hardening (ADR rule added) | no (mitigated): :23-24 still ask for headers/auth settings,… |
+| SEC-2 | T-0006 | ci-credentials | candidate low/low; filter: not a defect (0.15); not a defect; covered by the same ADR rule | partly: :22 unchanged; the general rule at :56-58 ('Evidenc… |
+| SEC-3 | T-0006 | supply-chain | candidate low/low; filter: not a defect (0.08); not a defect; not handled (CI does not pin either) | yes: no lock/constraints/freeze wording in ADR-0018 (grep),… |
+| SEC-4 | T-0006 | registry-replace-drops-hook | candidate low/low; filter: not a defect (0.85); not a defect (AC-04, pre-existing in v0.6); teaching side recorded for T-0017 (R2-15) | yes: registry.py:175 `self._by_kind[kind][name] = instance`… |
+| SEC-5 | T-0006 | hook-gating-gap | candidate low/medium; filter: not a defect (0.08); not a defect (pre-existing limit); AutoMemory docstring fixed by T-0014 (R2-7) | partly: _remote_tool.py:48-49 still set hooks to None, memo… |
+| SEC-6 | T-0006 | hook-gating-gap | candidate low/low; filter: not a defect (0.95); not a defect; not handled (hooks are set by the developer) | yes: `_to_tool` (tool.py:185-206) has no callable check on… |
+| SEC-7 | T-0006 | type-gate-rebind | candidate low/low; filter: not a defect (0.93); not a defect (compatibility change); recorded for T-0015/T-0019 | yes: huggingface.py:40 `from smolagents import Tool as Smol… |
+| T0007-SEC-01 | T-0007 | deprecation-signal | candidate low/0.7; filter: not a security defect (0.85), correctness defect real; fixed (stage-6/7 fix on the T-0007 branch; commit not identified here) | no: :149-152 `try: number = int(lineno) except (ValueError,… |
+| T0007-SEC-02 | T-0007 | deprecation-signal | candidate low/0.5; filter: not a security defect (0.85), semantic gap real; fixed (same change as SEC-01; test row 44 gained `::+0`) | no: lineno is parsed with `int()` and only non-zero values… |
+| T0007-SEC-03 | T-0007 | deprecation-signal | candidate low/0.45; filter: not a defect (0.9); recorded (ticket Comments for T-0012 and T-0019); not changed | yes: cli.py:185 catches only `ImportError`; app.py:250-259… |
+| T0007-SEC-04 | T-0007 | deprecation-signal | candidate low/0.25; filter: not a defect (0.9); fixed for the file-name substring match; the `cantus.` prefix rule is spec 2.4 and stays | partly: import machinery is now matched by exact module nam… |
+| T0007-SEC-05 | T-0007 | deprecation-signal | candidate low/0.2; filter: not a defect (0.9); not a defect; taken as hardening (insert under `warnings._lock`) | hardened: :198-199,218-220 take `warnings._lock` when it ex… |
+| T0007-SEC-06 | T-0007 | model-output-key | candidate low/0.15; filter: not a defect (0.93); not a defect (AC-22 by design); trace question passed to T-0010, decided there as D10 (no… | yes: `except CantusDeprecationWarning: if w_id != "W13": ra… |
+| T0007-SEC-07 | T-0007 | deprecation-signal | candidate low/0.1; filter: not a defect (0.95); not a defect; not handled | yes: unchanged loop at _deprecation.py:245-249 |
+| T0007-SEC-08 | T-0007 | ci-credentials | candidate low/0.2; filter: not a defect (0.9); not a defect; taken as hardening (`--host 127.0.0.1`, drop `CANTUS_SERVE_*`) | mostly no: test_warning_visibility.py:370 drops `CANTUS_SER… |
+| T0008-SEC-01 | T-0008 | registry-fallback | candidate medium/0.5; filter: not a defect (0.85); not a defect (AC-11, v0.6 fallback kept for the alias period) | yes: agent.py:98-101 `value = _get_global_registry(); if va… |
+| T0008-SEC-02 | T-0008 | registry-fallback | candidate low/0.8; filter: not a security defect (0.9), correctness defect real (stage-6…; fixed (identity check added) | no: `_both_keywords_allowed` now also requires `tools is or… |
+| T0008-SEC-03 | T-0008 | frame-check | candidate low/0.25; filter: not a defect (0.93); not a defect (misuse guard, not an authorization boundary) | yes, narrowed: frame-name check remains at :117 but is now… |
+| T0008-SEC-04 | T-0008 | error-message-exposure | candidate low/0.6; filter: not a security defect (0.85); not a defect; taken as hardening (no `repr()` of elements) | no: :123-134 use `__name__` only when it is an identifier,… |
+| T0008-SEC-05 | T-0008 | remote-tool-name | candidate low/0.35; filter: not a defect (0.85); not a defect; taken as hardening (empty-name ValueError) | partly: empty names are now rejected (:136-140); neither `R… |
+| T0008-SEC-06 | T-0008 | registry-replace-drops-hook | candidate low/0.4; filter: not a defect (0.9); not a defect (AC-09/TR-35 and AC-04 by spec) | yes: getter/setter at agent.py:193-210 return and accept th… |
+| T0008-SEC-07 | T-0008 | validation-bypass | candidate low/0.3; filter: not a defect (0.9); not a defect; taken as hardening (slot renamed, AttributeError) | no: slot is `_cantus_tools` (:87) and an unset slot raises… |
+| T0008-SEC-08 | T-0008 | dos-local | candidate low/0.2; filter: not a defect (0.95); not a defect; taken as hardening (validate while iterating) | hardened: elements are validated in the loop at :113-141 so… |
+| T0008-SEC-09 | T-0008 | remote-tool-name | candidate low/0.25; filter: not a defect (0.9); not a defect (near-name shadowing pre-existing; exact duplicates fail closed) | yes: `if name in seen` exact match at :145, no normalization |
+| SEC-T0009-01 | T-0009 | frame-check | candidate low/0.75; filter: not a security defect (0.9), logic gap real; recorded (docstring and ticket); not changed | yes: identity test at :38; the limit is written in the docs… |
+| SEC-T0009-02 | T-0009 | dispatch-override-skip | candidate low/0.6; filter: not a security defect (0.8), mechanism real; recorded (ticket readings and OQ-013, open, for the async-core epic) | yes: guard is `hasattr(cls, "_dispatch_skill")` at class-cr… |
+| SEC-T0009-03 | T-0009 | string-match-migration | candidate low/0.35; filter: not a defect (0.85); recorded for T-0019 (X1 upgrade note) | yes: `type=type(event).__name__` at introspection.py:395 (n… |
+| SEC-T0009-04 | T-0009 | deprecation-signal | candidate low/0.55; filter: not a security defect (0.9); recorded for T-0019 | yes: property getter calls `warn_legacy("W7")` at :69; docu… |
+| SEC-T0009-05 | T-0009 | pickle | candidate low/0.5; filter: not a security defect (0.9); recorded (X10, measured in the ticket) | yes: aliases at action.py:49-54 and observation.py:86-91; `… |
+| SEC-T0009-06 | T-0009 | frame-check | candidate low/0.4; filter: not a defect (0.95); not a defect | yes: `caller.f_globals.get("__name__") != "dataclasses"` at… |
+| SEC-T0010-01 | T-0010 | model-output-key | candidate low/0.35; filter: not a defect (0.88); not a defect (TR-83); recorded for T-0019 | yes: tool_call.py:50-54 |
+| SEC-T0010-02 | T-0010 | model-output-key | candidate low/0.3; filter: not a defect (0.9); not a defect (TR-85; D10 approved: no trace); recorded for T-0019 | yes: see _deprecation.py:105-109; stated in the migration g… |
+| SEC-T0010-03 | T-0010 | model-output-key | candidate low/0.3; filter: not a security defect (0.9); not a defect | yes: `warn_legacy("W13")` on each legacy-key action at tool… |
+| SEC-T0010-04 | T-0010 | registry-fallback | candidate low/0.25; filter: not a defect (0.95); not a defect (AC-19/AC-22: only W13 is exempt) | yes: fallback at :76-79; no call site inside `cantus/` omit… |
+| SEC-T0010-05 | T-0010 | model-output-key | candidate low/0.2; filter: not introduced by this change (0.9); not a defect (v0.6 wording kept by D7) | yes: tool_call.py:190 `f"tool_name '{tool_name}' not regist… |
+| T0006-CHK-http-no-hooks | T-0006 | http-skips-hooks | not graded (listed under 'checked, nothing found' as known behaviour R2-5); recorded (pre-existing; owner T-0012) | yes: app.py:249 `result: Any = tool_instance.run(**body)`;… |
+| T0006-CHK-legacy-global-registration | T-0006 | registry-fallback | not graded (checked, nothing found); recorded | yes: skill.py:90 `_get_global_registry().register("tool", i… |
+| T0007-CHK-introspection-redaction | T-0007 | introspection-redaction | not graded (checked, nothing found); recorded | yes: app.py:257 stores `message=str(exc)`; introspection.py… |
+| T0007-TKT-warning-visibility-limits | T-0007 | deprecation-signal | not graded (ticket note only); recorded for T-0019 | unknown (behavioural claims not re-run); the insertion logi… |
+| T0008-TKT-known-limits | T-0008 | deprecation-signal | not graded (ticket known limits); recorded (known limit, characterization tests) | yes for the first (docstring at agent.py:114-115); attribut… |
+| T0009-TKT-dataclass-subclass-keyword | T-0009 | deprecation-signal | not graded (ticket known limit, accepted by the user); recorded for T-0019 | inferred yes: the wrapper is installed on the decorated cla… |
+| T0010-TKT-empty-registry-accepts-any-name | T-0010 | model-output-key | not graded (approved reading); recorded (v0.6 behaviour kept) | yes: `if registered and tool_name not in registered` at age… |
+| SEC-T0011-1 | T-0011 | provenance-loss | low / 0.25 (filtered: not valid, 0.9); not a defect; recorded for close-out chain analysis (same class as R2-15) | yes - _arguments.py:36 checks only isinstance(tool, Tool);… |
+| SEC-T0011-2 | T-0011 | input-validation | low / 0.3 (filtered: not valid, 0.93); not a defect (user-approved reading C2-F18-d); pre-existing in v0.6 | yes - mcp_server.py:110-111 assign name/version as given; _… |
+| SEC-T0011-3 | T-0011 | log-injection | low / 0.1 (filtered: not valid, 0.97); not a defect | yes - _arguments.py:27 and :37, mcp_server.py:54, :60, :75 |
+| SEC-T0011-4 | T-0011 | availability | low / 0.1 (filtered: not valid, 0.95); not a defect; pre-existing | yes - mcp_server.py:51 |
+| T0011-LIMIT-MCP-SDK | T-0011 | untested-surface | coverage limit (ungraded); recorded; deferred to epic 2 (ticket line 71) | yes - mcp.py:68 server.tool(, mcp.py:118-121 list_tools loo… |
+| T0011-LIMIT-FAKE-SDK | T-0011 | untested-surface | coverage limit (ungraded); recorded | unknown - inferred from the report and ticket line 140; tes… |
+| SEC-T0012-1 | T-0012 | route-misidentification | low / 0.35 (filtered: not valid, 0.88); not a defect | yes - _aliases.py:51 and :57 |
+| SEC-T0012-2 | T-0012 | deprecation-signal | low / 0.6 (filtered: not valid, 0.88); not a defect (approved reading D3); recorded for close-out chain analysis and T-0019 guide | yes - _aliases.py:61-64 logs once per template; note_use ca… |
+| SEC-T0012-3 | T-0012 | information-disclosure | low / 0.4 (filtered: not valid, 0.85); not a defect | yes - _aliases.py:92 appends DEPRECATION_HEADERS regardless… |
+| SEC-T0012-4 | T-0012 | alias-auth-parity | low / 0.3 (filtered: not valid, 0.93); not a defect; stage-6 design suggestion S6-19 (one factory for primary+alias) not adopted… | yes - app.py:283 and :297 both route_dependencies; dashboar… |
+| SEC-T0012-5 | T-0012 | route-misidentification | low / 0.2 (filtered: not valid, 0.95); not a defect | yes - _aliases.py:143 |
+| SEC-T0012-6 | T-0012 | middleware-composition | low / 0.3 (filtered: not valid, 0.93); not a defect (approved D1); recorded for T-0019 | yes - _aliases.py:106-108 build_middleware_stack wraps in A… |
+| SEC-T0012-7 | T-0012 | availability | low / 0.2 (filtered: not valid, 0.9); not a defect | yes - _aliases.py:91 inside send_marked |
+| SEC-T0012-8 | T-0012 | tool-name-path-syntax | low / 0.25 (filtered: not valid, 0.9); not a defect; pre-existing in v0.6; recorded for close-out chain analysis (maintenance ti… | yes - app.py:159-165 only reserved-name checks; :277 path=f… |
+| SEC-T0012-9 | T-0012 | test-hygiene | low / 0.2 (filtered: not valid, 0.95); not a defect; timeout shortened to 30 s in the fix | yes - test_w06_w16_serve.py:206 drops CANTUS_SERVE_*, :219… |
+| SEC-T0012-10 | T-0012 | availability | low / 0.15 (filtered: not valid, 0.95); fixed (29e017f), although not confirmed as a defect | no - _aliases.py:104 self.state.alias_state = AliasState()… |
+| R2-5 | T-0012 | http-skips-hooks | ungraded (coverage-limit note; v0.6 behaviour pinned by test); recorded for close-out chain analysis; documented in migration guide V6 (MIGRATION_v0.6.0… | yes - app.py:249 result = tool_instance.run(**body); valida… |
+| T0012-D8 | T-0012 | stale-session-state | ungraded (ticket Comments, 'Close-out' line 244); recorded for close-out; pre-existing in v0.6 | yes - app.py:244 start then :245 await request.json() outsi… |
+| T0012-S6-27 | T-0012 | untested-surface | ungraded (stage-6 leftover); deferred - needs its own ticket (CI matrix entry for the FastAPI lower bound); S6-16 also… | yes for the pin - pyproject.toml:120; CI matrix not inspect… |
+| SEC-T0013-1 | T-0013 | tui-markup-injection | low / 0.3 (filtered: not introduced here, 0.9); not a defect of this change; pre-existing sink; recorded for close-out chain analysis wit… | yes - widgets.py:191-196 add_row(name, str(tool.get("descri… |
+| SEC-T0013-2 | T-0013 | tui-malformed-snapshot | low / 0.35 (filtered: not introduced here, 0.9); not a defect of this change; pre-existing; recorded for close-out (a malicious or broken… | yes - app.py:139-142 passes rows through unchecked; widgets… |
+| SEC-T0013-3 | T-0013 | deprecation-signal | low / 0.15 (filtered: not valid, 0.95); not a defect | yes - widgets.py:198-201 |
+| T0013-LIMIT-CREDS | T-0013 | untested-surface | coverage limit (ungraded); recorded | yes (limit unchanged) - PermissionsPane reads only four nam… |
+| T0013-TEXTUAL-LB | T-0013 | untested-surface | ungraded (ticket Comments, 'Close-out'); recorded for close-out | yes for the pin - pyproject.toml:195; CI matrix not inspect… |
+| SEC-T0014-1 | T-0014 | docs-example | medium / 0.6 (filtered: not valid, 0.88); not a defect of this change (docstring only); wording decision left to the user (D4b); re… | yes - memory_auto.py:157-159; docs/site/protocols/memory.md… |
+| SEC-T0014-2 | T-0014 | docs-example | low / 0.5 (filtered: not valid, 0.85); not a defect of this change; recorded for close-out; recommendation to T-0017 to say read… | yes - memory_auto.py:162; no 'untrusted'/'prompt injection'… |
+| SEC-T0014-3 | T-0014 | docs-example | low / 0.4 (filtered: not valid, 0.9); not a defect | yes - memory_auto.py:159 raise ValueError("refusing to stor… |
+| SEC-T0014-4 | T-0014 | docs-example | low / 0.35 (filtered: not valid, 0.9); not a defect; non-security suggestion left to the user (D4b); recorded for close-out | yes - memory_auto.py:153 unpacks all four, :162 hands out [… |
+| SEC-T0014-5 | T-0014 | test-hygiene | low / 0.15 (filtered: not valid, 0.95); not a defect | yes - tests/test_memory_auto.py:159 exec( |
+| T0014-EXCL-1 | T-0014 | log-injection | excluded by candidate reviewer (ungraded); not a defect (self-excluded) | yes - agent.py:56-58 |
+| T0014-EXCL-2 | T-0014 | log-injection | excluded by candidate reviewer (ungraded); not a defect (self-excluded) | yes - debug.py:39 raise TypeError( (message body not re-rea… |
+| T0014-EXCL-3 | T-0014 | debug-prints-args | excluded by candidate reviewer (ungraded); teaching note; recorded as a teaching caution; pre-existing v0.6 behaviour | yes - debug.py:55-57 prints args on raise, :60-62 prints ar… |
+| SEC-T0015-1 | T-0015 | test-hygiene | low / 0.3 (filtered: not valid, 0.92); not a defect | yes - test_internal_paths_silent.py:317-330 Popen with --ho… |
+| SEC-T0015-2 | T-0015 | test-hygiene | low / 0.25 (filtered: not valid, 0.92); not a defect (also stage-6 S-24, left as is) | yes - _free_port at :284-288, used at :316 before Popen |
+| SEC-T0015-3 | T-0015 | test-hygiene | low / 0.35 (filtered: not valid, 0.93); fixed (post-review test commit): requests use a proxy-less opener | no - test_internal_paths_silent.py:346 build_opener(ProxyHa… |
+| SEC-T0015-4 | T-0015 | test-hygiene | low / 0.15 (filtered: not valid, 0.93); not a defect | yes - test_internal_paths_silent.py:239 filters only a drop… |
+| SEC-T0015-5 | T-0015 | test-hygiene | low / 0.1 (filtered: not valid, 0.95); not a defect | yes - tests/legacy/support.py:121 sys.path.insert(0, str(tm… |
+| SEC-T0015-6 | T-0015 | test-hygiene | low / 0.3 (filtered: not valid, 0.93); not a defect; not changed | yes - Popen at :317, reader.start() at :344, try: at :349 |
+| SEC-T0015-7 | T-0015 | test-hygiene | low / 0.2 (filtered: not valid, 0.97); not a defect (also stage-6 S-15, left as is) | yes - test_matrix_w01_w18.py:479 only sys.modules.pop(f"can… |
+| SEC-T0016-1 | T-0016 | docs-example | low/0.35 candidate; rejected (0.9); not a defect; wording fixed at stage 6 | no - ludus-migration.md:152 names `cantus-agent`; :72, :128… |
+| SEC-T0016-2 | T-0016 | docs-example | low/0.4 candidate; rejected (0.9); not a defect; not changed | yes - ludus-migration.md:275 still only says "Commit and op… |
+| SEC-T0016-3 | T-0016 | docs-example | low/0.45 candidate; rejected (0.85); not a defect; not changed (user decision D8) | yes - checks unchanged at ludus-migration.md:163, :187 (nam… |
+| SEC-T0016-4 | T-0016 | install-smoke | low/0.3 candidate; rejected (0.9); not a defect; not changed | yes - ludus-migration.md:163 and :258 still run `python -c… |
+| SEC-T0016-5 | T-0016 | http-skips-hooks / serve-no-auth | low/0.35 candidate; rejected (0.9); CHAIN INPUT; not a defect; recorded as chain-analysis input | yes - app.py:249 calls `tool_instance.run(**body)` directly… |
+| SEC-T0016-6 | T-0016 | docs-example | low/0.2 candidate; rejected (0.92); not a security defect; doc-quality fix (P-08) | mitigated - ludus-migration.md:147 and :255 tell the reader… |
+| SEC-T0017-1 | T-0017 | dual-route-rules | medium/0.45 candidate; rejected (0.8); CHAIN INPUT; not a defect; operator note added in both directions (0fb8419) | partly - serve.md has no `/skills` mention (grep: only /too… |
+| SEC-T0017-2 | T-0017 | dual-route-rules | low/0.15 candidate; rejected (0.85); not a defect; not changed, optional hardening sentence left open (ticket Comments, open i… | yes - no normalisation/allow-list sentence in tool.md (grep… |
+| SEC-T0017-3 | T-0017 | model-output-key / remote-tool-prompt-injection | low/0.3 candidate; rejected (0.88); CHAIN INPUT; not a defect; not changed, optional doc sentence left open | yes - adapters.md:83-84 `Agent(model, tools=remote_tools)`;… |
+| SEC-T0017-4 | T-0017 | registry-fallback | low/0.3 candidate; rejected (0.85); not a defect; wording fix adopted (0fb8419) | yes (behaviour) - agent.py:98-101 uses `_get_global_registr… |
+| SEC-T0017-5 | T-0017 | registry-fallback / shared-registry | low/0.2 candidate; rejected (0.88); CHAIN INPUT; not a defect; doc sentence adopted (0fb8419) | yes - registry.py:175 `self._by_kind[kind][name] = instance… |
+| T-0017 F-02/F-03 (stage 6, chain input) | T-0017 | http-skips-hooks | stage 6 finding, no security grade; CHAIN INPUT; fixed in the pages at stage 6; recorded as chain input (R2-5 family) | yes - hooks/validate_args only at agent.py:493-532; serve c… |
+| SEC-T0018-1 | T-0018 | dual-route-rules | low/0.45 candidate; rejected (0.85); CHAIN INPUT; not a defect; not changed (R15) | yes - quickstart-desktop.md:93 unchanged in substance; no `… |
+| SEC-T0018-2 | T-0018 | dual-route-rules | low/0.35 candidate; rejected (0.85); CHAIN INPUT; not a defect; not changed | yes - google-chat.md:147 names only `/tools` |
+| SEC-T0018-3 | T-0018 | shared-registry | medium/0.5 candidate; rejected (0.8); CHAIN INPUT; not a defect; doc suggestion adopted (04d108e) | yes (behaviour, now documented) - tips.md:157 `agent.regist… |
+| SEC-T0018-4 | T-0018 | registry-fallback | low/0.4 candidate; rejected (0.85); not a defect; wording aligned to the Tool page (04d108e) | yes (behaviour) - agent.md:20 documents it; agent.py:98-101 |
+| SEC-T0018-5 | T-0018 | serve-no-auth | low/0.55 candidate; rejected (0.85); CHAIN INPUT; not a defect (pre-existing); shown to the user, not changed; left for retrospective (tick… | yes - line.md:55-59 has no `--auth-mode`, :69 `cloudflared… |
+| SEC-T0018-6 | T-0018 | docs-example | low/0.15 candidate; rejected (0.95); not a defect; not changed (R16) | yes - line.md:8; pyproject.toml:7 `version = "0.6.0"` |
+| SEC-T0018-7 | T-0018 | docs-example | low/0.25 candidate; rejected (0.9); not a defect; sentence added (04d108e) | no (addressed) - quickstart-agent.md:175 says an agent buil… |
+| SEC-T0018-8 | T-0018 | shared-registry | low/0.2 candidate; rejected (0.9); not a defect; not changed | yes - tips.md:71-72; registry.py:175 |
+| SEC-T0019-1 | T-0019 | http-skips-hooks | low/0.5 candidate; rejected (0.85); CHAIN INPUT; not a defect; sentence adopted (73fd75c) | addressed in doc - guide :1477-1478; behaviour remains at c… |
+| SEC-T0019-2 | T-0019 | deprecation-signal | low/0.55 candidate; rejected (0.85); not a defect; doc fix adopted (73fd75c) | no (doc fixed) - guide :1475 "assigned to the class or to a… |
+| SEC-T0019-3 | T-0019 | deprecation-signal | low/0.45 candidate; rejected (0.85); CHAIN INPUT; not a defect; doc fix adopted (73fd75c) | yes (design) - guide :2042-2044 now warns and suggests `mes… |
+| SEC-T0019-4 | T-0019 | dual-route-rules | low/0.6 candidate; rejected (0.85); not a defect; doc fix adopted (73fd75c) | no (doc fixed) - guide :1056-1058 lists both families and t… |
+| SEC-T0019-5 | T-0019 | dual-route-rules | low/0.6 candidate; rejected (0.85); CHAIN INPUT; not a defect; regenerated entry (b994485) | no (doc fixed) - CHANGELOG.md:17 gives `/skills`→`/tools` a… |
+| SEC-T0019-6 | T-0019 | dual-route-rules | low/0.55 candidate; rejected (0.85); CHAIN INPUT; not a defect; doc fix adopted (73fd75c) | no (doc fixed) - guide :2200 and X11 at :1591-1593 |
+| SEC-T0019-7 | T-0019 | model-output-key | low/0.45 candidate; rejected (0.85); CHAIN INPUT; not a defect (frozen-spec decision); doc sentence adopted (73fd75c) | yes (by design) - tool_call.py:50-54 checks `tool_name` fir… |
+| SEC-T0019-8 | T-0019 | dual-route-rules | low/0.3 candidate; rejected (0.85); not a defect; not changed | yes - no normalisation sentence in the guide (grep percent\… |
+| SEC-T0019-9 | T-0019 | serve-no-auth | low/0.3 candidate; rejected (0.9); CHAIN INPUT (via T-0020); not a defect; note adopted (73fd75c) | yes (example) with note - guide :907-909 says examples run… |
+| SEC-T0019-10 | T-0019 | deprecation-signal | low/0.3 candidate; rejected (0.93); not a defect; not changed (T-0012 design D3) | yes (by design) - _aliases.py:61-64 returns if the template… |
+| SEC-T0019-11 | T-0019 | docs-example | low/0.15 candidate; rejected (0.92); not a defect; not changed | yes - guide :912 `PYTHONPATH=. cantus serve --registry-impo… |
+| SEC-T0020-1 | T-0020 | ci-credentials | low/0.2 candidate; rejected (0.92); not a defect; recorded as known | yes - test_rename_sweep.py:186 `file_path.read_bytes()`; no… |
+| SEC-T0020-2 | T-0020 | ci-credentials | low/0.25 candidate; rejected (0.9); fixed as robustness (5791a62) | no - `_git_env()` drops `GIT_*` (:115); `_TMP_GIT_ENV` sets… |
+| SEC-T0020-3 | T-0020 | ci-credentials | low/0.15 candidate; rejected (0.95); CHAIN INPUT; not a defect (pre-existing); deferred to a low-priority 0000-maintenance ticket, user dec… | yes - six steps without it: docs.yml:18, release.yml:27, cr… |
+| SEC-T0020-4 | T-0020 | supply-chain | low/0.3 candidate; rejected (0.9); not a defect; not changed (approved N3) | yes - cell 4: `cantus_version = "v0.6.0"`, the note about `… |
+| SEC-T0020-5 | T-0020 | serve-no-auth / http-skips-hooks | low/0.3 candidate; rejected (0.88); partly adopted (fc3be11) | partly - llms.txt:110 states no hook via `cantus serve`; :2… |
+| SEC-T0020-6 | T-0020 | serve-no-auth | low/0.3 candidate; rejected (0.85); CHAIN INPUT; not a defect (pre-existing, D15); deferred to a 0000-maintenance docs ticket plus an OPEN… | yes - the three lines above; security note at docs/quicksta… |
+| SEC-T0020-7 | T-0020 | dual-route-rules | low/0.2 candidate; rejected (0.9); CHAIN INPUT; not a defect; not changed (consistent with T-0018 R15) | yes - no `/skills` in docs/quickstart-desktop.md (grep); bo… |
+| SEC-T0020-8 | T-0020 | install-smoke | low/0.15 candidate; rejected (0.9); CHAIN INPUT; not a defect (verification credibility, pre-existing); deferred to a 0000-maintenance tic… | yes - smoke_install.sh:33 and cross-platform-install.yml:42… |
+| SEC-T0020-9 | T-0020 | memory-untrusted | low/0.15 candidate; rejected (0.92); CHAIN INPUT; not a defect; doc fix adopted (fc3be11) | yes (behaviour) - llms.txt:148 documents `auto.tools` with… |
+| T-0020 CI fix outside reviewed range (Comments only) | T-0020 | supply-chain | ungraded; not reviewed at stage 6/7; recorded in ticket Comments for the user to weigh at landing; landed with PR #71 | yes - supply-chain.yml:54-56 and :127 record the removal; C… |
+| T-0020 pyproject ruff per-file ignore (Comments only) | T-0020 | ci-credentials | ungraded; lint config only; recorded in ticket Comments | unknown - not checked in pyproject.toml |
+| T-0016 open items (Comments only) | T-0016 | http-skips-hooks / install-smoke | ungraded; left as is; raise at the retrospective | yes - ludus-migration.md:26 and :67-68 state the gate is no… |
+| T-0018/T-0020 Known, not changed: missing PYTHONPATH and grammar claims (Comments only) | T-0018, T-0020 | docs-example | ungraded; documentation accuracy, not security; recorded as known, not changed | yes for the quickstart command lines (docs/quickstart-deskt… |
+| T-0018 coverage note: /docs and /openapi.json unauthenticated | T-0018 | serve-no-auth | not a candidate; listed as pre-existing and not covered; recorded (coverage limitation) | yes - config.py:71-72 defaults `/docs`, `/openapi.json`; ap… |
+| T-0019/T-0020 stage 8 coverage gaps (Comments only) | T-0019, T-0020 | dual-route-rules | ungraded; recorded | n/a (evidence gap, not code) - bearer/none parity matches c… |
