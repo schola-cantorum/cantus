@@ -226,6 +226,7 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   | repository checks | ruff, mypy (89 files), dev paths, verify-project (rc 0), `docs:api` no diff, `docs:build` | all pass (`repo-checks-fdf6359.txt`) | — | — |
   | readings | `readings_check.py` | 17/17 on `fdf6359` (`readings-check-fdf6359.txt`); 7 fail on the base | — | prose readings are stage 6's |
   | TR-133 in CI | the `cross-platform-install` workflow | pending: runs on the PR | AC-36 | recorded after the push |
+  | Stage 8, Colab | the stage-8 Colab entry below | — | AC-40 (TR-150) | AC-40 is not verified: the count half is vacuous (both builds at the ceiling, every model output empty); the W2 half and the T4 condition hold |
 - **Stage 6 (2026-11-19), reviewed range `13ddcbc...dccb737`.** Five `harness-reviewer` axes in one
   Workflow: Standards 26 findings (2 medium), Spec requirements with a per-row mapping 14 (2 medium), sweep
   exactness against traceability 4.1–4.3 13 (1 medium), llms.txt facts 10 (1 medium), facts of the other
@@ -323,3 +324,42 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
     `ImportError: cannot import name 'tool'`, as the usage text says (`smoke-fdf6359.txt`).
   - **Rendered Markdown** (markdown-it in agent-browser): `stage8/browser/browser.md`.
   - Not covered here: Colab (AC-40, by hand, below), CI (after the push), real provider APIs, Windows.
+- **Stage 8, Colab (2026-11-20, the user by hand, D7 A). AC-40 is not verified: the count half is
+  vacuous.** Surface: a Colab notebook kernel on a Tesla T4 (driver 580.82.07, CUDA 13.0 as torch
+  reports it, Python 3.13.16), two kernel sessions of one runtime (pids 3891 and 9740). Records, the
+  cells run and the deviations: `.proj.specs/0001-tool-rename-phase-one/reports/T-0020-colab/`.
+  The reading was recomputed from the raw turn records and the executed notebook by three independent
+  agents before this entry was written.
+  - Builds: `cantus-agent==0.6.0` from PyPI (no `cantus.tool`), then the wheel of `fdf6359` (sha256
+    `bf6795cb…09a460517`, recomputed in Colab and recorded in `direct_url.json`; `cantus.tool` present,
+    after the restart). The two `pip freeze` files differ only in the cantus line.
+  - Package versions (not pinned, D7b): torch 2.14.1+cu130, transformers 5.22.1, bitsandbytes 0.50.2,
+    accelerate 1.15.0, huggingface_hub 1.33.0, tokenizers 0.23.3, safetensors 0.8.0, pydantic 2.14.2.
+    Diff against T-0010's freeze: none; the v0.6.0 freeze is byte-identical to T-0010's.
+  - Model: the same mirror as T-0010 (Hub commit `b324173c7d5721c2baba7f3b17b3b9b3d34ab1e9`, the same
+    file hashes). The T4 smoke (D4) loaded it and generated text; the noise probe is identical within
+    each run and across the builds.
+  - Count half: v0.6.0 60 `action_parse` errors, branch build 60, 12 for each of the five queries,
+    every one `error_type: json_syntax`; no tool call, no final answer, W13 count 0, every query ended
+    in `MaxIterationsObservation`. All 120 raw outputs are the empty string. The 60 prompt pairs differ
+    only in the catalog key (`"skill"` against `"tool"`).
+  - Turns that reached the name key: 0 on each build. The run therefore says nothing about the
+    rename's effect on the model.
+  - Offline cross-replay (both builds' parsers, run locally): 0 of 120 outputs classified differently,
+    no warning. With every output empty it adds nothing.
+  - W2 half, on the branch build: a cell applying `@skill` printed W2 once; the first import of a
+    helper module applying `@skill` printed W2 once, attributed to `/content/w2_helper_module.py:4`,
+    the decorator line. Shown.
+  - Reading (the rule above, fixed before the run): the branch total is not greater than v0.6.0's, both
+    totals are 60 and the per-`error_type` distributions are equal, so the count half is
+    **not verified (vacuous)**. Both summaries record a T4 and both W2 cells show W2, but AC-40 needs
+    the count half to hold non-vacuously, so **AC-40 is not verified**. Closing the epic with AC-40
+    unverified is the user's decision at close-out (D5b); no later ticket repeats the run.
+  - Not tested here: why the output is empty. No diagnostic was made (D6). The result is consistent
+    with T-0010's L4 diagnostic (cantus's prompt is sent without the chat template and the first token
+    is end-of-turn), which was not repeated on the T4. This run forced greedy decoding; default
+    sampling was not tried on the T4.
+  - Deviations: B1 as generated failed with `SameFileError` when the wheel was uploaded to `/content`
+    (the user guarded the copy line and re-ran it; the generator is fixed); the packing cell's `tar`
+    returned 1 (`file changed as we read it`) and the archive was checked complete; the others are in
+    the records' README.

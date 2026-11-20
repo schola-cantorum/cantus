@@ -1,0 +1,44 @@
+{
+ "dir": "<Drive mirror folder>/gemma-4-E2B-it-4bit",
+ "commit_hashes": [
+  "b324173c7d5721c2baba7f3b17b3b9b3d34ab1e9"
+ ],
+ "files": {
+  ".gitattributes": {
+   "size": 1570,
+   "sha256": "34448b82c17d60fec9b65b1f093c115ddbaadc04beb1b0140b6bfed2e012a930"
+  },
+  "README.md": {
+   "size": 26708,
+   "sha256": "12bb9ae9ceecb0d8dc3712187e4347202d3ac05328ccdd3c797310fdafee646a"
+  },
+  "chat_template.jinja": {
+   "size": 16804,
+   "sha256": "33204f1acb5bd0002713e16a593847f24ceeafe711ed88bda2a352dc996a3373"
+  },
+  "config.json": {
+   "size": 4954,
+   "sha256": "1b28f3d2c3100f6c594754b81107428bd7b822a7f48272ca681dae9d2ec38330"
+  },
+  "generation_config.json": {
+   "size": 208,
+   "sha256": "d4226bbe3117d2d253ba4609720ba82c6c4ce4627a9a6ae05387c78983ac03de"
+  },
+  "model.safetensors": {
+   "size": 10246621918,
+   "sha256": "2db5482b20d746879bb3ef79b5203e9075a2e2b98f54ec7c2f281c1477ddc550"
+  },
+  "processor_config.json": {
+   "size": 1689,
+   "sha256": "32bdf45d2ad4cc29a0822ddd157a182de76644f0419a6228d151495256e9813c"
+  },
+  "tokenizer.json": {
+   "size": 32169626,
+   "sha256": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f"
+  },
+  "tokenizer_config.json": {
+   "size": 2095,
+   "sha256": "90c3a3ba5bf53818383a58e1a776cbcacd2a038d4812eaa373e1522f2d06f3df"
+  }
+ }
+}
