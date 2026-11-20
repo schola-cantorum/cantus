@@ -225,7 +225,7 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
   | N1–N5 (`nbrun20.py`) | 8 rows | base 5 rows fail (`nbrun-red-13ddcbc-harness-fdf6359.txt`; N1b's base failure is a harness precondition: the template text differs); head 8/8 (`nbrun-green-fdf6359.txt`), any warning other than IPython's own `%pip` forkpty warning fails; N1b counts both hook calls; mutations 9/9, control 1/1 (`mutations-nb-fdf6359.txt`) | R2-13, C2-F20, Deliverable | real providers (N5 uses stand-in chat models); Colab (stage 8) |
   | repository checks | ruff, mypy (89 files), dev paths, verify-project (rc 0), `docs:api` no diff, `docs:build` | all pass (`repo-checks-fdf6359.txt`) | — | — |
   | readings | `readings_check.py` | 17/17 on `fdf6359` (`readings-check-fdf6359.txt`); 7 fail on the base | — | prose readings are stage 6's |
-  | TR-133 in CI | the `cross-platform-install` workflow | pending: runs on the PR | AC-36 | recorded after the push |
+  | TR-133 in CI | the `cross-platform-install` workflow | install smoke passes on ubuntu-latest, macos-latest and windows-latest for PR #71 at `8db0c28` (Actions run 44669440377) | AC-36 | — |
   | Stage 8, Colab | the stage-8 Colab entry below | — | AC-40 (TR-150) | AC-40 is not verified: the count half is vacuous (both builds at the ceiling, every model output empty); the W2 half and the T4 condition hold |
 - **Stage 6 (2026-11-19), reviewed range `13ddcbc...dccb737`.** Five `harness-reviewer` axes in one
   Workflow: Standards 26 findings (2 medium), Spec requirements with a per-row mapping 14 (2 medium), sweep
@@ -363,3 +363,16 @@ T-0013 遺留的三個 server 已停掉（D18）；T-0013 的 AC-42 紀錄因此
     (the user guarded the copy line and re-ran it; the generator is fixed); the packing cell's `tar`
     returned 1 (`file changed as we read it`) and the archive was checked complete; the others are in
     the records' README.
+- **CI on PR #71 (2026-11-20), first run at `8db0c28`.** Passing: pytest on 3.10, 3.11 and 3.12, the
+  three install smokes (TR-133), the documentation build, repo hygiene, verify-project, pip-audit
+  `main` and `mlx`. Two failures:
+  - `ruff + mypy`: E401 in `reports/T-0020-colab/t0020_colab.py:356`, the Colab program committed as a
+    record in `bf9e2ab`; `ruff check .` was not re-run before that push. Fixed by a per-file ignore
+    in `pyproject.toml` for that one file, so the record stays byte-identical to what ran. This is the
+    only change to a file outside `.proj.*` after `fdf6359`; it touches lint configuration only, not
+    the wheel's contents.
+  - `pip-audit (openhands)`: not caused by this change. The audit itself finds nothing; the job fails
+    its own staleness guard because the `openhands` extra now resolves `pillow 13.0.0` while the
+    group's acknowledgements are for `pillow==12.3.0` (T-0021). The guard asks for the two matrix
+    fields to be deleted in `.github/workflows/supply-chain.yml`. That is a workflow change with its
+    own stage 7, so it is left for a `0000-maintenance` ticket and the user's decision.
