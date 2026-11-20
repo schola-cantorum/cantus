@@ -544,10 +544,10 @@ and needs a spec; a script or an agent prompt may fit the lightweight path (ADR-
   tool; or a general agent prompt like the ludus one.
 - Scope: mechanical renames only, or also a report of the sites it cannot rewrite safely.
 - Notebooks: whether `.ipynb` cells are rewritten (students work in Colab).
-- Implementation language. The user asked on 2026-11-20 whether a Rust extension through PyO3 would
-  be faster. Advice given, not a decision: stay in Python (the standard library's `ast` and
-  `tokenize`, or LibCST), because student projects are small and a compiled extension would end the
-  pure-Python wheel and add per-platform builds for Windows, macOS, Linux and Colab.
+- Library: the standard library's `ast` and `tokenize`, or LibCST as an optional dependency.
+  Ruled out by the user on 2026-11-20: a Rust extension through PyO3. Student projects are small, and
+  a compiled extension would end the pure-Python wheel and add per-platform builds for Windows,
+  macOS, Linux and Colab.
 - Timing: before the async-core epic (the user's preference), with the v0.7.0 release, or with
   alias removal in the seventh epic, when unmigrated code stops working.
 - Whether later epics that rename public names add their own rules to the same tool.
