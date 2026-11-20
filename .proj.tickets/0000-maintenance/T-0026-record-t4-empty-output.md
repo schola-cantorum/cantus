@@ -2,7 +2,7 @@
 id: T-0026
 title: Record the empty model output on Colab T4 as OQ-015
 epic: 0000-maintenance
-status: review
+status: done
 blocked_by: []
 lightweight_reason: Adds one deferred question to .proj.specs/OPEN-QUESTIONS.md only; no change to cantus/ runtime behaviour, public API, tests, workflows, pyproject dependencies or guard scripts.
 ---
