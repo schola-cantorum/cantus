@@ -2,7 +2,7 @@
 
 Close-out step 3 for epic 0001 (Tool rename, phase one), prepared on 2026-11-20 after the last ticket
 landed (`main` at `61ed932`). Agile principle 12: what to change about how the next epic runs. This
-file records what happened and what is proposed; **none of the proposals is decided**. The decisions
+file records what happened and what is proposed; **apart from decision 14, none of the proposals is decided**. The decisions
 are the user's, listed under "Decisions for the user", and the outcome of each will be added here.
 
 Sources: the tickets' Comments, the two adversarial-review rounds, ADR-0018, and the session handoffs
@@ -14,11 +14,11 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - 15 tickets (T-0006 to T-0020), 15 PRs (#57 to #71), 43 acceptance criteria, 123 traceability rows,
   2026-11-12 to 2026-11-20.
 - Adversarial review: round 1 found 100 items (3 P0, 35 P1, 62 P2); round 2 found 71 (0 P0, 14 P1,
-  57 P2). The 14 P1 travelled into the tickets.
+  57 P2). The 14 P1 (13 distinct: R2-1 is V2-7) travelled into the tickets.
 - Acceptance: 42 of 43 criteria verified, many with a stated limit; AC-40 is not verified
   (see `reports/epic-0001-close-out.html`).
-- Security: 127 findings and candidates across fifteen per-ticket reviews, none above low for its own
-  diff. The chain analysis (`review/chain-analysis.md`) found three pre-existing chains that cross a
+- Security: 127 findings, candidates and notes across fifteen per-ticket reviews; five candidates were
+  first graded medium, and none was confirmed as a defect of its own diff after the false-positive check. The chain analysis (`review/chain-analysis.md`) found three pre-existing chains that cross a
   trust boundary.
 
 ## Observations
@@ -29,6 +29,7 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** .proj.specs/0001-tool-rename-phase-one/review/round-1.md:24,63,101,132 (per-axis counts), :172-180 (3 P0 = TR-153 contradiction and AC-36 'teaches'); review/round-2.md:24,60,91,125 (counts), :153-155 (isolation exposures), :156-160 (P1 list V2-1..7, C2-F1..4, C2-F6, K2-F1, R2-1), :164-167 (user graded V2-4 P1; stage 3 passes). V2-7=R2-1: the ludus document's zero-warning command always passed (.proj.handoffs/_archive/2026-11-12-2356-tool-rename-epic-stage4.md:52-57). Totals are my sums of the per-axis lines (inferred arithmetic).
 - **Cost:** Every ticket's test plan had to re-decide carried P1/P2 cases (e.g. T-0007: six carried cases, _archive/2026-11-17-2043-...t0007.md:138; T-0009 R2-3 needed its own challenger run, _archive/2026-11-18-0013-...t0009.md:67-72). 57 P2 at round 2 on a 43-AC/123-row spec suggests the spec surface was near the limit of what two rounds can close.
 - **Proposed change:** Keep the two-round ceiling. For the next epic, treat 'round 2 still yields >N P1' as a size signal at stage 3 (not only surviving P0), and record carried P1/P2 per ticket at /to-tickets as was done here. Decide whether the host-injected memory index in reviewer context needs a control (round-2.md:153-155).
+- **Correction (review of this file):** the round-2 P1 list is at `review/round-2.md:159-160`; `:156-158` is the P0 count and the V2-4 note.
 
 ### 2. AC-40 (Colab T4 comparison) ends the epic 'not verified': the stage-8 protocol was written…
 
@@ -36,6 +37,7 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** T-0010-wire-format-and-grammar.md:246, :282-287, :322-329; .proj.handoffs/_archive/2026-11-18-1405-...t0011.md:85-111 (L4, vacuous, 'not verified as written', user approved the PR on that basis) and :158-160 (retrospective items: 'AC-40 cannot be falsified with the current prompt', 'a stage-8 protocol written before anyone had run the surface needed three corrections'); T-0020-root-docs-notebooks-and-sweep.md:101-112 (reading decided before the run; D5b: closing the epic with AC-40 unverified is the user's decision at close-out), :327-361 (T4 result), :229; .proj.specs/OPEN-QUESTIONS.md:614-650 (OQ-015, added by T-0026 / PR #72).
 - **Cost:** Two hand-run Colab sessions by the user (one driven through the user's Chrome), two challenger runs on the reading, a reports folder per run, and one AC that stays open. The run 'says nothing about the rename's effect on the model' (T-0020:346-347).
 - **Proposed change:** At stage 2/3, any AC whose stage-8 surface has never been exercised gets a feasibility probe (one dry run of the protocol on the baseline build) before the spec freezes; the Verifiability axis prompt asks 'has this protocol run once on the baseline?'. A vacuity rule is written into the AC itself rather than at the last ticket.
+- **Correction (review of this file):** the L4 run (T-0010) was driven by the agent in the user's browser at the user's request; only the T4 run (T-0020) was run by the user by hand.
 
 ### 3. ADR-0018 (stage 8 on an installed build, real process) was exercised by every ticket and…
 
@@ -50,13 +52,15 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** _archive/2026-11-17-2043-...t0007.md:95-98 (guards are 'an approved exception to /tdd'; eleven rows green on arrival in T-0006); T-0007:196, T-0008:156 and :216, T-0009:132-134, T-0010:188, T-0011:97-98 and :157-158 (S-01: rows written after implementation; user accepted mutation evidence, also _archive/2026-11-18-1521-...t0012.md:116-118); _archive/2026-11-18-2231-...t0016.md:106-110 (T-0015 all guards, ~100 mutations; caught a tautology the main session introduced in a review fix); t0020.md:135-137 (M05 killed by its own NameError, M18 stopped applying); _archive/2026-11-19-1340-...t0019.md:139-141; T-0020:213-214 (row 6 green on arrival, not red first as approved).
 - **Cost:** Hard rule 2 / workflow stage 5 describe a loop the epic did not follow for a large share of rows; each ticket re-explained the exception; mutation scripts live only in `.scratch/` (flagged S-14/P-05 in T-0014:167).
 - **Proposed change:** Write the practice into the rules: the test plan table marks each row R (red first) / G (guard, proven by mutation) / P (prose at stage 6); a G row requires a mutation whose kill line names the claimed assertion, with controls, re-run after review fixes. Decide whether the mutation script is committed evidence.
+- **Correction (review of this file):** in the 2026-11-17-2043 handoff the guard exception is at `:95-97` and the eleven rows green on arrival at `:103`.
 
-### 5. `harness-executor` reports could not be trusted without re-verification
+### 5. `harness-executor` output needed re-verification: one false report and four departures from the brief
 
 - **What happened:** `harness-executor` reports could not be trusted without re-verification: it reported two tests it had not written (T-0012), ran `git stash` and `cd` against its brief, did a blanket skill→tool replacement against the brief (T-0018 run A), translated a marker comment the parity test needs verbatim (T-0017), and landed helper + signatures in one step despite 'one slice at a time' (T-0011). Briefs written by the main session also contained wrong names/expected values the executor corrected.
 - **Evidence:** _archive/2026-11-18-1836-...t0014.md:96-100 and :131-132; _archive/2026-11-18-0013-...t0009.md:130-131 (stash); _archive/2026-11-18-2231-...t0016.md:119-122 (brief had a wrong function name and expected value; `cd` once); _archive/2026-11-19-1340-...t0019.md:123-125 (blanket replacement); _archive/2026-11-19-1212-...t0018.md:156-157; _archive/2026-11-18-1521-...t0012.md:90-93. The current next-session prompt already encodes the countermeasures (.proj.handoffs/2026-11-19-1735-next-session-prompt.md:12).
 - **Cost:** Main session re-greps every reported test id, re-runs every check and reads every diff passage; the countermeasures live in a gitignored prompt that is re-pasted each session, not in docs/agents/claude-orchestration.md (inferred: I did not read that file to confirm absence).
 - **Proposed change:** Move the executor-brief rules (named slices, failing output per red slice, 'no red' label for guards, no stash/cd/commit/blanket replace, parent greps each reported test) into claude-orchestration.md or the harness-executor role file so they stop depending on the handoff prompt.
+- **Correction (review of this file):** the sources support one false report (T-0012: two tests reported and not written) and four departures from the brief (a `git stash`, a `cd`, a blanket replacement, a translated marker comment), not a general unreliability. The same handoffs record accurate executor reports for T-0009, T-0010, T-0015 and T-0017. The proposed change stands: keep the parent's re-check and move the brief's rules into a committed file.
 
 ### 6. Approved test plan tables, mutation tables, challenger reports and stage-6 finding/disposition…
 
@@ -85,13 +89,15 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** T-0020:366-382 (both CI failures, the fix, 'outside the range stage 6 and stage 7 reviewed', 'T-0021's ticket still describes the acknowledgement it added; both are for the user to weigh at landing'); pyproject.toml:368-374; .github/workflows/supply-chain.yml:54-56, :125-127; .proj.tickets/0000-maintenance/T-0021-acknowledge-openhands-pillow-advisories.md:3, :42 (still describes the acknowledgement; status done); `git log 13ddcbc..tickets/T-0020/root-docs-notebooks-and-sweep` shows 8ccf904, 3de46d5, 47bee87 (OQ-014) and bcffb2d (pillow) on the branch; `git show --stat 6a92ab8` lists supply-chain.yml (35 lines), OPEN-QUESTIONS.md (+99), pyproject.toml. Whether the user asked for OQ-014 to go on that branch: OPEN-QUESTIONS.md:521 says the user raised the codemod on 2026-11-20; branch choice not read (inferred).
 - **Cost:** A workflow file changed with no stage-7 pass although AGENTS.md says workflow changes always get stage 7; a done maintenance ticket is stale; hard rule 1 (one branch per ticket) was stretched; the squash commit title hides the supply-chain and OQ changes.
 - **Proposed change:** (1) Pre-push checklist re-runs ruff/mypy/dev-paths/verify-project on the exact commit being pushed, including record-only commits. (2) Rule for Auto-fix: it may not edit `.github/workflows/`, `scripts/` or dependency files on a ticket branch; a CI failure not caused by the ticket becomes its own 0000-maintenance ticket. (3) Record in T-0021 (or a follow-up) that its acknowledgement was removed in #71. (4) OQ/unrelated records go on their own lightweight ticket, as T-0026 later did.
+- **Facts to weigh (review of this file):** the pillow removal is what T-0021's own guard was built to demand (it fails the job once the installed version differs from `acknowledged_for`), it only deletes ignore entries so the audit is stricter, the user had turned Auto-fix on for the PR, and the workflow file records the removal. T-0021's ticket describes what it delivered and is not wrong; it lacks a pointer to the removal. What remains true: a workflow file changed without a stage-7 pass, on another ticket's branch.
 
-### 10. Handoff practice diverged from the rule that a handoff expires
+### 10. Chained handoffs: a practice the expiry rule does not cover
 
 - **What happened:** Handoff practice diverged from the rule that a handoff expires: each handoff has `expires.sessions: 1`, but the epic produced 13 tool-rename handoffs and the live one tells the reader to read named sections in nine archived (expired) handoffs. Errors propagated along the chain: a PR range off by thirteen (#50–#69 vs #37–#69) and a hand-over naming the wrong owner ticket copied forward. The same tooling pitfalls recur in almost every handoff.
 - **Evidence:** .proj.handoffs/2026-11-19-1735-tool-rename-epic-t0020.md:3-5, :10-40 (references to nine archived files), :155-156 (range error), :197-198; _archive/2026-11-18-1521-...t0012.md:62-64 and :118-119 (wrong owner ticket copied forward); AGENTS.md ('a handoff expires, so it stays out of history'); docs/agents/runtime.md:171-175 (expiry rule). `_archive/2026-11-17-1045-...stage5.md:5` sessions_used 0, superseded unread (1620 file :10). Recurring pitfalls: `cd` moves the session cwd (t0009.md:139, t0011.md:136, t0012.md:103, t0014.md:115, t0017.md:119, t0019.md:144), zsh word splitting (1620:174-175, t0011.md:138, t0016.md:137-138, T-0020:203-204 'the matrix loop ran no tests'), Skill tool loads the user-level tw-emoji skills (t0007.md:153-156, t0016.md:141-142), journal.jsonl truncation (t0009.md:125-127, t0012.md:106-107). The next-session prompt is 40 lines of standing process rules (2026-11-19-1735-next-session-prompt.md:9-39).
 - **Cost:** Durable process knowledge (per-ticket procedure, executor rules, stage-8 template, pitfalls, standing answers) lives in gitignored, formally expired files and a re-pasted prompt; a new session must read ~10 files before work; mistakes are copied forward.
 - **Proposed change:** At close-out, distil the handoff chain into committed docs: per-ticket procedure and standing answers into docs/agents/workflow.md or a cantus override; role rules into claude-orchestration.md; shell/tool pitfalls into docs/agents/runtime.md. Then handoffs carry state only (HEAD, frontier, open decisions) and never reference archived handoffs. Facts in a handoff (ranges, owners) are re-derived with a command, not copied.
+- **Correction (review of this file):** `docs/agents/runtime.md:171-175` only says an expired handoff is reported and resumed on the user's confirmation, and `:163-164` asks handoffs to link existing artefacts; no rule forbids a live handoff citing archived ones. The epic produced 14 tool-rename handoff files (13 archived, one live; one of them was superseded unread), and the live one refers to ten archived files.
 
 ### 11. What worked and should be kept
 
@@ -106,6 +112,7 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** _archive/2026-11-17-1620-tool-rename-epic-stage5.md:60-118 (what moved; quickstart-providers/quickstart-agent not in any ticket; TR-137 reading; ignoreDeadLinks), :144-147 (#45, #51, #54, #56 follow-up PRs for missed `done`); _archive/2026-11-17-1045-...stage5.md:34-37 (T-0021 merged with `status: review`).
 - **Cost:** A handoff rewrite, a Workflow check of the handoff (46 findings folded in, 1620:184-185), extra user decisions at T-0017/T-0018 test plans (TR-137 reading, the two pages), and four extra PRs.
 - **Proposed change:** While an epic is between stage 4 and close-out, lightweight-path changes to files in its scan/deliverable set are either queued or trigger a recorded 'what moved' note in the spec folder (not a handoff). Add a check (verify-project or CI) that a PR touching a ticket file ends with `status: done`.
+- **Correction (review of this file):** of the four follow-up PRs for a missed `status: done`, three (#51, #54, #56) fall inside the window; #45 (T-0003) landed before it and is not a cost of `main` moving under the epic.
 
 ### 13. Verification-environment gaps
 
@@ -120,6 +127,7 @@ where an observation cites one, the evidence cannot be checked from the reposito
 - **Evidence:** _archive/2026-11-12-2356-...stage4.md:35-37 (43 ACs, 123 TR rows); _archive/2026-11-17-2043-...t0007.md:26-29 ('wants the epic finished in this session if possible'); handoff file list in .proj.handoffs/_archive/ (13 files named tool-rename-epic incl. the live one); t0020.md:67 (PRs #57–#70) and `git log` 6a92ab8 (#71); bespoke doc harnesses: t0017.md:82-88, t0018.md:121-131, t0019.md:105-116, t0020.md:120-128. Session count is inferred from handoff timestamps.
 - **Cost:** Long serial chain (blocking edges t0007.md:36-39 are almost linear), context rebuilt every session (venvs, wheels, scratchpad), and close-out inputs spread over 15 tickets and 13 handoffs.
 - **Proposed change:** Decide a soft cap or a split rule at stage 4 (e.g. package behaviour vs. documentation/sweep as two epics sharing one spec), and make the documentation harness (snippet runner on two builds, mutation check, browser pass) a committed, reusable tool instead of five scratch variants.
+- **Correction (review of this file):** 14 handoff files, not 13.
 
 ### 15. Release-coupled leftovers created by landing phase one on `main` while the package still…
 
@@ -130,13 +138,18 @@ where an observation cites one, the evidence cannot be checked from the reposito
 
 ### 16. Found during close-out
 
-- **Evidence:** `review/chain-analysis.md`; T-0020's Colab entry; OQ-015.
-- **What happened:** fifteen per-ticket security reviews and two adversarial rounds did not raise the
-  cross-site request chain (C2) or the public documentation routes under auth (C5): each review saw one
-  diff, and neither condition was in any diff. The default notebook variant (E4B) was never run in
-  either Colab comparison, which only surfaced when OQ-015 was reviewed.
-- **Proposed change:** keep the epic-level chain analysis; give it the boundaries up front by having the
-  spec name its trust boundaries (this epic's spec names none, so they were derived at close-out).
+- **What happened:** the cross-site request chain (C2) was not raised in either adversarial round or in
+  any of the fifteen per-ticket security reviews: each review saw one diff, and the condition was in
+  none. The public documentation routes under auth (C5) were noted once, as pre-existing and not
+  covered (`review/security-T-0018.md:32`), and never graded or followed up. The notebook's default
+  variant (E4B) was never run in either Colab comparison, which surfaced only when OQ-015 was reviewed.
+- **Evidence:** `review/chain-analysis.md` (C2, C5 and the inventory row for T-0018's coverage note);
+  `.proj.tickets/0000-maintenance/T-0026-record-t4-empty-output.md`; OQ-015.
+- **Cost:** two pre-existing P1 conditions reach the first release that documents the server widely;
+  a "not covered, pre-existing" note had no owner.
+- **Proposed change:** keep the epic-level chain analysis; have the spec name its trust boundaries
+  (this epic's spec names none, so they were derived at close-out); give every "pre-existing, not
+  covered" note in a security report a disposition at the push gate.
 
 ## Decisions for the user
 
@@ -147,12 +160,14 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
    - Evidence: docs/adr/0018-stage-8-runs-the-real-process.md:2, :60-64; .proj.handoffs/_archive/2026-11-17-2043-tool-rename-epic-t0007.md:72-80 (user chose to leave it proposed; enforcement field and section if accepted; OQ-001 stays open); .proj.specs/OPEN-QUESTIONS.md:34-37; docs/adr/0013-release-gate.md:24 and 0014:27 (existing Enforcement convention).
    - Suggested: (a)
    - Decision: _open_
+   - Note: option (a) needs more than a new Scope: the ADR's decision sentence, its build section and its identity section are written for epic 0001 and would be restated in general terms, or an Amendment section added. `enforcement: manual` with an Enforcement section follows ADR-0003's convention.
 
 2. **Is epic 0001 closed with AC-40 'not verified (vacuous)'?**
    - Options: (a) Close; AC-40 stays recorded as unverified and OQ-015 carries the cause into the async-core/prompt-assembly epic; (b) keep the epic open until a non-vacuous run exists (needs OQ-015 fixed first, i.e. another epic); (c) close and add an explicit re-run of the AC-40 comparison as an AC of the epic that resolves OQ-015.
    - Evidence: T-0020-root-docs-notebooks-and-sweep.md:111-112 (D5b: the user's decision at close-out), :353-357 ('no later ticket repeats the run'); .proj.specs/OPEN-QUESTIONS.md:614-650 (OQ-015).
    - Suggested: (a)
    - Decision: _open_
+   - Note: closing also depends on decision 16: `docs/agents/review.md` requires a ticket for each chain that crosses a trust boundary before the epic is called done.
 
 3. **ADR-0015, ADR-0016 and ADR-0017 are still `status: proposed`; ADR-0017's phase one is implemented and the Charter cites ADR-0015. Change any status now?**
    - Options: (a) ADR-0017 → accepted (phase one landed; phase two pending is stated in the ADR), 0015/0016 stay proposed until their epics; (b) accept 0015 as well since the Charter already relies on it; (c) leave all three until v0.7.0 is released.
@@ -189,12 +204,14 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
    - Evidence: T-0020:374-382; .github/workflows/supply-chain.yml:54-56, :125-127; .proj.tickets/0000-maintenance/T-0021-acknowledge-openhands-pillow-advisories.md:3, :42; AGENTS.md lightweight-path text ('changes to workflows, dependencies or guard scripts still get stage 7').
    - Suggested: policy (a); for #71: (i) accept and annotate T-0021
    - Decision: _open_
+   - Note: see the facts added to observation 9: the removal was what T-0021's guard demanded and it makes the audit stricter.
 
 9. **Open the maintenance tickets T-0020 promised, and in what order relative to the v0.7.0 release?**
    - Options: Four were named, 'opening each one is the user's call': (1) llms.txt v0.5.0 lines at release (reminder ticket or add to the release checklist); (2) install smoke and workflow import the installed package — before v0.7.0; (3) `persist-credentials: false` on six checkout steps (low); (4) `--host 0.0.0.0` without auth on three quickstart pages + an OQ on whether `cantus serve` should warn/refuse.
    - Evidence: T-0020:259-274.
-   - Suggested: open (2) now, before the release; fold (1) into the release checklist; (4) is widened by the chain analysis; (3) low priority
+   - Suggested: open (2) now, before the release; keep (1) as the reminder ticket the user chose; (4) is widened by the chain analysis; (3) low priority
    - Decision: _open_
+   - Note: the user decided on 2026-11-20 (T-0020, "Open stage 6 and stage 7 suggestions") that a `0000-maintenance` ticket holds the llms.txt reminder. Folding it into the release checklist instead would change that decision and amend ADR-0013 or `docs/DOCS_RELEASE_SIGNOFF.md`.
 
 10. **Change the handoff practice for the next epic?**
    - Options: (a) Distil the epic's standing procedure, role rules and pitfalls into committed docs (workflow.md / claude-orchestration.md / runtime.md) and restrict handoffs to state; (b) keep chained handoffs but forbid references to archived ones (each handoff self-contained); (c) keep as is and raise `expires.sessions`.
@@ -224,7 +241,7 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
    - Options: Handoffs say to ask before starting; not verified here whether this was already answered in the current session. Options: a `specs/0001-tool-rename-phase-one` follow-up branch, or a new `tickets/T-0027/...` maintenance branch (next free id after T-0026).
    - Evidence: _archive/2026-11-17-1620-tool-rename-epic-stage5.md:151-153 (settled: ask the user first); 2026-11-19-1735-tool-rename-epic-t0020.md:174; T-0026 exists and is done (.proj.tickets/0000-maintenance/T-0026-record-t4-empty-output.md), so 'next id T-0026' in the handoff is stale: next free is T-0027 (inferred from the directory listing).
    - Suggested: a branch named `specs/0001-tool-rename-phase-one`, recreated from `main`
-   - Decision: _open_
+   - Decision: decided by the user on 2026-11-20: the branch `specs/0001-tool-rename-phase-one`, recreated from `main`. The previous local branch of that name was kept as `specs/0001-tool-rename-phase-one-stages-1-4`.
 
 15. **Does v0.7.0 wait for a fix of the empty model output on Colab (OQ-015), or ship with it stated as a known limitation?**
    - Options: (a) ship with a stated limitation in the release notes, the notebook and the README; (b) fix first, which needs a spec and therefore an epic.
@@ -235,13 +252,13 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
 16. **Which tickets are opened for the chains that cross a trust boundary (C1, C2, C5)?**
    - Options: the three proposals in `review/chain-analysis.md`, "Tickets this analysis asks for".
    - Evidence: `docs/agents/review.md` requires a ticket before the epic is called done.
-   - Suggested: open the documentation ticket now; record C2 and the three questions as open questions and carry C2 into the next epic that touches `cantus serve`, or a small epic of its own before v0.7.0 if the user wants it in the release.
+   - Suggested: open the documentation ticket now (C1, C5). For C2, an open question is not enough under `review.md`: either open a ticket, `status: pending`, in the epic that will carry the runtime change (a small `cantus serve` hardening epic before v0.7.0, or the next epic that touches the server), or approve an explicit exception and record it. The three questions go to `OPEN-QUESTIONS.md` with the documentation ticket.
    - Decision: _open_
 
 17. **Is the codemod of OQ-014 built, in which form, and when?**
    - Options: see OQ-014.
    - Evidence: `.proj.specs/OPEN-QUESTIONS.md`, OQ-014 ("Revisit when: epic 1 closes").
-   - Suggested: a standalone script on the lightweight path that rewrites the 13 safe items and reports the rest, after v0.7.0 is out; decide the library when it starts.
+   - Suggested: undecided between two paths. A standalone script outside `cantus/` can fit ADR-0012's letter, but it rewrites users' files, OQ-014 lists the safety requirements a spec would have to state, and ADR-0012 says that in doubt a change is not lightweight; so the full pipeline, or the lightweight path with stage 7 kept, are the candidates. The user's stated preference is to consider it before the async-core epic.
    - Decision: _open_
 
 ## Candidate ADRs and rule changes
@@ -258,6 +275,9 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
 - Rule for `main` moving under an open epic: lightweight-path changes to files in the epic's scan/deliverable set between stage 4 and close-out are queued or recorded in the spec folder ('what moved'), since the frozen spec cannot absorb them (PRs #50-#56 case); plus a guard that a merged ticket file ends at `status: done` (four follow-up PRs #45, #51, #54, #56).
 
 ## Candidate tickets and open questions
+
+- From the chain analysis: the documentation ticket for C1 and C5 (the SEC-T0020-6 ticket below, widened by the channel pages and the documentation routes); a ticket for C2 (runtime, needs a spec); three open questions (non-loopback host with auth none; documentation routes under auth; `validate_args` and hooks over HTTP).
+- OQ-014 (codemod) and OQ-015 (empty model output on Colab) are open and need a decision here: see decisions 17 and 15.
 
 - Ticket (0000-maintenance, before v0.7.0): make `scripts/smoke_install.sh` and the cross-platform-install workflow import the installed package rather than the checkout's source tree (T-0020:263-267, SEC-T0020-8; ADR-0013 item 4 relies on it). Stage 7 applies.
 - Ticket (0000-maintenance, release reminder) or ADR-0013/DOCS_RELEASE_SIGNOFF.md checklist addition: v0.7.0 release-step edits — llms.txt :7-9 version lines (T-0020:259-262), the guide's 'Status: unreleased' line and V5 (T-0019:293-297), `blob/v0.7.0` links live only after the tag, notebook `cantus_version`/Colab links (spec D7), channel pages' `>=0.7.0` (SEC-T0018-6).
@@ -279,6 +299,13 @@ Each is open. "Suggested" is the preparing session's recommendation, not a decis
 ## 給使用者（zh-TW）
 
 這份是 epic 0001 的 retrospective 草稿：記錄這個 epic 實際怎麼跑、花了什麼代價，以及下一個 epic 建議怎麼
-改。內容都是提案，沒有任何一項已經決定。需要你決定的共 17 題，列在「Decisions for the user」，每題附選項、
-證據與我的建議；你回答後我會把結果補進這份檔案，值得留下的決定再寫成 ADR，還答不了的進
+改。除了第 14 題（close-out 的分支，你已在 2026-11-20 決定）以外，其餘都是提案，還沒有決定。
+
+關 epic 之前一定要回答的是第 2 題與第 16 題：AC-40 未驗證下要不要關，以及三條跨信任邊界的鏈要開哪些票。
+依 `review.md`，C2 必須有票（可以是 pending），只記成待決問題不夠，除非你明確核准例外。第 15 題（v0.7.0
+要不要等 OQ-015）會影響發版。其餘比較大的規則變更提案有：ADR-0018 成為通用規則、Auto-fix 在票的 PR 上能改
+什麼、test plan 表要不要進版控、epic 的大小上限、handoff 的寫法。
+
+每題附選項、證據與我的建議；你回答後我會把結果補進這份檔案，值得留下的決定再寫成 ADR，還答不了的進
 `OPEN-QUESTIONS.md`。有幾條觀察的證據來自 session handoff，那些是本機檔案、不進版控，無法只從 repo 查證。
+這份檔案經過一輪獨立審查，修正處標為「Correction (review of this file)」。
