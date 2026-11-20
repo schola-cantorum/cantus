@@ -114,7 +114,7 @@ openhands = [
 # v0.4.0 — `cantus.serve` / `cantus.config` framework entrypoint. Pulls
 # the FastAPI web framework, the Uvicorn ASGI server, and the
 # pydantic-settings BaseSettings package (pydantic 2.x sibling) so that
-# `cantus.serve(registry)` can expose Skill endpoints + Swagger UI and
+# `cantus.serve.serve(registry)` can expose tool endpoints + Swagger UI and
 # `cantus.config.Settings` can read `CANTUS_SERVE_*` env variables.
 serve = [
     "fastapi>=0.115,<1",
@@ -369,3 +369,6 @@ select = ["E4", "E7", "E9", "F"]
 # Colab notebooks interleave `%pip install` magics with imports (E402) and
 # pre-load names that Cell 3 student templates uncomment later (F401).
 "notebooks/*.ipynb" = ["E402", "F401"]
+# An evidence record: the program as it ran in Colab, kept byte-identical to the
+# notebook cell it was written from (its sha256 is in the folder's README).
+".proj.specs/0001-tool-rename-phase-one/reports/T-0020-colab/t0020_colab.py" = ["E401"]

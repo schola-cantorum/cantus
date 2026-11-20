@@ -228,7 +228,7 @@ def test_the_invariant_ignores_backticked_filenames() -> None:
 def test_the_invariant_ignores_backticked_non_tools() -> None:
     """Exception types and protocol names in the same section are not claims."""
     synthetic = (
-        "- **Naming** — protocol classes stay unprefixed (`Skill`, `Memory`).\n"
+        "- **Naming** — protocol classes stay unprefixed (`Tool`, `Memory`).\n"
         "- **No silent fallback** — prefer raising `ImportError` or `TypeError`.\n"
     )
 

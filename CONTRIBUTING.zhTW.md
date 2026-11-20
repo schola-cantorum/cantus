@@ -29,7 +29,7 @@ Cantus 是一套教學框架，主要為了在 Google Colab 上教學生組裝 L
 - **Python**：black（line-length 100）+ ruff（default rules）。CI 會跑 lint，PR 必須過。
 - **Type hints**：所有 public API 必須有完整 type hint；internal helper 視情況。
 - **Docstring**：所有 public function/class 用 Google-style docstring；至少含 summary、Args、Returns。
-- **命名**：protocol class 維持無前綴形式（`Skill`、`Analyzer`、`Validator`、`Workflow`、`Memory`、`Agent`），不要加 `Cantus` 前綴。
+- **命名**：protocol class 維持無前綴形式（`Tool`、`Analyzer`、`Validator`、`Memory`、`Agent`），不要加 `Cantus` 前綴。
 - **No silent fallback**：寧可 raise `ImportError`、`TypeError`、`ValueError` 也不要靜默 degrade。
 
 ## Scope（什麼 PR 會被拒）
@@ -37,14 +37,14 @@ Cantus 是一套教學框架，主要為了在 Google Colab 上教學生組裝 L
 - 增加新的第三方依賴 —— 要先在 issue 討論
 - 與 Colab 教學情境無關的功能（雲端 deploy、production-grade serving 等）
 - 把現有 protocol 重新設計（若你想加擴充協定，請寫 RFC issue 先；長遠目標是另開 `schola-cantorum/discantus`）
-- 對 protocol class 名加前綴（如 `CantusSkill`） —— 名稱已穩定
+- 對 protocol class 名加前綴（如 `CantusTool`） —— 名稱已穩定
 
 ## Tests
 
 ```bash
 pip install -e '.[dev]'
 pytest                          # 全部
-pytest tests/test_skill.py      # 單一檔
+pytest tests/test_tool.py       # 單一檔
 pytest -k 'not loader'          # 排除某些
 ```
 

@@ -28,7 +28,7 @@ A table of contents for everything under `docs/`. New here? Start with the
 
 ## Protocols
 
-- [Skill](site/protocols/skill.md) — the Skill protocol
+- [Tool](site/protocols/tool.md) — the Tool protocol
 - [Memory](site/protocols/memory.md) — the Memory protocol
 - [Identity](site/protocols/identity.md) — Soul / identity
 - [Analyzer](site/protocols/analyzer.md) — the Analyzer hook helper

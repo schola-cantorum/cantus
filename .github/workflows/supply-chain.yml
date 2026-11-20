@@ -51,34 +51,9 @@ jobs:
             extras: "openhands"
             os: ubuntu-latest
             python: "3.12"
-            # pillow 12.3.0, all 42 fixed in 13.0.0 (T-0021, 2026-11-17).
-            # Unactionable inside `openhands>=1.16,<2`: openhands 1.16.0 (the
-            # newest) pins openhands-tools==1.21.0 -> browser-use>=0.8.0, and
-            # every browser-use 1.0.x, plus the browser-harness 0.1.13 it
-            # pulls, pins pillow==12.3.0. Forcing pillow>=13 falls back to
-            # browser-use 0.11.13 and downgrades anthropic/openai/google-genai
-            # for users. No cantus/ code imports pillow or browser-use, but
-            # users of this extra who run the OpenHands browser tool do reach
-            # pillow through it. Every ID, the CVEs included, is a Pillow-code
-            # advisory (OSV), not a bundled-library one; pip-audit matches IDs
-            # and aliases across all packages. Upstream: browser-use issue 4824.
-            # Scoped to this group so a pillow 12.3.0 in `main` or `mlx` still
-            # fails. `acknowledged_for` fails the job once the installed pillow
-            # is no longer 12.3.0: then delete both fields.
-            acknowledged_for: "pillow==12.3.0"
-            acknowledged: >-
-              PYSEC-2026-4326 PYSEC-2026-4327 PYSEC-2026-4328 PYSEC-2026-4329
-              PYSEC-2026-4330 PYSEC-2026-4331 PYSEC-2026-4332 PYSEC-2026-4333
-              PYSEC-2026-4334 PYSEC-2026-4335 PYSEC-2026-4336 PYSEC-2026-4337
-              PYSEC-2026-4338 PYSEC-2026-4339 PYSEC-2026-4340 PYSEC-2026-4341
-              PYSEC-2026-4342 PYSEC-2026-4343 PYSEC-2026-4363
-              CVE-2026-96638 CVE-2026-96640 CVE-2026-96778 CVE-2026-112390
-              CVE-2026-112391 CVE-2026-112393 CVE-2026-112395 CVE-2026-112399
-              CVE-2026-112400 CVE-2026-112401 CVE-2026-112404 CVE-2026-112406
-              CVE-2026-112891 CVE-2026-112892 CVE-2026-112893 CVE-2026-112894
-              CVE-2026-112895 CVE-2026-112897 CVE-2026-112899 CVE-2026-112900
-              CVE-2026-128066 CVE-2026-128067
-              GHSA-78g4-xqwv-q3g8
+            # No group-scoped acknowledgement: the 42 pillow 12.3.0 IDs that
+            # T-0021 acknowledged here were removed once this extra resolved
+            # pillow 13.0.0, which fixes them (T-0020, 2026-11-20).
           # Its environment marker restricts it to darwin/arm64, so on a Linux
           # runner this group would install nothing and audit nothing.
           - group: mlx
@@ -148,8 +123,8 @@ jobs:
       # It must name the exact version it was written for in
       # `acknowledged_for` (`<package>==<version>`); the step fails when a
       # different version is installed, so a lifted pin cannot leave stale
-      # IDs behind. As of T-0021 (2026-11-17) only `openhands` has one: 42
-      # pillow 12.3.0 IDs.
+      # IDs behind. As of 2026-11-20 no group has one: `openhands` carried 42
+      # pillow 12.3.0 IDs from T-0021 until the extra resolved pillow 13.0.0.
       #
       # Nothing outside these lists is acknowledged. A newly published advisory,
       # against any package in any of the three groups, still fails the job.

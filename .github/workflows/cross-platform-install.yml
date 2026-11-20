@@ -39,7 +39,7 @@ jobs:
         run: uv pip install --system .
 
       - name: Import smoke
-        run: python -c "from cantus import skill, Agent, load_chat_model"
+        run: python -c "from cantus import tool, Agent, load_chat_model"
 
       - name: Install cantus-agent[serve,openai]
         run: uv pip install --system ".[serve,openai]"

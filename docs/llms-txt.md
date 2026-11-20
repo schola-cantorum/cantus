@@ -29,10 +29,10 @@ docs/api/              ←  完整文件樹，給 NotebookLM / IDE / 學生長�
 
 1. 老師（或想要嘗試 LLM-assisted authoring 的學生）打開外部 LLM 的對話介面
 2. 把 `llms.txt` 整檔貼進去
-3. 第二則訊息要求：「Write a `@skill` named `get_weather` that takes a `city: str` and returns the forecast」
+3. 第二則訊息要求：「Write a `@tool` named `get_weather` that takes a `city: str` and returns the forecast」
 4. 期待回傳的程式碼能滿足以下 4 個條件
    - `ast.parse(code)` 不報 `SyntaxError`
-   - 含 `@skill` decorator
+   - 含 `@tool` decorator
    - 函式參數有 type 標註、有回傳值標註
    - docstring 含 Google-style `Args:` 區塊
 
@@ -44,7 +44,7 @@ docs/api/              ←  完整文件樹，給 NotebookLM / IDE / 學生長�
 | ------------- | ----------------------------------------------------------------- |
 | 第一行        | `# cantus` H1 標題                                           |
 | 第二非空行    | Markdown blockquote 一句話摘要                                    |
-| 各 protocol   | 至少一個 code block 涵蓋 Skill / Memory；hook helper（Analyzer / Validator）與 cantus.workflows building block 至少各一例 |
+| 各 protocol   | 至少一個 code block 涵蓋 Tool / Memory；hook helper（Analyzer / Validator）與 cantus.workflows building block 至少各一例 |
 | Token budget  | `tiktoken cl100k_base` ≤ 8000 tokens                              |
 | 排版          | 純 Markdown，無 HTML、無外部圖片                                  |
 

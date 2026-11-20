@@ -29,7 +29,7 @@ For "the framework is behaving oddly" reports, first confirm that the Cantus ver
 - **Python** — `ruff`, with the rule set declared explicitly under `[tool.ruff.lint]` in `pyproject.toml` rather than left to ruff's default, which widens between releases. CI runs `ruff check` over the repository as a separate lint job on every pull request, and PRs must pass it. Formatting is not enforced by any tool; match the surrounding code.
 - **Type hints** — every public API must carry complete type hints. Internal helpers may carry partial hints when appropriate.
 - **Docstrings** — every public function and class uses a Google-style docstring with at least a summary, `Args`, and `Returns`.
-- **Naming** — protocol classes stay unprefixed (`Skill`, `Analyzer`, `Validator`, `Workflow`, `Memory`, `Agent`). Do not add a `Cantus` prefix.
+- **Naming** — protocol classes stay unprefixed (`Tool`, `Analyzer`, `Validator`, `Memory`, `Agent`). Do not add a `Cantus` prefix.
 - **No silent fallback** — prefer raising `ImportError`, `TypeError`, or `ValueError` over silently degrading.
 
 ## Pre-commit hooks
@@ -46,14 +46,14 @@ pre-commit install
 - Adding a new third-party dependency without a prior issue discussion.
 - Functionality unrelated to the Colab teaching context (cloud deployment, production-grade serving, and so on).
 - Redesigning an existing protocol. If you want an extension protocol, file an RFC issue first; the long-term home for that work is a separate `schola-cantorum/discantus` repository.
-- Adding a prefix to a protocol class name (for example `CantusSkill`). Names are stable.
+- Adding a prefix to a protocol class name (for example `CantusTool`). Names are stable.
 
 ## Tests
 
 ```bash
 pip install -e '.[dev]'
 pytest                          # everything
-pytest tests/test_skill.py      # a single file
+pytest tests/test_tool.py       # a single file
 pytest -k 'not loader'          # exclude a pattern
 ```
 

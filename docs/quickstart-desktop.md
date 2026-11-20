@@ -33,12 +33,12 @@ $env:OPENAI_API_KEY = "sk-..."
 set OPENAI_API_KEY=sk-...
 ```
 
-### 3. Define a skill
+### 3. Define a tool
 
 ```python
-from cantus import skill, Agent, ChatModelAsHandle, load_chat_model
+from cantus import tool, Agent, ChatModelAsHandle, load_chat_model
 
-@skill
+@tool
 def add(a: int, b: int) -> int:
     """Add two integers."""
     return a + b
@@ -48,7 +48,7 @@ def add(a: int, b: int) -> int:
 
 ```python
 chat = load_chat_model("openai/gpt-4o-mini")
-agent = Agent(model=ChatModelAsHandle(chat))
+agent = Agent(model=ChatModelAsHandle(chat), tools=[add])
 ```
 
 `load_chat_model("openai/gpt-4o-mini")` reads `OPENAI_API_KEY` from the environment and routes through the OpenAI Chat Completions API. The same factory accepts `"anthropic/claude-..."`, `"google/gemini-..."`, and `"groq/..."` once you install the matching extras (`uv pip install "cantus-agent[anthropic,google,groq]"`). `Agent` only speaks the Tier 1 `.generate(prompt) -> str` protocol, so a `ChatModel` must be wrapped in `ChatModelAsHandle` before it is passed in.
@@ -61,7 +61,7 @@ final = state.stream[-1]
 print(getattr(final, "answer", final))
 ```
 
-You should see the agent invoke the `add` skill and print `42`.
+You should see the agent's reply. With a capable model it invokes the `add` tool first and answers `42`.
 
 ## Serve via CLI
 
@@ -69,7 +69,7 @@ Once your `Registry` is exposed as a top-level binding in a module, you can star
 
 ```bash
 pip install cantus-agent[serve]
-cantus serve --host 0.0.0.0 --port 8765 --registry-import myskills.app:registry
+cantus serve --host 0.0.0.0 --port 8765 --registry-import mytools.app:registry
 ```
 
 The CLI accepts overrides for `--host`, `--port`, `--auth-mode {none,bearer,api-key}`, `--dashboard` / `--no-dashboard`, and one or more `--channels DOTTED_PATH`. Unset flags fall through to `CANTUS_SERVE_*` env vars and finally to `Settings` defaults; press `Ctrl-C` for a graceful uvicorn shutdown.
@@ -84,7 +84,7 @@ cloudflared tunnel --url http://127.0.0.1:8765
 
 `cloudflared` prints a randomly-assigned `https://<slug>.trycloudflare.com` URL. Press `Ctrl-C` to tear the tunnel down — the URL stops resolving immediately.
 
-**Security note.** The quick-tunnel mode shown above is unauthenticated — anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The same applies to the read-only `/introspection` endpoints, which are enabled by default and are equally reachable over the tunnel — `cantus serve --auth-mode bearer` protects them alongside `/skills` (with `auth_mode=none`, the server prints a startup warning that `/introspection` is open). The quick-tunnel mode persists no token to disk; if you upgrade to a named tunnel later, the resulting `cert.pem` MUST NOT be committed to version control (it is the long-lived credential for your tunnel namespace).
+**Security note.** The quick-tunnel mode shown above is unauthenticated — anyone who learns the URL can hit your FastAPI app. Pair it with `cantus serve --auth-mode bearer` so callers must present a token, and rotate the token between sessions. The same applies to the read-only `/introspection` endpoints, which are enabled by default and are equally reachable over the tunnel — `cantus serve --auth-mode bearer` protects them alongside the `/tools` routes (with `auth_mode=none`, the server prints a startup warning that `/introspection` is open). The quick-tunnel mode persists no token to disk; if you upgrade to a named tunnel later, the resulting `cert.pem` MUST NOT be committed to version control (it is the long-lived credential for your tunnel namespace).
 
 ## Inspect with `cantus tui`
 
@@ -95,7 +95,7 @@ pip install cantus-agent[tui]
 cantus tui --url http://127.0.0.1:8765
 ```
 
-It opens five tabs — **Dashboard**, **Skills**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`; press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server: with `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment, and with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY` — treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (skill names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
+It opens five tabs — **Dashboard**, **Tools**, **Permissions**, **Dataflow**, and **Inspector** — switchable with keys `1`–`5`; press `Enter` on a row in the Sessions list to jump to that run's step trace in the Inspector. Match `--auth-mode` to the server: with `--auth-mode bearer` it reads `CANTUS_SERVE_BEARER_TOKEN` from the environment, and with `--auth-mode api-key` it reads `CANTUS_SERVE_API_KEY` — treat both as secrets and never log or share them. The workflow step trace shows only de-sensitized summaries (tool names, argument key names, and result/exception type names, never their values), so it is safe to inspect even on a tunnelled server. See [`docs/tui.md`](./tui.md) for the full pane reference.
 
 ## Local LLMs via Ollama
 
@@ -117,7 +117,7 @@ response = chat.chat([Message(role="user", content="hi")])
 print(response.message.content)
 ```
 
-Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training. Verify with a small `@skill` before relying on it.
+Tool-use availability is model-dependent: `OllamaChatModel.supports_tool_use` is `True` (inherited from `OpenAIChatModel`), but whether a particular Ollama model actually supports OpenAI-style function calling depends on that model's training; check it with a small `chat(..., tools=[...])` call before relying on it. An agent's `@tool` tools do not use provider function calling.
 
 ## Local LLMs via MLX (Apple Silicon)
 
